@@ -132,12 +132,13 @@
     "largestGap": "key remapping, leg animation, cup variety"
   },
   "performance": {
-    "fps": 75,
-    "frameTimeMs": 13.3,
-    "p99Ms": 18.1,
-    "drawCalls": 14,
-    "triangles": 5594,
-    "status": "baseline_measured_2026-09-13"
+    "fps": 68.9,
+    "frameTimeMs": 14.6,
+    "p95Ms": 15.1,
+    "worstMs": 15.6,
+    "drawCalls": 494,
+    "triangles": 67134,
+    "status": "mid_race_measured_2026-09-13 (busiest scene; baseline was 75fps/13.3ms on the empty shell)"
   },
   "tests": {
     "status": "not_run",
@@ -166,7 +167,10 @@
     "2026-09-13: baseline perf 75fps avg13.3ms p99 18.1ms 14 draws 5.6k tris (measured while driving)",
     "2026-09-13: art direction set \u00e2\u20ac\u201d 3 Grok concepts Selected (A rounded canonical / B square heavy / C wedge fast)",
     "2026-09-13: slice critic FAIL 4/10 \u00e2\u2020\u2019 fix pass: visible walls, wall contact-episode, steer ramp, boost bleed, cam shake",
-    "2026-09-13: wall slide verified live (impact 15.5 \u00e2\u2020\u2019 slide 24.3 \u00e2\u2020\u2019 release 28 m/s); road winding + z-fight fixed"
+    "2026-09-13: wall slide verified live (impact 15.5 \u00e2\u2020\u2019 slide 24.3 \u00e2\u2020\u2019 release 28 m/s); road winding + z-fight fixed",
+    "2026-09-13: wave4 critic3 PASS 8/10 — all HIGH/LOW defects fixed + committed (ee3770f)",
+    "2026-09-13: NN wall-clip resolved — V-kink (R≈6/110°) softened to ~55° lean, AI braking horizon 1.3s/6 probes; 0 hits all tracks (3aaabcd)",
+    "2026-09-13: final regression sweep — full GP autopilot (standings ★BOT-A2 24pts, clean title re-arm), 68.9fps p95 15.1ms, 0 console errors, build clean"
   ],
   "blockers": [],
   "milestones": [
@@ -188,11 +192,15 @@
     "typecheck": "clean",
     "build": "clean",
     "perf": {
-      "fps": 75,
-      "avgMs": 13.3,
-      "draws": 368,
-      "tris": 57560
-    }
+      "fps": 68.9,
+      "avgMs": 14.6,
+      "p95Ms": 15.1,
+      "draws": 494,
+      "tris": 67134
+    },
+    "console": "0 errors / 0 warnings across full GP session",
+    "aiSmoke": "all 3 tracks, all skills, 3 laps, 0 wall hits (PG 22.69/19.22/18.12, SR 26.42/22.46/21.62, NN 25.54/21.61/20.90)",
+    "grandPrix": "full 3-leg autopilot pass verified — points accumulate, final standings sorted, champion starred, title re-arms fresh cup"
   },
   "completedUnits": [
     "AI-001-integration",

@@ -69,16 +69,19 @@ None.
 
 ## Build State
 
-- `tsc --noEmit`: clean; `vite build`: clean.
-- Live: 4 racers on grid, AI laps at ~18-22 s, collision verified, position
-  HUD live (P n/N). Draws ~160-400 / tris ~35-58k @ 73-75 fps.
-- AI smoke post-continuity-refactor, all 3 tracks: PG identical baseline
-  (3 skills, 0 wall hits, 22.22/18.72/17.72); SR clean (0 hits, best
-  21.5); NN all laps complete — 3-4 wall hits at frac ~0.61 fast
-  transition on higher skills (first NN baseline; tuning target, not a
-  foldback defect). Traffic lock 9.2/5.6/15.3% (no deadlocks).
-- Latest commit: critic3 fix batch (continuity lookups, GP cup state,
-  pause-leak, stuck hint, GP points display).
+- `tsc --noEmit`: clean; `vite build`: clean (677 KB → 177 KB gzip).
+- Live: 4 racers on grid, AI laps ~18-27 s depending on track, collision
+  verified, position HUD live. Mid-race 68.9 fps / p95 15.1 ms /
+  worst 15.6 ms at 494 draws / 67k tris — steady, no stutter.
+- AI smoke all 3 tracks CLEAN — 0 wall hits, all skills, 3 laps:
+  PG 22.69/19.22/18.12 · SR 26.42/22.46/21.62 · NN 25.54/21.61/20.90.
+  NN V-kink (R≈6/110° at frac ~0.58) softened to a ~55° lean +
+  braking horizon 1.3 s / 6 curvature probes → the 3-4 hit clip is gone.
+- Full GP autopilot pass verified: leg points accumulate, final
+  standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
+- Console audit: 0 errors / 0 warnings across the GP session.
+- Latest commits: `ee3770f` critic3 fix batch → `3aaabcd` NN geometry +
+  AI braking horizon.
 
 ---
 
@@ -112,6 +115,10 @@ None.
   (pause-gated + pause cleared on phase transition), D4 wall-pin
   recovery undiscoverable (STUCK? ⌫/S hint after 2 s <1.5 m/s under
   throttle), D5 leg results "0 pts" (now "+earned → total").
+- Final regression sweep: NN wall-clip watch item RESOLVED (V-kink
+  softened + longer braking horizon — 0 hits all tracks); full GP on
+  autopilot end-to-end (standings/champion/title re-arm correct);
+  68.9 fps mid-race; 0 console errors; build clean.
 
 ---
 

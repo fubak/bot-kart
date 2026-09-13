@@ -191,3 +191,35 @@ full Grand Prix, 20-item verified-working list, clean console).
 **AI smoke post-refactor (all 3 tracks):** PG identical baseline
 (0 hits, 22.22/18.72/17.72); SR 0 hits (best 21.5); NN 3 laps all
 skills, 3-4 hits at frac ~0.61 (first NN baseline — watch item).
+
+## Wave 4 — NN wall-clip fix + final regression sweep
+
+**NN geometry fix (commit `3aaabcd`):** the frac ~0.58 control point
+forced an R≈6/110° direction reversal that the AI's 1.1 s braking
+horizon could not anticipate. Respread over two points → ~55° lean
+(R 11-14) into an R 17-36 sweeper (`nn-switchback-fixed.png`,
+`nn-rightlean.png`); braking horizon 1.1→1.3 s and curvature probes
+3→6 (mirrored in `__gauntlet/autopilot.js`); gravel zone 1 tightened
+to end before the new right-lean's outside edge.
+
+**AI smoke — all clean (3 laps, all skills, 0 wall hits):**
+- PG: 22.69 / 19.22 / 18.12 s
+- SR: 26.42 / 22.46 / 21.62 s
+- NN: 25.54 / 21.61 / 20.90 s (faster than the clipped baseline)
+
+**Full Grand Prix on autopilot (all 3 legs, live browser):**
+- Leg 1 PG: BOT-A2 1:01.27 (+10), BOT-B (+7), BOT-C (+5), YOU (+3)
+- Leg 2 SR: BOT-C 1:11.69 (+10→15), cumulative 17/15/12/6
+- Leg 3 NN: BOT-B 1:13.91 (+10→22); N → FINAL STANDINGS sorted
+  24/22/20/9, ★ BOT-A2 champion (`gp-champion.png`)
+- Q → title shows fresh "GRAND PRIX — leg 1/3" (no leg-4/3 leak)
+- Autopilot wall-contact events reflect the simple harness driver;
+  the shipped AI's 0-hit smoke results are the regression metric.
+
+**Performance (mid-race, busiest scene):** 68.9 fps avg, p50 14.6 ms,
+p95 15.1 ms, worst 15.6 ms, 494 draws / 67k tris — steady pacing,
+no stutter; comfortably above the 60 fps floor.
+
+**Console audit:** 0 errors / 0 warnings across the full GP session.
+**Build:** `tsc --noEmit` clean; `vite build` clean (677 KB → 177 KB
+gzip; >500 kB chunk advisory is Three.js in the main bundle).
