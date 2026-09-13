@@ -580,3 +580,14 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   auto-countdown; leg 3 shows final standings. HUD shows `GP n/3`.
 - **Largest Gap:** no cup-selection (fixed order); no difficulty setting;
   abandoning mid-cup discards standings silently.
+
+### VFX-011 — Night headlights
+
+- **Domain:** VFX/Track
+- **Status:** Integrated
+- **Evidence:** `wave4/night-headlights.png` — `theme.night` flag;
+  emissive lamp quads on every kart's nose + a real SpotLight beam on
+  the player's kart (one extra light, cheap). Night GO shot shows lamps
+  on all 4 chassis + beam lighting the road ahead.
+- **Largest Gap:** rival karts have lamps but no beams (perf budget);
+  beam doesn't swing with steering yet (fixed to kart forward).

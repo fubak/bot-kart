@@ -27,6 +27,8 @@ export interface TrackLayout {
     hemiSky?: number;
     hemiGround?: number;
     hemiIntensity?: number;
+    /** Night circuits: karts run headlights (emissive lamps + beam). */
+    night?: boolean;
   };
 }
 
@@ -150,6 +152,7 @@ export const TRACKS: readonly TrackLayout[] = [
       hemiSky: 0x4a5e92,
       hemiGround: 0x2a3828,
       hemiIntensity: 1.35,
+      night: true,
     },
   },
 ];

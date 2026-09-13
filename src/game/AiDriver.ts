@@ -16,10 +16,13 @@ import type { Track } from './Track';
 
 export class AiDriver {
   /** 0.8 (cautious) … 1.0 (baseline) … 1.1 (hot). */
-  private skill: number;
+  private skillN_: number;
+  get skill(): number {
+    return this.skillN_;
+  }
   /** Difficulty select scales skill at runtime (options menu). */
   setSkill(v: number): void {
-    this.skill = THREE.MathUtils.clamp(v, 0.8, 1.1);
+    this.skillN_ = THREE.MathUtils.clamp(v, 0.8, 1.1);
   }
 
   private driftTime = 0;
@@ -41,7 +44,7 @@ export class AiDriver {
      *  the cheeky shortcut-taker (slower surface, shorter path). */
     takesShortcuts = false,
   ) {
-    this.skill = THREE.MathUtils.clamp(skill, 0.8, 1.1);
+    this.skillN_ = THREE.MathUtils.clamp(skill, 0.8, 1.1);
     this.lineOffset = THREE.MathUtils.clamp(lineOffset, -3.5, 3.5);
     this.takesShortcuts = takesShortcuts;
   }

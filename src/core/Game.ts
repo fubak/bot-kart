@@ -318,6 +318,10 @@ export class Game {
     this.hemi.color.set(th.hemiSky ?? 0xbfd9ff);
     this.hemi.groundColor.set(th.hemiGround ?? 0x3a5f3a);
     this.hemi.intensity = th.hemiIntensity ?? 0.9;
+    // Night circuits run headlights: lamp quads on every kart, a real
+    // beam only on the player (one extra light stays cheap).
+    this.kart.setNight(!!th.night, true);
+    for (const k of this.aiKarts) k.setNight(!!th.night);
 
     const spawn = this.track.spawn();
     this.kart.reset(spawn.position, spawn.heading);

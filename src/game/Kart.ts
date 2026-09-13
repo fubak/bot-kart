@@ -43,6 +43,10 @@ export class Kart {
   celebrating = false;
   /** Finish position (1 = winner) — celebration intensity varies. */
   finishRank = 0;
+  // Night-race headlights: emissive lamp quads + a beam spotlight
+  // (beam only on the player kart — one extra light is cheap).
+  private readonly headlamps: THREE.Object3D[] = [];
+  private headlight?: THREE.SpotLight;
   /** True while a spin-out is in effect (item hits) — QA/AI read it. */
   isSpinning = false;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
@@ -112,6 +116,17 @@ export class Kart {
     this.proceduralBody.push(chassis, nose, engine);
     this.placeholderDriver.push(head, eyeL, eyeR);
     this.group.add(this.body);
+    // Headlight lamp quads — hidden until setNight(true). Parented to the
+    // body so they yaw/lean with the kart.
+    const lampGeo = new THREE.CircleGeometry(0.14, 10);
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
+    for (const x of [-0.42, 0.42]) {
+      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      lamp.position.set(x, 0.34, -KART.length / 2 - 0.56);
+      lamp.visible = false;
+      this.body.add(lamp);
+      this.headlamps.push(lamp);
+    }
     this.loadAsset();
     this.loadDriver();
 
@@ -222,6 +237,22 @@ export class Kart {
       undefined,
       (err) => console.warn('[kart] driver GLB failed:', err),
     );
+  }
+
+  /** Night mode: lamp quads glow on every kart; `beam` also mounts a real
+   *  spotlight ahead (player kart only — one extra light stays cheap). */
+  setNight(on: boolean, beam = false): void {
+    for (const l of this.headlamps) l.visible = on;
+    if (on && beam && !this.headlight) {
+      this.headlight = new THREE.SpotLight(0xffeecc, 60, 55, 0.5, 0.5, 1.6);
+      this.headlight.position.set(0, 1.4, -1.2);
+      this.headlight.target.position.set(0, 0, -14);
+      this.group.add(this.headlight, this.headlight.target);
+    } else if (!on && this.headlight) {
+      this.group.remove(this.headlight, this.headlight.target);
+      this.headlight.dispose();
+      this.headlight = undefined;
+    }
   }
 
   get speed(): number {
