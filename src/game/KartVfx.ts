@@ -94,6 +94,20 @@ export class KartVfx {
     this.emit(pos, v, color, 0.28 + Math.random() * 0.15, 2.5, 2, 0.25);
   }
 
+  /** Finish celebration — multi-colored confetti fountain over the kart. */
+  confetti(pos: THREE.Vector3): void {
+    const palette = [0xff4a6a, 0x40c8ff, 0xffd54a, 0x7aff6a, 0xc07aff];
+    for (let i = 0; i < 26; i++) {
+      const c = new THREE.Color(palette[i % palette.length]);
+      const v = new THREE.Vector3(
+        (Math.random() - 0.5) * 6,
+        7 + Math.random() * 5,
+        (Math.random() - 0.5) * 6,
+      );
+      this.emit(pos, v, c, 1.2 + Math.random() * 0.8, 1.2, -12, 1.4);
+    }
+  }
+
   /** Wall-grind chips — pale debris kicked off the barrier. */
   wallChips(pos: THREE.Vector3, inward: THREE.Vector3): void {
     const v = inward.clone().multiplyScalar(3).setY(2);

@@ -41,6 +41,7 @@ export class Game {
   private lastMs = 0;
   private simTime = 0;
   private paused = false;
+  private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -101,6 +102,7 @@ export class Game {
       }
       if (e.code === 'Space' && !this.paused) this.items.use(0, this.simTime);
       if (e.code === 'KeyR') {
+        this.celebrated.length = 0;
         this.paused = false; // restart always unfreezes (kills P→R soft-lock)
         const s = this.track.spawn();
         this.kart.reset(s.position, s.heading);
@@ -175,6 +177,14 @@ export class Game {
       this.items.update(this.simTime, SIM.fixedDt);
       const positions = [this.kart.position, ...this.aiKarts.map((k) => k.position)];
       this.race.update(positions, this.simTime, SIM.fixedDt);
+      // Finish celebration: confetti fountain the moment each racer crosses.
+      const karts = [this.kart, ...this.aiKarts];
+      for (let i = 0; i < this.race.racers.length; i++) {
+        if (this.race.racers[i].finished && !this.celebrated[i]) {
+          this.celebrated[i] = true;
+          karts[i].vfx.confetti(karts[i].position);
+        }
+      }
       this.simTime += SIM.fixedDt;
       this.accumulator -= SIM.fixedDt;
     }
