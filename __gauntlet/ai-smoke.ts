@@ -3,7 +3,7 @@ import type { ControlState } from '../src/core/Input';
 import { AiDriver } from '../src/game/AiDriver';
 import { Kart } from '../src/game/Kart';
 import { Race } from '../src/game/Race';
-import { Track } from '../src/game/Track';
+import { Track, TRACKS } from '../src/game/Track';
 
 // Headless smoke: run AiDriver around Proving Grounds at fixed dt and report
 // laps / wall hits / lateral excursion / drift usage per skill level.
@@ -29,8 +29,15 @@ interface RunResult {
   wrongWaySeen: number; // steps with wrongWay flag
 }
 
+// ?track=N selects the layout (default 0 = Proving Grounds). Lets the
+// smoke suite cover every circuit, not just the first.
+const TRACK_IDX = Math.min(
+  TRACKS.length - 1,
+  Math.max(0, parseInt(new URLSearchParams(location.search).get('track') ?? '0', 10) || 0),
+);
+
 function runOne(skill: number, simSeconds: number): RunResult {
-  const track = new Track();
+  const track = new Track(TRACKS[TRACK_IDX]);
   const kart = new Kart();
   const ai = new AiDriver(skill);
   const race = new Race(track);
@@ -107,7 +114,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
 /** Traffic regression: 3 karts, mixed skills, count time welded <2.75 m
  *  (the pair-lock defect the critic found — should be rare, not ~90%). */
 function runTraffic(simSeconds: number) {
-  const track = new Track();
+  const track = new Track(TRACKS[TRACK_IDX]);
   const karts = [new Kart(), new Kart(), new Kart()];
   const drivers = [new AiDriver(0.95), new AiDriver(1.0), new AiDriver(1.05)];
   const spawn = track.spawn();
@@ -144,7 +151,7 @@ function runTraffic(simSeconds: number) {
 try {
   const results = [0.85, 1.0, 1.1].map((s) => runOne(s, 90));
   const traffic = runTraffic(60);
-  const json = JSON.stringify({ solo: results, traffic }, null, 2);
+  const json = JSON.stringify({ track: TRACKS[TRACK_IDX].name, solo: results, traffic }, null, 2);
   const el = document.getElementById('out');
   if (el) el.textContent = json;
   console.log('[ai-smoke]', json);
