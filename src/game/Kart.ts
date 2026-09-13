@@ -72,6 +72,9 @@ export class Kart {
   private readonly tint: THREE.Color | null;
   private readonly botUrl: string;
   private readonly kartUrl: string;
+  // Articulated driver limbs (seated-bot GLBs ship a full node rig):
+  // base rotation cached at load so emotes apply as additive deltas.
+  private readonly limbs: Record<string, { node: THREE.Object3D; base: THREE.Euler }> = {};
 
   /** tint multiplies the GLB materials — cheap rival differentiation until
    *  distinct Bot B/C assets land. */
@@ -201,6 +204,10 @@ export class Kart {
         // Seat-base origin → place at cockpit floor, slightly behind center.
         bot.position.set(0, 0.62, 0.28);
         for (const o of this.placeholderDriver) o.visible = false;
+        for (const name of ['arm_l', 'arm_r', 'head']) {
+          const node = bot.getObjectByName(name);
+          if (node) this.limbs[name] = { node, base: node.rotation.clone() };
+        }
         this.driver.add(bot);
       },
       undefined,
@@ -536,6 +543,13 @@ export class Kart {
     // Driver expressiveness: idle bob, lean with steering, eyes track the
     // slide, flinch back on impacts — sells the bots as characters.
     const t = this.lastSimTime + this.driverPhase;
+    // Limb emotes — additive deltas on the rig's cached base pose:
+    //   celebrating → right arm pumps the air
+    //   spinning    → both arms flail
+    //   steering    → head looks into the turn
+    const armL = this.limbs['arm_l'];
+    const armR = this.limbs['arm_r'];
+    const headN = this.limbs['head'];
     if (this.celebrating) {
       // Victory bounce: big happy hops + side-to-side arm-rock — sells the
       // finish moment (critic: bots never emoted).
@@ -543,7 +557,30 @@ export class Kart {
       this.driver.rotation.z = Math.sin(t * 7) * 0.35;
       this.driver.rotation.y = Math.sin(t * 3.5) * 0.5;
       this.driver.rotation.x = -0.15;
+      if (armR) {
+        armR.node.rotation.set(
+          armR.base.x - 1.9 + Math.sin(t * 9) * 0.45,
+          armR.base.y,
+          armR.base.z,
+        );
+      }
+      if (armL) armL.node.rotation.set(armL.base.x - 1.4, armL.base.y, armL.base.z + Math.sin(t * 9 + 1) * 0.3);
       return;
+    }
+    if (this.isSpinning) {
+      if (armL) armL.node.rotation.set(armL.base.x - 2.2, armL.base.y, armL.base.z + Math.sin(t * 30) * 0.5);
+      if (armR) armR.node.rotation.set(armR.base.x - 2.2, armR.base.y, armR.base.z - Math.sin(t * 30) * 0.5);
+      if (headN) headN.node.rotation.set(headN.base.x + 0.3, headN.base.y + Math.sin(t * 20) * 0.4, headN.base.z);
+    } else {
+      if (armL) armL.node.rotation.copy(armL.base);
+      if (armR) armR.node.rotation.copy(armR.base);
+      // Head tracks the steering — the driver looks into the corner.
+      if (headN)
+        headN.node.rotation.set(
+          headN.base.x,
+          headN.base.y - this.steerVisual * 0.45 - slip * 0.25,
+          headN.base.z,
+        );
     }
     this.driver.position.y =
       Math.sin(t * 2.3) * 0.022 + (this.onGravel ? Math.sin(t * 43) * 0.02 : 0);
