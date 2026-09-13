@@ -86,3 +86,17 @@ errors.
 **Post-shortcut AI smoke:** solo 0.85/1.0/1.1 → 3 laps each, 0 wall hits,
 best laps 22.02/18.65/17.73 (identical to pre-shortcut baseline);
 traffic lock 7.8% unchanged.
+
+## Wave-4 round 2 (pacing + items)
+
+- **Rubber-band** — AI paceAssist vs player score; leaders clamp -0.05,
+  trailing symmetric +0.08 cap. Live race: AI pack compressed to 14
+  score-points apart at lap 3.
+- **Ink item** — 5th kind; blooper semantics verified (all leaders
+  inkedUntil+4s, shield absorbs, AI wander, player splat overlay
+  `wave4/ink-splat.png`).
+- **Celebration** — drivers bounce 0.012→0.12 + arm-rock on finish;
+  all 3 AI confirmed `celebrating=true` post-race.
+- **Gauntlet race (rubber-band build):** P1 BOT-B 1:01.10 · P2 BOT-C
+  1:04.75 · P3 BOT-A2 1:08.68 · P4 YOU 1:23.13 — `wave4/results-rb.png`;
+  75 fps, 160 draws, 34.5k tris, all celebrating.
