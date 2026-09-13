@@ -45,11 +45,13 @@ export class Kart {
   private steerVisual = 0;
   private lastDt = 0;
   private readonly tint: THREE.Color | null;
+  private readonly botUrl: string;
 
   /** tint multiplies the GLB materials — cheap rival differentiation until
    *  distinct Bot B/C assets land. */
-  constructor(tint?: THREE.ColorRepresentation) {
+  constructor(tint?: THREE.ColorRepresentation, botUrl?: string) {
     this.tint = tint === undefined ? null : new THREE.Color(tint);
+    this.botUrl = botUrl ?? botGlbUrl;
     this.body = new THREE.Group();
 
     const mat = (c: number) =>
@@ -157,7 +159,7 @@ export class Kart {
   /** Grok Bot A GLB as the driver — authored seated, origin at seat base. */
   private loadDriver(): void {
     new GLTFLoader().load(
-      botGlbUrl,
+      this.botUrl,
       (gltf) => {
         const bot = gltf.scene;
         const box = new THREE.Box3().setFromObject(bot);

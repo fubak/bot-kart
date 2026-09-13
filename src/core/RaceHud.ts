@@ -59,7 +59,12 @@ export class RaceHud {
         ? ''
         : `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}   P${pos}/${race.racers.length}`;
 
-    const cur = race.phase === 'racing' ? simTime - race.lapStart : 0;
+    const cur =
+      race.phase === 'finished'
+        ? race.lastLapTime
+        : race.phase === 'racing'
+          ? simTime - race.lapStart
+          : 0;
     this.timesEl.innerHTML =
       `TIME ${fmt(race.raceTime)}<br>` +
       `LAP&nbsp;&nbsp;${fmt(cur)}<br>` +

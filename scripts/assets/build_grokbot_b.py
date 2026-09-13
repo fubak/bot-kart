@@ -48,6 +48,7 @@ def mat(name, base, rough=0.5, metal=0.0, emit=None, es=0.0):
     if emit:
         b.inputs['Emission Color'].default_value = (*emit, 1)
         b.inputs['Emission Strength'].default_value = es
+    m.diffuse_color = (*base, 1)              # viewport display color
     return m
 
 GUN  = mat('gunmetal',   (0.185, 0.205, 0.235), rough=0.42, metal=0.55)

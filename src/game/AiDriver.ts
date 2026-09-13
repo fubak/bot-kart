@@ -22,9 +22,18 @@ export class AiDriver {
   private recovering = false;
   private prevLateral = 0;
 
-  constructor(skill = 1.0) {
+  constructor(
+    skill = 1.0,
+    /** Preferred lateral line offset (m, + = left of centerline). Gives
+     *  each bot its own racing line so the field spreads and side-by-side
+     *  battles happen instead of single-file centerline trains. */
+    lineOffset = 0,
+  ) {
     this.skill = THREE.MathUtils.clamp(skill, 0.8, 1.1);
+    this.lineOffset = THREE.MathUtils.clamp(lineOffset, -3.5, 3.5);
   }
+
+  readonly lineOffset: number;
 
   /** Clear per-maneuver state (call on kart reset / race restart). */
   reset(): void {
@@ -79,10 +88,10 @@ export class AiDriver {
     // Far off-line → shorten lookahead to rejoin instead of cutting across.
     if (Math.abs(lateral) > AI.rejoinLateral) look *= AI.rejoinLookMul;
 
-    const toTarget = track
-      .lookaheadPoint(kart.position, look)
-      .sub(kart.position)
-      .setY(0);
+    const target = track.lookaheadPoint(kart.position, look);
+    // Shift the pursuit point onto this bot's preferred line.
+    target.addScaledVector(track.leftAt(track.nearestIndex(target)), this.lineOffset);
+    const toTarget = target.sub(kart.position).setY(0);
     if (toTarget.lengthSq() < 1e-6) return { ...idle, throttle: 1 };
     toTarget.normalize();
     const desiredHeading = Math.atan2(-toTarget.x, -toTarget.z);
