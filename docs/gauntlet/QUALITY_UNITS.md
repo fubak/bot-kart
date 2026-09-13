@@ -35,11 +35,14 @@ them in the actual running game; the Coordinator sequences them into waves.
 | TRACK-001 | Test track (Proving Grounds) | Fixed → Re-review | — |
 | MOVE-005 | Off-road terrain response | Planned | — |
 | MOVE-006 | Jump + airborne + landing | Planned | — |
-| MOVE-007 | Drift/boost feedback VFX | Planned | — |
-| RACE-001 | Checkpoints + lap counting | Planned | — |
-| RACE-002 | Race flow (countdown/finish) | Planned | — |
-| AI-001 | Opponent AI (racing line) | Planned | — |
-| HUD-001 | Race HUD (lap/position/time) | Planned | — |
+| MOVE-007 | Drift/boost feedback VFX | Built | — |
+| RACE-001 | Checkpoints + lap counting | Built | — |
+| RACE-002 | Race flow (countdown/finish) | Built | — |
+| AI-001 | Opponent AI (racing line) | In Progress | — |
+| HUD-001 | Race HUD (lap/position/time) | Built | — |
+| AUDIO-001 | Procedural SFX (engine/skid/boost/impact/UI) | Built | — |
+| ART-001 | Grok Bot A + Kart A (canonical assets) | Built | — |
+| TRACK-002 | Track readability pass 1 (scenery/dashes/gantry) | Built | — |
 
 ---
 
@@ -202,29 +205,45 @@ them in the actual running game; the Coordinator sequences them into waves.
 ### MOVE-007 — Drift/boost feedback VFX
 
 - **Domain:** VFX
-- **Status:** Planned
+- **Status:** Built (pre-critic)
+- **Builder:** Coordinator
 - **Dependencies:** MOVE-003
-- **Wave:** 2
-- **Spec:** Drift spark/tire-smoke intensity grows with charge tier (color
-  shift at tier 2); boost has exhaust burst + FOV kick readability.
+- **Wave:** 1+
+- **Spec:** Pooled additive particle system: drift sparks at rear wheels,
+  grey→amber→cyan by charge tier (player-facing charge readout); boost
+  exhaust flames; wall-grind chips. `src/game/KartVfx.ts`.
+- **Evidence:** `docs/gauntlet/evidence/wave1/vfx-drift2.png` — cyan tier-2
+  spark trail behind drifting kart
+- **Largest Gap:** sparks are chunky squares; no tire smoke yet.
 
 ### RACE-001 — Checkpoints + lap counting
 
 - **Domain:** Race rules
-- **Status:** Planned
+- **Status:** Built (verified live via teleport sweep)
+- **Builder:** Coordinator
 - **Dependencies:** TRACK-001
-- **Wave:** 2
-- **Spec:** Ordered checkpoints around the centerline; lap counted on start
-  line after all checkpoints; prevents shortcut lap-skips.
+- **Wave:** 1+
+- **Spec:** 8 ordered progress-index gates around the centerline; lap counts
+  only after all gates; monotonic unwrapped progress can't skip at speed;
+  wrong-way detection on sustained backward progress. `src/game/Race.ts`.
+- **Evidence:** eval trace progressIdx 782→990 → wrap → lap 1→2→3 →
+  'finished'; `race-finish.png` FINISH banner + lap times.
+- **Largest Gap:** no position tracking vs rivals (needs AI); wrong-way is
+  flag-only (no reset assist).
 
 ### RACE-002 — Race flow (countdown → finish)
 
 - **Domain:** Starting/finish sequence
-- **Status:** Planned
+- **Status:** Built
+- **Builder:** Coordinator
 - **Dependencies:** RACE-001
-- **Wave:** 2
-- **Spec:** 3-2-1-GO countdown with input lock; N-lap race ends at line with
-  result state; restartable.
+- **Wave:** 1+
+- **Spec:** 3-2-1-GO countdown (input locked), 3 laps, FINISH banner with
+  times + [R] restart. RaceHud DOM overlay.
+- **Evidence:** `race-countdown.png`, `race-finish.png` — LAP 1/3→3/3,
+  TIME/LAST/BEST, finish banner.
+- **Largest Gap:** no grid/rival start positions; finish is a banner, not a
+  results screen.
 
 ### AI-001 — Opponent AI (racing line)
 
@@ -238,10 +257,15 @@ them in the actual running game; the Coordinator sequences them into waves.
 ### HUD-001 — Race HUD
 
 - **Domain:** HUD
-- **Status:** Planned
+- **Status:** Built (needs rival position once AI lands)
+- **Builder:** Coordinator
 - **Dependencies:** RACE-001
-- **Wave:** 3
-- **Spec:** Lap counter, position, race time, speed; readable at speed.
+- **Wave:** 1+
+- **Spec:** Lap counter, race/lap/last/best times, countdown, wrong-way,
+  finish banner — DOM overlay readable at speed. `src/core/RaceHud.ts`.
+- **Evidence:** `race-countdown.png`, `race-finish.png`
+- **Largest Gap:** no position/P1-P8 display (needs AI); no minimap;
+  styling is plain.
 
 ---
 

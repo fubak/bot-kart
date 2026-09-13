@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CAMERA, KART } from '../config/tuning';
 import type { Kart } from './Kart';
+import type { Race } from './Race';
 
 // Chase camera: damped follow behind the kart, look-ahead along its heading,
 // speed/boost FOV response, wall-impact shake (consumes kart.lastWallHit).
@@ -13,21 +14,32 @@ export class ChaseCamera {
   private lastSeenHit = -1;
   private shake = 0;
   private readonly shakeOffset = new THREE.Vector3();
+  private introAngle = Math.PI * 0.5; // countdown orbit angle
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CAMERA.fovBase, aspect, 0.1, 500);
   }
 
-  update(dt: number, kart: Kart): void {
+  update(dt: number, kart: Kart, race?: Race): void {
     const fwd = kart.forward();
     const speedT = THREE.MathUtils.clamp(kart.speed / KART.maxSpeed, 0, 1);
     const dist = CAMERA.distance - CAMERA.distanceSpeedTrim * speedT;
-    const targetPos = kart.position
+    let targetPos = kart.position
       .clone()
       .addScaledVector(fwd, -dist)
       .add(new THREE.Vector3(0, CAMERA.height, 0));
 
-    if (!this.initialized) {
+    // Countdown intro: slow orbit that sweeps toward the chase position and
+    // hands over smoothly at GO (the normal lerp lands it behind the kart).
+    const inCountdown = !!race && race.phase === 'countdown';
+    if (inCountdown) {
+      this.introAngle += dt * 0.55;
+      const a = this.introAngle;
+      targetPos = kart.position
+        .clone()
+        .add(new THREE.Vector3(Math.sin(a) * 8.5, 2.6, Math.cos(a) * 8.5));
+      this.initialized = false;
+    } else if (!this.initialized) {
       this.camera.position.copy(targetPos);
       this.lookTarget.copy(kart.position).addScaledVector(fwd, CAMERA.lookAhead);
       this.initialized = true;
@@ -38,7 +50,9 @@ export class ChaseCamera {
     const kl = 1 - Math.exp(-CAMERA.lookDamp * dt);
     this.camera.position.lerp(targetPos, kp);
 
-    const wantLook = kart.position.clone().addScaledVector(fwd, CAMERA.lookAhead).add(new THREE.Vector3(0, 1.0, 0));
+    const wantLook = inCountdown
+      ? kart.position.clone().add(new THREE.Vector3(0, 1.0, 0))
+      : kart.position.clone().addScaledVector(fwd, CAMERA.lookAhead).add(new THREE.Vector3(0, 1.0, 0));
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
 

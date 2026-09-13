@@ -109,7 +109,7 @@ export class Game {
       this.accumulator -= SIM.fixedDt;
     }
 
-    this.chaseCam.update(frameDt, this.kart);
+    this.chaseCam.update(frameDt, this.kart, this.race);
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
     this.raceHud.update(this.race, this.kart, this.simTime);
