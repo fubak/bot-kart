@@ -351,6 +351,7 @@ export class Game {
         if (this.race.racers[i].finished && !this.celebrated[i]) {
           this.celebrated[i] = true;
           karts[i].celebrating = true;
+          karts[i].finishRank = this.race.positionOf(i);
           karts[i].vfx.confetti(karts[i].position);
         }
       }

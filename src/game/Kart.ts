@@ -41,6 +41,8 @@ export class Kart {
   inked = false;
   /** Set when this kart's racer finishes — driver celebrates. */
   celebrating = false;
+  /** Finish position (1 = winner) — celebration intensity varies. */
+  finishRank = 0;
   /** True while a spin-out is in effect (item hits) — QA/AI read it. */
   isSpinning = false;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
@@ -75,6 +77,8 @@ export class Kart {
   // Articulated driver limbs (seated-bot GLBs ship a full node rig):
   // base rotation cached at load so emotes apply as additive deltas.
   private readonly limbs: Record<string, { node: THREE.Object3D; base: THREE.Euler }> = {};
+  private readonly eyes: { node: THREE.Object3D; base: THREE.Vector3 }[] = [];
+  private blinkAt = 2 + Math.random() * 3; // next blink (sim seconds)
 
   /** tint multiplies the GLB materials — cheap rival differentiation until
    *  distinct Bot B/C assets land. */
@@ -207,6 +211,11 @@ export class Kart {
         for (const name of ['arm_l', 'arm_r', 'head']) {
           const node = bot.getObjectByName(name);
           if (node) this.limbs[name] = { node, base: node.rotation.clone() };
+        }
+        // Eye nodes for blinks — base scale cached to restore after each wink.
+        for (const name of ['eye_l', 'eye_r']) {
+          const node = bot.getObjectByName(name);
+          if (node) this.eyes.push({ node, base: node.scale.clone() });
         }
         this.driver.add(bot);
       },
@@ -551,20 +560,22 @@ export class Kart {
     const armR = this.limbs['arm_r'];
     const headN = this.limbs['head'];
     if (this.celebrating) {
-      // Victory bounce: big happy hops + side-to-side arm-rock — sells the
-      // finish moment (critic: bots never emoted).
-      this.driver.position.y = Math.abs(Math.sin(t * 7)) * 0.12;
-      this.driver.rotation.z = Math.sin(t * 7) * 0.35;
+      // Victory bounce — the winner (finishRank 1) pumps an arm high while
+      // other finishers give a smaller gracious hop with a dipped head.
+      const winner = this.finishRank === 1;
+      const amp = winner ? 1 : 0.5;
+      this.driver.position.y = Math.abs(Math.sin(t * 7)) * 0.12 * amp;
+      this.driver.rotation.z = Math.sin(t * 7) * 0.35 * amp;
       this.driver.rotation.y = Math.sin(t * 3.5) * 0.5;
-      this.driver.rotation.x = -0.15;
+      this.driver.rotation.x = winner ? -0.15 : 0.2; // losers nod forward
       if (armR) {
         armR.node.rotation.set(
-          armR.base.x - 1.9 + Math.sin(t * 9) * 0.45,
+          armR.base.x - (winner ? 1.9 : 0.6) + Math.sin(t * 9) * 0.45 * amp,
           armR.base.y,
           armR.base.z,
         );
       }
-      if (armL) armL.node.rotation.set(armL.base.x - 1.4, armL.base.y, armL.base.z + Math.sin(t * 9 + 1) * 0.3);
+      if (armL) armL.node.rotation.set(armL.base.x - (winner ? 1.4 : 0.3), armL.base.y, armL.base.z + Math.sin(t * 9 + 1) * 0.3 * amp);
       return;
     }
     if (this.isSpinning) {
@@ -581,6 +592,18 @@ export class Kart {
           headN.base.y - this.steerVisual * 0.45 - slip * 0.25,
           headN.base.z,
         );
+    }
+    // Blink: brief 120 ms eye squash every 2.5–5.5 s — bots feel alive.
+    const blinking = this.lastSimTime >= this.blinkAt;
+    for (const e of this.eyes) {
+      e.node.scale.set(
+        e.base.x,
+        blinking ? e.base.y * 0.12 : e.base.y,
+        e.base.z,
+      );
+    }
+    if (blinking && this.lastSimTime > this.blinkAt + 0.12) {
+      this.blinkAt = this.lastSimTime + 2.5 + Math.random() * 3;
     }
     this.driver.position.y =
       Math.sin(t * 2.3) * 0.022 + (this.onGravel ? Math.sin(t * 43) * 0.02 : 0);

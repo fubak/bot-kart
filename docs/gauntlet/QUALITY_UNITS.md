@@ -544,3 +544,14 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   `grok-kart-settings` in localStorage; verified reload restored
   SWITCHBACK RIDGE and applies volumes/reduced-motion on boot.
 - **Largest Gap:** no reset-to-defaults control in the menu.
+
+### CHAR-004 — Eye blink + rank-aware celebration
+
+- **Domain:** Characters
+- **Status:** Integrated
+- **Evidence:** `eye_l`/`eye_r` nodes cached at load; 120 ms blink squash
+  every 2.5–5.5 s per bot (verified scale.y oscillating 0.05↔0.01 live).
+  `kart.finishRank` set at finish — winner pumps arm high (−1.9 rad),
+  other finishers do a half-amplitude hop with a forward head-nod.
+- **Largest Gap:** blink is a uniform squash, no directional look; legs
+  still unanimated.
