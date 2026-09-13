@@ -606,3 +606,32 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   starts + drives at 28 m/s, P rejected without pausing.
 - **Largest Gap:** arrows/RSHIFT stay fixed alternates (no removal);
   gamepad binding is a later unit.
+
+### UI-009 — Persisted lap records
+
+- **Domain:** UI/Progression
+- **Status:** Integrated
+- **Evidence:** `wave4/lap-records-results.png` — per-track best-lap
+  records persisted under `grok-kart-records` (`{trackIdx: s}`).
+  Detection taps the post-`race.update` player lap-count delta, so
+  only gate-validated player laps can set records (no AI laps, no
+  teleports). Title shows `rec M:SS.ss` beside the track name,
+  `★ NEW LAP RECORD!` toasts ~2.5 s on a record crossing, results
+  star the player row `★REC`. Live-verified: seeded 999 s record
+  loads + persists across reload; three laps rewrote it
+  19.87→19.36→19.35; a ~140 s wall-pinned lap did NOT overwrite.
+- **Largest Gap:** no records reset in options; no per-difficulty
+  records; AI times aren't recorded (player-only by design).
+
+### UI-010 — Gamepad support
+
+- **Domain:** Input/Accessibility
+- **Status:** Integrated
+- **Evidence:** runtime-verified via mocked `navigator.getGamepads` —
+  axes merge into `ControlState` (RT throttle, LT brake, left-stick
+  steer with deadzone) and button edges dispatch through the same
+  synthetic-key pipeline as the autopilot (A item/start, Start pause),
+  so every action works without a parallel handler. Title hint shows
+  a gamepad line when a pad is connected.
+- **Largest Gap:** no pad remapping or analog-item binding; no
+  vibration/rumble; verified only via mock (no physical pad on hand).
