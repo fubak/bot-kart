@@ -198,6 +198,7 @@ export class Game {
       for (let i = 0; i < this.race.racers.length; i++) {
         if (this.race.racers[i].finished && !this.celebrated[i]) {
           this.celebrated[i] = true;
+          karts[i].celebrating = true;
           karts[i].vfx.confetti(karts[i].position);
         }
       }

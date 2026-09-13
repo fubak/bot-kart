@@ -410,3 +410,30 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Evidence:** post-shortcut smoke — 0 true wall hits all skills
   (landings reuse lastWallHit for thump/shake and were inflating the
   count); lap times identical to baseline → no AI regression.
+
+### AI-004 — Rubber-band pacing
+
+- **Domain:** AI
+- **Status:** Integrated
+- **Evidence:** live probe — leaders at -0.05 paceAssist while ahead of
+  parked player; trailing path symmetric (clamp(gap*gain)). Headless
+  smoke unchanged (Game-side assist only).
+- **Largest Gap:** linear in score only — no item-weight rubber-banding
+  (genre also weights item rolls by position).
+
+### ITEM-004 — Ink (blooper)
+
+- **Domain:** Items
+- **Status:** Integrated
+- **Evidence:** use() splatted all 3 leaders (inkedUntil=+4s); AI inked
+  shortens lookahead + steering wander; player splat overlay verified
+  (`wave4/ink-splat.png`); shield absorbs ink.
+- **Largest Gap:** wasted when leading (genre-consistent); no projectile
+  travel — instant splat.
+
+### CHAR-002 — Finish celebration
+
+- **Domain:** Characters
+- **Status:** Integrated
+- **Evidence:** driver.position.y oscillates 0.012→0.12 on finish
+  (vs 0.022 idle bob) + arm-rock; fires alongside confetti per racer.

@@ -39,6 +39,8 @@ export class Kart {
   /** Ink item: vision-denied until this sim-time (`inked` flag mirrors it). */
   inkedUntil = 0;
   inked = false;
+  /** Set when this kart's racer finishes — driver celebrates. */
+  celebrating = false;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
   private wallContact = false;
   private steerSmooth = 0;
@@ -238,6 +240,7 @@ export class Kart {
     this.paceAssist = 0;
     this.inkedUntil = 0;
     this.inked = false;
+    this.celebrating = false;
     this.syncVisual();
   }
 
@@ -530,6 +533,15 @@ export class Kart {
     // Driver expressiveness: idle bob, lean with steering, eyes track the
     // slide, flinch back on impacts — sells the bots as characters.
     const t = this.lastSimTime + this.driverPhase;
+    if (this.celebrating) {
+      // Victory bounce: big happy hops + side-to-side arm-rock — sells the
+      // finish moment (critic: bots never emoted).
+      this.driver.position.y = Math.abs(Math.sin(t * 7)) * 0.12;
+      this.driver.rotation.z = Math.sin(t * 7) * 0.35;
+      this.driver.rotation.y = Math.sin(t * 3.5) * 0.5;
+      this.driver.rotation.x = -0.15;
+      return;
+    }
     this.driver.position.y =
       Math.sin(t * 2.3) * 0.022 + (this.onGravel ? Math.sin(t * 43) * 0.02 : 0);
     this.driver.rotation.z = -this.steerVisual * 0.16 - slip * 0.1;
