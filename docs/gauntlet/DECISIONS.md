@@ -115,3 +115,22 @@ Only long-lived decisions belong here — not implementation trivia.
 - **Consequences:** Cup legs reuse the standard race/results flow —
   no parallel UI to keep in sync. Fixed order (Proving → Switchback →
   Neon); cup selection/difficulty-cup variants remain future gaps.
+
+## ADR-011: Key rebinds are a primary-slot map, arrows stay universal
+
+- **Date:** 2026-09-13
+- **Status:** Accepted
+- **Decided by:** Coordinator Devin
+- **Context:** Accessibility needed remappable drive controls without
+  breaking the menu/meta command layer or the always-works fallback.
+- **Decision:** Each of the six drive actions (throttle/brake/steer L/
+  steer R/drift/item) owns one remappable `event.code` slot persisted
+  to `grok-kart-bindings`. Arrow keys + Right Shift remain universal
+  alternates (a rebind never removes the fallback). Capture swallows
+  all keys while armed; meta/game-command codes (pause/quit/menu/GP)
+  are RESERVED and rejected so a bind can't shadow a command. A code
+  bound to a second action displaces the first to `—` rather than
+  driving two actions.
+- **Consequences:** Single-slot model keeps the UI flat (six rows,
+  no chord editor); alternates can't be removed (deliberate — a
+  keyboard can always drive); gamepad bindings remain a later unit.
