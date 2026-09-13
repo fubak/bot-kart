@@ -31,4 +31,22 @@ Blender sources live under `assets/blender/<category>/`; runtime exports under
 
 ---
 
-*No assets registered yet.*
+### kart-a — Bot A's kart (rounded pod)
+
+- **Category:** karts
+- **Status:** Integrated (unoptimized — 212 KB, 6.2k verts; meshopt deferred)
+- **Owner:** Blender Asset Builder subagent
+- **Quality Unit:** kart visuals (placeholder swap)
+- **Blender Source:** `assets/blender/karts/kart-a.blend`
+- **Runtime Export:** `assets/exported/karts/kart-a.glb`
+- **Art-Direction Notes:** rounded pod body, rear roll-cage — matches
+  Candidate A "friendly" silhouette language
+- **Triangles:** ~27k render / 6.2k upload verts | **Materials:** ~6 |
+  **Textures:** 0 (vertex/plain materials)
+- **Animation:** none | **Collision:** box clamp via track constraint |
+  **LOD:** none
+- **Performance Notes:** +55 draw calls (72 total) — many small primitives;
+  batch/merge when karts are finalized
+- **Critic Result:** pending fresh critic
+- **Biggest Gap:** no named wheel animation hooks (Cylinder.* heuristic);
+  driver is still the placeholder icosahedron bot

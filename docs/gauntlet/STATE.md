@@ -18,21 +18,28 @@ slice that proves the driving experience can become excellent.
 
 ## Active Managed Devins
 
-None yet — Wave 1 architectural foundation is Coordinator-owned until
-conventions exist (avoid fan-out on unsettled architecture).
+None right now. Prior agents this wave: Gameplay Critic (slice FAIL 4/10,
+static audit — explore profile cannot exec), Grok Concept Builder (done),
+Blender Asset Builder (exhausted context — only `_axis_probe.glb` produced;
+relaunch pending). Lesson: gameplay critics need the `subagent_general`
+profile so they can run the game.
 
 ---
 
 ## Current Integration Wave
 
-Wave 1 — Technical Spine
+Wave 1 — Technical Spine (fix pass applied; awaiting fresh live critic)
 
 ---
 
 ## Highest Priority Quality Gaps
 
-Everything is a gap — no gameplay exists yet. Priority order per spec §53:
-kart control feel > camera > race flow > content.
+1. **Player-facing feedback** — drift charge is debug-HUD only; no VFX or
+   audio anywhere; impact feedback is camera-shake only.
+2. **Track readability/speed perception** — flat single-color road, no
+   scenery, landmarks, or optical-flow cues.
+3. **Race structure** — no laps/checkpoints/AI/race flow (Wave 2 units).
+4. Wall wedge recovery; boost feel tuning.
 
 ---
 
@@ -72,19 +79,21 @@ box kart over a fog disc. No gameplay, assets, tests, or instrumentation yet.
 
 ## Next Actions
 
-1. Architect runtime modules (loop, input, kart physics, camera, track,
-   debug overlay, `window.__game` hooks for QA).
-2. Establish 3D conventions (scale/axes/pivots) — record in DECISIONS.md.
-3. Build vertical slice: drivable kart on a simple closed track.
-4. Wire instrumentation (FPS/frame-time overlay) + baseline perf profile.
-5. Decompose Wave 1+ systems into QUALITY_UNITS.md.
-6. Fan out Managed Devins once conventions stabilize.
+1. Fresh gameplay critic (subagent_general) on the fixed slice — live drive.
+2. Relaunch Blender asset builder: canonical Bot A body + kart (ADR-002).
+3. MOVE-007 drift/boost VFX + player-facing charge indicator.
+4. Track readability pass: scenery, landmarks, surface detail.
+5. Wave 2: RACE-001 checkpoints/laps → RACE-002 race flow → AI-001.
 
 ---
 
 ## Latest Whole-Game Critic Result
 
-Not yet performed — nothing to critique.
+Slice critic (static audit): **FAIL 4/10**. Verified defects fixed:
+wall tar-pit (contact-episode model), invisible walls (barrier meshes),
+drag under throttle, boost snap-clamp, binary steering, left/right basis,
+unused lastWallHit. Live-verified: wall slide 15.5→24.3→28 m/s, road
+renders correctly after winding fix. Fresh live critic pending.
 
 ---
 

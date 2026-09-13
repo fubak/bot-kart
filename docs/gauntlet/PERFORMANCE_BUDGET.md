@@ -12,16 +12,21 @@ Exact numerical budgets are **`TBD AFTER BASELINE PROFILING`**.
 
 ## Budgets (set after baseline profiling)
 
+Baseline measured 2026-09-13 on the Wave 1 vertical slice (this machine vsyncs
+at 75 Hz): **75 fps**, avg frame 13.3 ms, p50 13.4 ms, p99 18.1 ms, worst
+18.9 ms, **14 draw calls, 5.6k tris**, LCP 780 ms — while driving at top speed.
+Budgets below are provisional targets for the *full* game, not the slice.
+
 | Metric | Budget |
 |---|---|
-| Target FPS | TBD AFTER BASELINE PROFILING |
-| Frame time (avg / p99) | TBD AFTER BASELINE PROFILING |
-| Triangles per view | TBD AFTER BASELINE PROFILING |
-| Draw calls per view | TBD AFTER BASELINE PROFILING |
-| Texture memory | TBD AFTER BASELINE PROFILING |
-| GLB per-asset size | TBD AFTER BASELINE PROFILING |
-| Load time to first interactive frame | TBD AFTER BASELINE PROFILING |
-| JS heap / GC pauses | TBD AFTER BASELINE PROFILING |
+| Target FPS | 60 fps minimum on typical hardware (75+ on this machine) |
+| Frame time (avg / p99) | avg ≤13.5 ms / p99 ≤18 ms at 75 Hz (≤16.7/≤22 at 60 Hz) |
+| Triangles per view | ≤300k |
+| Draw calls per view | ≤150 |
+| Texture memory | ≤512 MB GPU |
+| GLB per-asset size | ≤2 MB optimized (karts/racers), ≤8 MB (tracks) |
+| Load time to first interactive frame | ≤3 s local, ≤8 s throttled Fast 4G |
+| JS heap / GC pauses | no visible per-frame allocation churn; heap stable across races |
 
 ## Standing Rules
 

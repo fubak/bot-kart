@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KART } from '../config/tuning';
 import type { ControlState } from '../core/Input';
 import type { Track } from './Track';
+import kartGlbUrl from '../../assets/exported/karts/kart-a.glb?url';
 
 // Arcade kart entity: velocity-based model with exp-grip lateral slip,
 // hold-to-drift with mini-turbo charge, wall constraint via track lookup.
@@ -21,11 +23,17 @@ export class Kart {
   driftCharge = 0;
   boostTimer = 0;
   state: DriveState = 'grip';
-  lastWallHit = 0; // sim-time of last wall contact (for feedback hooks)
+  lastWallHit = -1; // sim-time of last wall impact (feedback hooks consume)
+  slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
+  private wallContact = false;
+  private steerSmooth = 0;
+  private impactSquash = 0; // 0..1 wall-hit squash, decays in syncVisual
 
   private readonly wheels: THREE.Mesh[] = [];
   private readonly frontAxle = new THREE.Group();
   private readonly body: THREE.Group;
+  private readonly proceduralBody: THREE.Object3D[] = [];
+  private glbWheels: THREE.Object3D[] = [];
   private wheelSpin = 0;
   private steerVisual = 0;
   private lastDt = 0;
@@ -53,7 +61,9 @@ export class Kart {
     const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
     eyeR.position.set(0.15, 1.0, -0.18);
     this.body.add(chassis, nose, engine, head, eyeL, eyeR);
+    this.proceduralBody.push(chassis, nose, engine);
     this.group.add(this.body);
+    this.loadAsset();
 
     // Wheels: 4 cylinders; fronts parented to a steerable axle group.
     const wheelGeo = new THREE.CylinderGeometry(KART.wheelRadius, KART.wheelRadius, 0.3, 12);
@@ -76,6 +86,40 @@ export class Kart {
     this.group.add(rearL, rearR, this.frontAxle);
   }
 
+  /**
+   * Swap the procedural placeholder kart for the Blender-authored GLB once
+   * it loads. Keeps the icosahedron bot head as the driver until Bot A's
+   * character asset exists. Orientation verified in-game (ADR-002: -Z fwd).
+   */
+  private loadAsset(): void {
+    new GLTFLoader().load(
+      kartGlbUrl,
+      (gltf) => {
+        const model = gltf.scene;
+        // Normalize to KART footprint: GLB is 2.6 m long, target ~3.2 m.
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const scale = KART.length / size.z;
+        model.scale.setScalar(scale);
+        // Ground the model and center it on the kart origin.
+        box.setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center).setY(-box.min.y);
+        // GLB wheels (Cylinder.* spokes in the export) get spin like ours.
+        model.traverse((o) => {
+          if (o.name.startsWith('Cylinder')) this.glbWheels.push(o);
+        });
+        for (const o of this.proceduralBody) o.visible = false;
+        for (const w of this.wheels) w.visible = false;
+        this.body.add(model);
+      },
+      undefined,
+      () => {
+        // Load failed — procedural placeholder stays visible.
+      },
+    );
+  }
+
   get speed(): number {
     return this.velocity.length();
   }
@@ -89,6 +133,11 @@ export class Kart {
     return new THREE.Vector3(-Math.sin(this.heading), 0, -Math.cos(this.heading));
   }
 
+  right(): THREE.Vector3 {
+    const f = this.forward();
+    return new THREE.Vector3(-f.z, 0, f.x);
+  }
+
   reset(position: THREE.Vector3, heading: number): void {
     this.position.copy(position);
     this.heading = heading;
@@ -97,6 +146,10 @@ export class Kart {
     this.driftCharge = 0;
     this.boostTimer = 0;
     this.state = 'grip';
+    this.wallContact = false;
+    this.steerSmooth = 0;
+    this.impactSquash = 0;
+    this.slipAngle = 0;
     this.syncVisual();
   }
 
@@ -119,12 +172,17 @@ export class Kart {
         this.velocity.addScaledVector(fwd, -KART.accel * 0.6 * input.brake * dt);
       }
     }
-    // Coast drag.
-    this.velocity.addScaledVector(fwd, -Math.sign(fwdSpeed) * Math.min(Math.abs(fwdSpeed), KART.drag * dt));
+    // Coast drag — only when off-throttle (critic: it silently ate accel).
+    if (input.throttle === 0) {
+      this.velocity.addScaledVector(fwd, -Math.sign(fwdSpeed) * Math.min(Math.abs(fwdSpeed), KART.drag * dt));
+    }
 
-    // Clamp forward speed (leave lateral to the grip model).
-    const newFwd = THREE.MathUtils.clamp(this.velocity.dot(fwd), -KART.reverseSpeed, topSpeed);
+    // Speed handling: cap forward speed; above topSpeed (boost end) BLEED back
+    // at overSpeedDecay rather than hard-clamping in one step (critic jolt).
     const lateral = this.velocity.clone().addScaledVector(fwd, -this.velocity.dot(fwd));
+    let newFwd = this.velocity.dot(fwd);
+    if (newFwd > topSpeed) newFwd = Math.max(topSpeed, newFwd - KART.overSpeedDecay * dt);
+    newFwd = Math.max(newFwd, -KART.reverseSpeed);
     this.velocity.copy(lateral).addScaledVector(fwd, newFwd);
 
     // --- drift state machine ---
@@ -134,9 +192,11 @@ export class Kart {
       this.driftCharge = 0;
     }
     if (drifting) {
+      // Brake pauses charge gain (critic: charge accrued while braking into
+      // walls) but doesn't break the drift — brake-tap line-tightening stays.
       const canSustain = input.drift && fwdSpeed > KART.steerMinSpeed * 2;
       if (canSustain) {
-        this.driftCharge += dt;
+        if (input.brake === 0) this.driftCharge += dt;
       } else {
         // Release → mini-turbo if a tier was charged.
         const tier = this.driftCharge >= KART.driftChargeTier[1] ? 1 : this.driftCharge >= KART.driftChargeTier[0] ? 0 : -1;
@@ -150,21 +210,23 @@ export class Kart {
     this.state = this.boostTimer > 0 ? 'boost' : this.driftDir !== 0 ? 'drift' : 'grip';
 
     // --- steering ---
+    // Virtual wheel slews toward the stick target — kills binary dart-twitch
+    // (critic: instant full lock). Drift still gets fast lock-in.
+    const slewTarget = drifting ? this.driftDir * 0.8 + input.steer * 0.45 : input.steer;
+    const slewRate = drifting ? KART.steerSlew * 1.6 : KART.steerSlew;
+    this.steerSmooth += THREE.MathUtils.clamp(
+      slewTarget - this.steerSmooth, -slewRate * dt, slewRate * dt,
+    );
     // Full effect up to steerFullSpeed, gentle fade above, none when parked.
     const speedAbs = Math.abs(fwdSpeed);
     const speedFactor =
       THREE.MathUtils.smoothstep(speedAbs, KART.steerMinSpeed, KART.steerFullSpeed) *
       (1 - 0.35 * THREE.MathUtils.clamp(speedAbs / KART.maxSpeed, 0, 1));
-    let steer = input.steer;
-    if (drifting) {
-      // During a drift the locked direction dominates; opposite stick trims it.
-      steer = this.driftDir * 0.8 + input.steer * 0.45;
-    }
     const steerMul = drifting ? KART.driftSteerMul : 1;
     // Reverse steering when going backward.
     const dirSign = fwdSpeed >= 0 ? 1 : -1;
-    this.heading -= steer * KART.steerRate * steerMul * speedFactor * dirSign * dt;
-    this.steerVisual = input.steer;
+    this.heading -= this.steerSmooth * KART.steerRate * steerMul * speedFactor * dirSign * dt;
+    this.steerVisual = this.steerSmooth;
     this.lastDt = dt;
 
     // --- grip: exp decay of lateral velocity ---
@@ -177,7 +239,9 @@ export class Kart {
     if (lAmt > 1e-5) lDir.normalize();
     this.velocity.copy(fwd2.multiplyScalar(fAmt)).addScaledVector(lDir, lAmt * lKeep);
 
-    // --- walls ---
+    // --- walls: contact-episode model ---
+    // Impact penalty fires once per wall ENTRY (scaled by impact speed), not
+    // per step — sustained contact slides with a light scrub (critic tar-pit).
     const before = this.position.clone();
     this.position.addScaledVector(this.velocity, dt);
     const c = track.constrain(this.position);
@@ -189,16 +253,30 @@ export class Kart {
         normal.divideScalar(d);
         const out = this.velocity.dot(normal);
         if (out < 0) {
-          // Impact frame only: reflect outward component + one-time speed loss.
+          // Remove outward velocity with restitution.
           this.velocity.addScaledVector(normal, -out * (1 + KART.wallBounce));
-          this.velocity.multiplyScalar(KART.wallSpeedLoss);
+        }
+        if (!this.wallContact) {
+          // Contact episode start: penalty scales with how hard we hit.
+          const impact = Math.min(1, Math.abs(out) / KART.maxSpeed);
+          this.velocity.multiplyScalar(1 - KART.wallImpactLoss * (0.4 + 0.6 * impact));
           this.lastWallHit = simTime;
+          this.impactSquash = 0.4 + 0.6 * impact;
+          this.wallContact = true;
         } else {
-          // Already sliding along the wall: light scrub friction only.
-          this.velocity.multiplyScalar(1 - 0.5 * dt);
+          // Sustained grind: light scrub friction only.
+          this.velocity.multiplyScalar(1 - KART.wallScrub * dt);
         }
       }
+    } else {
+      this.wallContact = false;
     }
+
+    // Actual slip angle (velocity vs heading) drives the drift visual.
+    const fAmt2 = this.velocity.dot(this.forward());
+    const lat = this.velocity.clone().addScaledVector(this.forward(), -fAmt2);
+    const latSigned = lat.dot(this.right());
+    this.slipAngle = this.speed > 0.5 ? Math.atan2(latSigned, Math.abs(fAmt2)) : 0;
 
     this.syncVisual();
   }
@@ -208,9 +286,16 @@ export class Kart {
     this.group.rotation.y = this.heading;
     this.wheelSpin += (this.forwardSpeed / KART.wheelRadius) * this.lastDt;
     for (const w of this.wheels) w.rotation.x = this.wheelSpin;
-    // Visual steer on front axle; body yaw-out + roll while drifting.
+    for (const w of this.glbWheels) w.rotation.x = this.wheelSpin;
+    // Visual steer on front axle.
     this.frontAxle.rotation.y = -this.steerVisual * 0.45;
-    this.body.rotation.y = this.driftDir * -0.28;
-    this.body.rotation.z = this.driftDir * 0.06;
+    // Body yaws with the TRUE slip angle (not a fixed snap) + leans into it.
+    const slip = THREE.MathUtils.clamp(this.slipAngle, -0.6, 0.6);
+    this.body.rotation.y = -slip * 0.7;
+    this.body.rotation.z = slip * 0.12;
+    // Wall-impact squash: brief scale dip on contact (consumes lastWallHit).
+    this.impactSquash = Math.max(0, this.impactSquash - this.lastDt * 6);
+    const s = this.impactSquash;
+    this.body.scale.set(1 + s * 0.1, 1 - s * 0.18, 1 + s * 0.1);
   }
 }

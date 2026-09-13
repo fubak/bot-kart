@@ -32,7 +32,7 @@ const CONTROL_POINTS: ReadonlyArray<readonly [number, number]> = [
 interface Sample {
   point: THREE.Vector3;
   tangent: THREE.Vector3;
-  left: THREE.Vector3; // unit vector toward road-left
+  left: THREE.Vector3; // unit vector toward TRUE road-left (driver's left)
 }
 
 export class Track {
@@ -58,7 +58,7 @@ export class Track {
       const next = pts[(i + 1) % n];
       const prev = pts[(i - 1 + n) % n];
       const tangent = next.clone().sub(prev).setY(0).normalize();
-      const left = new THREE.Vector3(-tangent.z, 0, tangent.x);
+      const left = new THREE.Vector3(tangent.z, 0, -tangent.x);
       this.samples.push({ point, tangent, left });
     }
   }
@@ -126,7 +126,7 @@ export class Track {
       new THREE.MeshStandardMaterial({ color: 0x3e8a4e, roughness: 1 }),
     );
     grass.rotation.x = -Math.PI / 2;
-    grass.position.y = -0.02;
+    grass.position.y = -0.1; // clear of the road plane — avoids z-fighting
     this.group.add(grass);
 
     // Road ribbon: triangle strip between left/right road edges.
@@ -140,8 +140,8 @@ export class Track {
       );
       if (i < n) {
         const a = i * 2;
-        // CCW seen from +Y so normals face up.
-        roadIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+        // CCW seen from +Y so normals face up (left edge = even verts).
+        roadIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
       }
     }
     const roadGeo = new THREE.BufferGeometry();
@@ -181,6 +181,38 @@ export class Track {
     }
     this.group.add(curbsL, curbsR);
 
+    // Barrier walls: continuous raised ribbons just outside the curbs so the
+    // constraint boundary is VISIBLE (critic gap: invisible wall read as a bug).
+    // Two vertical strips facing inward, one per edge.
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: 0xe8e4da,
+      roughness: 0.7,
+      side: THREE.DoubleSide,
+    });
+    for (const side of [1, -1]) {
+      const wallPos: number[] = [];
+      const wallIdx: number[] = [];
+      const off = hw + 0.35;
+      const h = TRACK.wallHeight;
+      for (let i = 0; i <= n; i++) {
+        const s = this.samples[i % n];
+        const bx = s.point.x + s.left.x * side * off;
+        const bz = s.point.z + s.left.z * side * off;
+        wallPos.push(bx, 0, bz, bx, h, bz);
+        if (i < n) {
+          const a = i * 2;
+          // CCW when viewed from the road side.
+          if (side > 0) wallIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+          else wallIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+        }
+      }
+      const wallGeo = new THREE.BufferGeometry();
+      wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
+      wallGeo.setIndex(wallIdx);
+      wallGeo.computeVertexNormals();
+      this.group.add(new THREE.Mesh(wallGeo, wallMat));
+    }
+
     // Start/finish stripe.
     const s0 = this.samples[0];
     const stripe = new THREE.Mesh(
@@ -189,7 +221,7 @@ export class Track {
     );
     stripe.rotation.x = -Math.PI / 2;
     stripe.rotation.z = -Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
-    stripe.position.copy(s0.point).setY(0.01);
+    stripe.position.copy(s0.point).setY(0.03); // above road, below wheels
     this.group.add(stripe);
   }
 }

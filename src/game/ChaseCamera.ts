@@ -3,13 +3,16 @@ import { CAMERA, KART } from '../config/tuning';
 import type { Kart } from './Kart';
 
 // Chase camera: damped follow behind the kart, look-ahead along its heading,
-// speed/boost FOV response. This is a primary gameplay system (spec §33) —
-// Wave 2 adds drift/boost/jump-specific behavior as separate quality units.
+// speed/boost FOV response, wall-impact shake (consumes kart.lastWallHit).
+// Primary gameplay system (spec §33) — later units add drift/jump behavior.
 
 export class ChaseCamera {
   readonly camera: THREE.PerspectiveCamera;
   private readonly lookTarget = new THREE.Vector3();
   private initialized = false;
+  private lastSeenHit = -1;
+  private shake = 0;
+  private readonly shakeOffset = new THREE.Vector3();
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CAMERA.fovBase, aspect, 0.1, 500);
@@ -17,9 +20,11 @@ export class ChaseCamera {
 
   update(dt: number, kart: Kart): void {
     const fwd = kart.forward();
+    const speedT = THREE.MathUtils.clamp(kart.speed / KART.maxSpeed, 0, 1);
+    const dist = CAMERA.distance - CAMERA.distanceSpeedTrim * speedT;
     const targetPos = kart.position
       .clone()
-      .addScaledVector(fwd, -CAMERA.distance)
+      .addScaledVector(fwd, -dist)
       .add(new THREE.Vector3(0, CAMERA.height, 0));
 
     if (!this.initialized) {
@@ -37,7 +42,22 @@ export class ChaseCamera {
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
 
-    const speedT = THREE.MathUtils.clamp(kart.speed / KART.maxSpeed, 0, 1);
+    // Wall-impact shake: fresh lastWallHit starts a decaying jitter burst.
+    if (kart.lastWallHit !== this.lastSeenHit) {
+      this.lastSeenHit = kart.lastWallHit;
+      this.shake = 1;
+    }
+    if (this.shake > 0) {
+      this.shake = Math.max(0, this.shake - dt / CAMERA.shakeTime);
+      const a = CAMERA.shakeAmp * this.shake * this.shake;
+      this.shakeOffset.set(
+        (Math.random() * 2 - 1) * a,
+        (Math.random() * 2 - 1) * a * 0.6,
+        (Math.random() * 2 - 1) * a,
+      );
+      this.camera.position.add(this.shakeOffset);
+    }
+
     const wantFov =
       CAMERA.fovBase + CAMERA.fovSpeed * speedT + (kart.state === 'boost' ? CAMERA.fovBoost : 0);
     const fov = THREE.MathUtils.lerp(this.camera.fov, wantFov, kl);

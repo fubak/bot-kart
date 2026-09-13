@@ -26,6 +26,9 @@ export const KART = {
   steerMinSpeed: 0.8,
   // Full steering effectiveness speed; fades above this (high-speed stability).
   steerFullSpeed: 10,
+  // Steering input slew — rad/s-rate the virtual wheel approaches the stick
+  // target; kills binary dart-twitch (critic: instant full-lock felt twitchy).
+  steerSlew: 7,
 
   // Grip: fraction of lateral velocity removed per second (exp model).
   grip: 9,
@@ -37,21 +40,30 @@ export const KART = {
   boostSpeed: 9, // added m/s during boost
   boostTime: [0.7, 1.4], // boost duration per tier
   boostAccel: 26,
+  // Above maxSpeed (boost end, downhill), bleed back instead of hard-clamping.
+  overSpeedDecay: 32,
 
-  // Wall collision response.
-  wallBounce: 0.35, // restitution into the road
-  wallSpeedLoss: 0.55, // fraction of speed kept after wall hit
+  // Wall collision response — contact-EPISODE model: impact penalty once per
+  // wall entry, scaled by how hard we hit; sustained contact only slides.
+  wallBounce: 0.3, // restitution into the road on impact
+  wallImpactLoss: 0.5, // fraction of OUTWARD speed kept... see Kart.ts
+  wallScrub: 0.6, // per-second velocity scrub while grinding along the wall
 } as const;
 
 export const CAMERA = {
-  distance: 7.5,
-  height: 3.4,
-  lookAhead: 6.0, // meters ahead of kart along its heading
-  posDamp: 5.0, // exp damping rate for position
+  distance: 7.0,
+  // Camera closes in at top speed so the kart stays readable (critic: ~13 m
+  // effective stand-off at speed shrank the kart).
+  distanceSpeedTrim: 1.4,
+  height: 3.2,
+  lookAhead: 9.0, // meters ahead of kart along its heading
+  posDamp: 7.0, // exp damping rate for position
   lookDamp: 9.0, // exp damping rate for look target
   fovBase: 60,
   fovSpeed: 14, // +fov at maxSpeed
   fovBoost: 8, // extra +fov while boosting
+  shakeTime: 0.28, // wall-impact shake duration (s)
+  shakeAmp: 0.35, // wall-impact positional jitter (m)
 } as const;
 
 export const TRACK = {

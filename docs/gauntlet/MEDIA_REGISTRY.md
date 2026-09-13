@@ -37,4 +37,59 @@ into the game/marketing.
 
 ---
 
-*No media registered yet.*
+### grokbot-explore-A — Grok Bot Explore A (Rounded-Friendly)
+
+- **Category:** concepts/characters
+- **Status:** Selected — CANONICAL signature-racer seed (Coordinator review 2026-09-13)
+- **Owner:** grok-imagine-concept-builder (subagent session, 2026-09-13)
+- **Critic:** Coordinator (visual review of rendered PNG)
+- **Model/Tool:** image_gen (grok CLI 1.0.30, headless `-p`)
+- **Prompt File:** `assets/media/prompts/2026-09-13_grokbot-explore-A-rounded_v1.md`
+- **Reference Media:** none
+- **Output:** `assets/media/concepts/characters/grokbot-explore-A.png`
+- **Quality Unit:** n/a
+- **Generation Parameters:** aspect_ratio 4:3, output 1152×864 PNG
+- **Selection Rationale:** Rounded/spherical shape-language candidate — ball
+  torso, dome head, capsule limbs; kart dome windshield echoes the head.
+  Most approachable, mascot-like read of the three candidates.
+- **Downstream Use:** Blender modeling reference for signature Grok Bot
+  racer; seed for `image_edit` consistency pass if selected as canonical.
+- **Critic Result:** pending
+
+### grokbot-explore-B — Grok Bot Explore B (Chunky-Square)
+
+- **Category:** concepts/characters
+- **Status:** Selected — heavyweight archetype seed (Coordinator review 2026-09-13)
+- **Owner:** grok-imagine-concept-builder (subagent session, 2026-09-13)
+- **Critic:** Coordinator (visual review of rendered PNG)
+- **Model/Tool:** image_gen (grok CLI 1.0.30, headless `-p`)
+- **Prompt File:** `assets/media/prompts/2026-09-13_grokbot-explore-B-square_v1.md`
+- **Reference Media:** none
+- **Output:** `assets/media/concepts/characters/grokbot-explore-B.png`
+- **Quality Unit:** n/a
+- **Generation Parameters:** aspect_ratio 4:3, output 1152×864 PNG
+- **Selection Rationale:** Square/box shape-language candidate — cube head,
+  appliance torso, mitten hands; kart roll-bar and squared fenders echo
+  the cube motif. Reads as the dependable heavy archetype.
+- **Downstream Use:** Blender modeling reference for a rival/heavyweight
+  Grok Bot; seed for `image_edit` consistency pass if selected.
+- **Critic Result:** pending
+
+### grokbot-explore-C — Grok Bot Explore C (Sleek-Wedge)
+
+- **Category:** concepts/characters
+- **Status:** Selected — speed archetype seed (Coordinator review 2026-09-13)
+- **Owner:** grok-imagine-concept-builder (subagent session, 2026-09-13)
+- **Critic:** Coordinator (visual review of rendered PNG)
+- **Model/Tool:** image_gen (grok CLI 1.0.30, headless `-p`)
+- **Prompt File:** `assets/media/prompts/2026-09-13_grokbot-explore-C-wedge_v1.md`
+- **Reference Media:** none
+- **Output:** `assets/media/concepts/characters/grokbot-explore-C.png`
+- **Quality Unit:** n/a
+- **Generation Parameters:** aspect_ratio 4:3, output 1152×864 PNG
+- **Selection Rationale:** Triangle/wedge shape-language candidate — swept
+  head fin, forward-leaning wedge torso, blade limbs; kart nose and fins
+  echo the fin motif. Reads as the speed archetype.
+- **Downstream Use:** Blender modeling reference for a speed-class Grok
+  Bot; seed for `image_edit` consistency pass if selected.
+- **Critic Result:** pending
