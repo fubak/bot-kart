@@ -271,6 +271,23 @@ export class Items {
     return item;
   }
 
+  /** Clear all in-flight item state for a race restart/quit: held items,
+   *  active missiles/slicks, shields; restores every box + pad. */
+  reset(): void {
+    this.held.fill(null);
+    for (const b of this.boxes) {
+      b.respawnAt = 0;
+      b.mesh.visible = true;
+    }
+    for (const p of this.pads) p.cooldownUntil = 0;
+    for (const m of this.missiles) this.group.remove(m.mesh);
+    this.missiles.length = 0;
+    for (const s of this.slicks) this.group.remove(s.mesh);
+    this.slicks.length = 0;
+    this.shieldUntil.fill(0);
+    for (const sm of this.shieldMeshes) sm.visible = false;
+  }
+
   update(simTime: number, dt: number, scores?: number[]): void {
     if (scores) this.scores = scores;
     // Pickup checks

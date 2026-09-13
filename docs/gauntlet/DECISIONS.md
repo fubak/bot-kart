@@ -82,3 +82,21 @@ Only long-lived decisions belong here — not implementation trivia.
   physics engine; kart feel needs bespoke slip/drift, not rigid-body realism.
 - **Consequences:** Deterministic sim enables replay tests and seeded
   scenarios later; debug handle is the QA contract — keep it stable.
+
+## ADR-009: Track layouts are data, worlds are rebuilt on select
+
+- **Date:** 2026-09-13
+- **Status:** Accepted
+- **Decided by:** Coordinator Devin
+- **Context:** A second circuit was the biggest longevity gap. Track
+  geometry/scenery/items/minimap/race all derive from a Track instance,
+  which was constructed once at Game init.
+- **Decision:** `TRACKS[]` holds `TrackLayout { name, points, gravel }`;
+  `Game.buildWorld(idx)` disposes the old track (GPU traversal) + items +
+  minimap, rebuilds everything, and re-grids the persistent karts.
+  Track select lives on the title screen (`T`) — swapping mid-race is
+  out of scope (karts would need re-spawning anyway).
+- **Consequences:** New circuits are pure data additions; gravel-zone
+  placement must be curvature-verified per layout (a zone on the wrong
+  edge is a detour, not a cut — see TRACK-006). `__game` uses live
+  getters so QA handles survive world rebuilds.

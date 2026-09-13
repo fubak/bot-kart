@@ -73,6 +73,7 @@ export class RaceHud {
       `<div style="font-size:13px;color:#9fb4d0;margin-top:14px;line-height:1.8">` +
       `WASD / arrows — drive &nbsp;·&nbsp; SHIFT — drift &nbsp;·&nbsp; ` +
       `SPACE — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; R — restart &nbsp;·&nbsp; ` +
+      `Q — quit &nbsp;·&nbsp; ⌫ — respawn<br>` +
       `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track</div>`;
     this.pauseEl = mk(
       'top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;' +

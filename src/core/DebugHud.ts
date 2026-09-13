@@ -7,7 +7,7 @@ import type { Kart } from '../game/Kart';
 
 export class DebugHud {
   private readonly el: HTMLDivElement;
-  private visible = true;
+  private visible = false; // dev overlay — opt-in via Backquote
   private frames = 0;
   private acc = 0;
   private fps = 0;
@@ -21,6 +21,7 @@ export class DebugHud {
       'font:12px/1.5 ui-monospace,monospace;padding:8px 10px;border-radius:6px;' +
       'pointer-events:none;white-space:pre;z-index:10';
     document.body.appendChild(this.el);
+    this.el.style.display = 'none';
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Backquote') {
         this.visible = !this.visible;

@@ -124,7 +124,34 @@ export class Game {
           if (dir !== 0) this.adjustSetting(dir);
           return;
         }
-        if (e.code !== 'KeyO' && e.code !== 'KeyT') this.race.beginCountdown(this.simTime);
+        // Only drive/start keys begin the race — Escape/O/T are handled
+        // above; a stray Space or Backquote shouldn't skip the title.
+        const START_KEYS = new Set([
+          'Enter', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD',
+          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+        ]);
+        if (START_KEYS.has(e.code)) this.race.beginCountdown(this.simTime);
+        return;
+      }
+      // Options menu is MODAL in every play phase (critic D1: it opened
+      // during countdown without pausing, and P unpaused under it). While
+      // open it consumes all keys; O/Esc/P close back to the paused state.
+      if (this.settings.open) {
+        if (e.code === 'KeyO' || e.code === 'Escape' || e.code === 'KeyP') {
+          this.settings.open = false;
+        } else if (e.code === 'ArrowUp') {
+          this.settings.sel = (this.settings.sel + 3) % 4;
+        } else if (e.code === 'ArrowDown') {
+          this.settings.sel = (this.settings.sel + 1) % 4;
+        } else {
+          const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
+          if (dir !== 0) this.adjustSetting(dir);
+        }
+        return;
+      }
+      if (e.code === 'KeyO') {
+        this.settings.open = true;
+        this.paused = true; // opening pauses in ANY play phase
         return;
       }
       // Pause works in any play phase (not title — nothing to freeze there).
@@ -136,34 +163,22 @@ export class Game {
         this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
         this.settings.reducedMotion = this.chaseCam.reducedMotion;
       }
-      // Options menu: O opens/closes; arrows navigate/adjust while open.
-      // Opening mid-race pauses the sim (genre-standard pause submenu).
-      if (e.code === 'KeyO') {
-        this.settings.open = !this.settings.open;
-        if (this.settings.open && this.race.phase === 'racing') this.paused = true;
-      }
-      if (this.settings.open) {
-        if (e.code === 'ArrowUp') this.settings.sel = (this.settings.sel + 3) % 4;
-        if (e.code === 'ArrowDown') this.settings.sel = (this.settings.sel + 1) % 4;
-        const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
-        if (dir !== 0) this.adjustSetting(dir);
-      }
       if (e.code === 'Space' && !this.paused) {
         this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
       }
+      // Respawn (Backspace): lakitu-style reset onto the racing line at the
+      // nearest sample — recovers wall-pinned karts (critic D3).
+      if (e.code === 'Backspace' && this.race.phase === 'racing' && !this.paused) {
+        const i = this.track.nearestIndex(this.kart.position);
+        const t = this.track.tangentAt(i);
+        this.kart.reset(this.track.pointAt(i), Math.atan2(-t.x, -t.z));
+      }
+      // Quit to title (Q): regrid + title phase, no reload needed (D3).
+      if (e.code === 'KeyQ') {
+        this.restartRace('title');
+      }
       if (e.code === 'KeyR') {
-        this.celebrated.length = 0;
-        this.paused = false; // restart always unfreezes (kills P→R soft-lock)
-        const s = this.track.spawn();
-        this.kart.reset(s.position, s.heading);
-        const positions = [s.position.clone()];
-        for (let i = 0; i < AI_COUNT; i++) {
-          const slot = this.track.gridSlot(10 + i * 7, i % 2 === 0 ? 2.2 : -2.2);
-          this.aiKarts[i].reset(slot.position, slot.heading);
-          this.aiDrivers[i].reset();
-          positions.push(slot.position.clone());
-        }
-        this.race.restart(positions, this.simTime);
+        this.restartRace();
       }
     });
 
@@ -237,6 +252,25 @@ export class Game {
     this.scene.add(this.items.group);
     this.minimap = new Minimap(this.track);
     this.celebrated.length = 0;
+  }
+
+  // Shared regrid: restart (fresh countdown) or quit-to-title. Always
+  // unfreezes (kills P→R soft-lock) and clears in-flight item state.
+  private restartRace(phase?: 'title'): void {
+    this.celebrated.length = 0;
+    this.paused = false;
+    this.settings.open = false;
+    this.items.reset();
+    const s = this.track.spawn();
+    this.kart.reset(s.position, s.heading);
+    const positions = [s.position.clone()];
+    for (let i = 0; i < AI_COUNT; i++) {
+      const slot = this.track.gridSlot(10 + i * 7, i % 2 === 0 ? 2.2 : -2.2);
+      this.aiKarts[i].reset(slot.position, slot.heading);
+      this.aiDrivers[i].reset();
+      positions.push(slot.position.clone());
+    }
+    this.race.restart(positions, this.simTime, phase);
   }
 
   start(): void {
