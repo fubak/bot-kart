@@ -591,3 +591,18 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   on all 4 chassis + beam lighting the road ahead.
 - **Largest Gap:** rival karts have lamps but no beams (perf budget);
   beam doesn't swing with steering yet (fixed to kart forward).
+
+### UI-008 — Key remapping
+
+- **Domain:** UI/Accessibility
+- **Status:** Integrated
+- **Evidence:** `wave4/options-rebind.png` — six bind rows (THROTTLE,
+  BRAKE/REV, STEER L/R, DRIFT, ITEM) + RESET BINDINGS in the options
+  menu, persisted to `grok-kart-bindings`. Capture armed via →/Enter/
+  Space on a row; swallows all keys while armed (Esc cancels);
+  meta/game-command codes rejected so a drive bind can't shadow
+  pause/quit; duplicate binds displace to `—`. Bound keys count as
+  race-start keys on title. Verified live: W→I survives reload, I
+  starts + drives at 28 m/s, P rejected without pausing.
+- **Largest Gap:** arrows/RSHIFT stay fixed alternates (no removal);
+  gamepad binding is a later unit.
