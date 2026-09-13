@@ -59,6 +59,12 @@ export class RaceHud {
       'font-weight:800;color:#ff5a3c;display:none',
     );
     this.warnEl.textContent = 'WRONG WAY';
+    this.stuckEl = mk(
+      'bottom:96px;left:50%;transform:translateX(-50%);font-size:17px;' +
+      'font-weight:800;color:#ffe28a;display:none;text-align:center',
+    );
+    this.stuckEl.innerHTML =
+      'STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; S reverse';
     this.itemEl = mk(
       'bottom:24px;right:18px;font-size:22px;font-weight:800;color:#7be8ff',
     );
@@ -114,6 +120,7 @@ export class RaceHud {
   private readonly pauseEl: HTMLDivElement;
   private readonly inkEl: HTMLDivElement;
   private readonly optionsEl: HTMLDivElement;
+  private readonly stuckEl: HTMLDivElement;
   private resultsRenderedAt = -1;
   private titlePulseAt = 0;
 
@@ -126,6 +133,7 @@ export class RaceHud {
     opts?: OptionsState,
     trackName?: string,
     gp?: GpState,
+    stuckHint = false,
   ): void {
     // Options overlay renders in every phase (openable from pause or title).
     if (opts?.open) {
@@ -159,7 +167,7 @@ export class RaceHud {
       // Track + mode line under PRESS ENTER (children[3]).
       (this.titleEl.children[3] as HTMLElement).textContent =
         trackName
-          ? `◂ ${trackName} ▸  [T]      ${gp?.mode ? `GRAND PRIX — leg ${gp.leg + 1}/${gp.total}` : '1 RACE'}  [G]`
+          ? `◂ ${trackName} ▸  [T]      ${gp?.mode ? `GRAND PRIX — leg ${Math.min(gp.leg + 1, gp.total)}/${gp.total}` : '1 RACE'}  [G]`
           : '';
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
       if (simTime - this.titlePulseAt > 0.06) {
@@ -207,6 +215,8 @@ export class RaceHud {
 
     this.warnEl.style.display =
       !paused && race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
+    this.stuckEl.style.display =
+      !paused && stuckHint && race.phase === 'racing' ? 'block' : 'none';
     // Held-item readout: colored glyph badge + name — readable at a glance.
     const ITEM_GLYPHS: Record<string, [string, string]> = {
       boost: ['⚡', '#ffd454'],
@@ -241,13 +251,27 @@ export class RaceHud {
         const dispOrder = gpFinal
           ? [...race.racers.keys()].sort((a, b) => gp.points[b] - gp.points[a])
           : order;
+        // Points are awarded on the N-press, so a leg's results screen
+        // shows "earned this leg → running total" (critic D5: leg-1 read
+        // "0 pts"). Table mirrors Game.GP_POINTS.
+        const GP_PTS = [10, 7, 5, 3];
         const rows = dispOrder
           .map((r, i) => {
             const rr = race.racers[r];
             const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
             const best = fmt(rr.bestLapTime);
             const cls = r === 0 ? ' style="color:#7be8ff"' : '';
-            const pts = gp?.mode ? `   ${gp.points[r]} pts` : '';
+            let pts = '';
+            if (gp?.mode) {
+              if (gp.done) {
+                pts = `   ${gp.points[r]} pts`;
+              } else {
+                const earned = rr.finished
+                  ? (GP_PTS[race.positionOf(r) - 1] ?? 0)
+                  : 0;
+                pts = `   +${earned} → ${gp.points[r] + earned} pts`;
+              }
+            }
             const crown = gpFinal && i === 0 ? ' ★' : '';
             return `<div${cls}>P${i + 1}${crown}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}${pts}</div>`;
           })

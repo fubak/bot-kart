@@ -72,9 +72,13 @@ None.
 - `tsc --noEmit`: clean; `vite build`: clean.
 - Live: 4 racers on grid, AI laps at ~18-22 s, collision verified, position
   HUD live (P n/N). Draws ~160-400 / tris ~35-58k @ 73-75 fps.
-- AI smoke (post-shortcut): all 3 skills 3 laps, 0 wall hits, traffic 7.8%
-  lock — identical lap times to pre-shortcut baseline (no regression).
-- Latest commit: gravel shortcut + wallHitCount metric split.
+- AI smoke post-continuity-refactor, all 3 tracks: PG identical baseline
+  (3 skills, 0 wall hits, 22.22/18.72/17.72); SR clean (0 hits, best
+  21.5); NN all laps complete — 3-4 wall hits at frac ~0.61 fast
+  transition on higher skills (first NN baseline; tuning target, not a
+  foldback defect). Traffic lock 9.2/5.6/15.3% (no deadlocks).
+- Latest commit: critic3 fix batch (continuity lookups, GP cup state,
+  pause-leak, stuck hint, GP points display).
 
 ---
 
@@ -97,6 +101,17 @@ None.
   menu now modal (pause-all-phases + key capture), Items.reset() on
   restart, Q quit-to-title, Backspace respawn, DebugHud hidden,
   title-start key whitelist. Score arc: 4→5→7.5→8→7.5(fixes in).
+- Wave-4 critic3 (HARD playtest, 3 tracks + full GP): 8/10 PASS —
+  `evidence/wave4/CRITIC3_REPORT.md`. 20-item verified-working list.
+  Both HIGH defects fixed mid-session + critic re-verified at runtime:
+  D1 GP state leak (leg 4/3 title, stale FINAL STANDINGS — resetCup +
+  title re-arm + R-on-standings fresh cup + T locked while armed);
+  D2 foldback beaching (nearest-sample snap onto wrong leg —
+  nearestIndexNear continuity hints through kart/progress/AI lookups).
+  LOW defects fixed post-report: D3 N leaking through paused results
+  (pause-gated + pause cleared on phase transition), D4 wall-pin
+  recovery undiscoverable (STUCK? ⌫/S hint after 2 s <1.5 m/s under
+  throttle), D5 leg results "0 pts" (now "+earned → total").
 
 ---
 

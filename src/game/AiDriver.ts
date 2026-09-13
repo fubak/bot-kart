@@ -68,7 +68,7 @@ export class AiDriver {
     const fwdSpeed = kart.forwardSpeed;
 
     // Local track frame: lateral offset + travel-direction tangent.
-    const { lateral, tangent: tanNow } = track.query(kart.position);
+    const { lateral, tangent: tanNow } = track.query(kart.position, kart.trackIdx);
     // Lateral velocity (m/s, signed) — how fast the slide is carrying the
     // kart toward a wall. Clamped: centerline index jumps can spike it.
     const latVel = THREE.MathUtils.clamp(
@@ -140,7 +140,8 @@ export class AiDriver {
     // Inked: vision denied — short sight + steering wander (see below).
     if (kart.inked) look *= 0.55;
 
-    const target = track.lookaheadPoint(kart.position, look);
+    const la = track.lookahead(kart.position, look, kart.trackIdx);
+    const target = la.point;
     // Shift the pursuit point onto this bot's preferred line — plus a
     // temporary sidestep while executing an overtake (see traffic below).
     let lineBias = this.lineOffset;
@@ -150,7 +151,7 @@ export class AiDriver {
       // (past the wall's end — approach-pull wedged bots into the wall
       // face). The inside cut doubles as an overtake line, so it takes
       // precedence over the blocked-sidestep below.
-      const gb = track.gravelBiasInside(kart.position);
+      const gb = track.gravelBiasInside(kart.position, 0.008, kart.trackIdx);
       if (gb !== null) {
         lineBias = gb;
         onShortcut = true;
@@ -159,7 +160,7 @@ export class AiDriver {
     if (!onShortcut && this.blockedTime > AI.overtakeTime) {
       lineBias += this.overtakeSide * AI.overtakeBias;
     }
-    target.addScaledVector(track.leftAt(track.nearestIndex(target)), lineBias);
+    target.addScaledVector(track.leftAt(la.index), lineBias);
     const toTarget = target.sub(kart.position).setY(0);
     if (toTarget.lengthSq() < 1e-6) return { ...idle, throttle: 1 };
     toTarget.normalize();
@@ -177,16 +178,16 @@ export class AiDriver {
     let minRadius = Infinity;
     for (const f of AI.curveSampleFracs) {
       const d = Math.max(horizon * f, 1);
-      const p = track.lookaheadPoint(kart.position, d);
-      const tan = track.tangentAt(track.nearestIndex(p));
+      const p = track.lookahead(kart.position, d, kart.trackIdx);
+      const tan = track.tangentAt(p.index);
       const ang = Math.abs(signedAngle(tanNow, tan));
       if (ang > 1e-4) minRadius = Math.min(minRadius, d / ang);
     }
 
     // Near-lookahead corner: drives drift entry/exit (radius + direction).
     const nearD = Math.max(look * 0.6, 6);
-    const nearP = track.lookaheadPoint(kart.position, nearD);
-    const tanNear = track.tangentAt(track.nearestIndex(nearP));
+    const nearLa = track.lookahead(kart.position, nearD, kart.trackIdx);
+    const tanNear = track.tangentAt(nearLa.index);
     const turnNear = signedAngle(tanNow, tanNear); // <0 = right-hand corner
     const radiusNow =
       Math.abs(turnNear) > 1e-4 ? nearD / Math.abs(turnNear) : Infinity;

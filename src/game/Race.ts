@@ -62,7 +62,13 @@ export class RacerProgress {
   update(pos: THREE.Vector3, simTime: number): boolean {
     if (this.finished) return false;
     const n = this.track.sampleCount;
-    const i = this.track.nearestIndex(pos);
+    // Continuity lookup: global nearest can snap to a parallel leg on
+    // foldbacks, phantoming gate crossings + wrong-way flags (critic: beached
+    // kart showed a 4:32 lap + wrongway flap).
+    const i =
+      this.lastIdx < 0
+        ? this.track.nearestIndex(pos)
+        : this.track.nearestIndexNear(pos, this.lastIdx);
     if (this.lastIdx < 0) {
       this.lastIdx = i;
       this.progressIdx = i;

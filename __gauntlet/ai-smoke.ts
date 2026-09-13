@@ -67,11 +67,11 @@ function runOne(skill: number, simSeconds: number): RunResult {
     race.update([kart.position], simTime, dt);
     simTime += dt;
 
-    const { lateral } = track.query(kart.position);
+    const { lateral } = track.query(kart.position, kart.trackIdx);
     if (Math.abs(lateral) > maxLat) maxLat = Math.abs(lateral);
     if (i % 6 === 0) {
       trace.push(
-        `t=${simTime.toFixed(1)} i=${track.nearestIndex(kart.position)} ` +
+        `t=${simTime.toFixed(1)} i=${kart.trackIdx} ` +
           `lat=${lateral.toFixed(1)} v=${kart.speed.toFixed(1)} ` +
           `fwd=${kart.forwardSpeed.toFixed(1)} drift=${kart.driftDir} ` +
           `steer=${ctl.steer.toFixed(2)} thr=${ctl.throttle} brk=${ctl.brake.toFixed(2)}`,
@@ -81,7 +81,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
     if (kart.wallHitCount > lastWall) {
       wallHits++;
       lastWall = kart.wallHitCount;
-      wallHitIdx.push(track.nearestIndex(kart.position));
+      wallHitIdx.push(kart.trackIdx);
       wallHitSpeed.push(Math.round(kart.speed * 10) / 10);
       if (firstHitTrace.length === 0) firstHitTrace = [...trace];
     }

@@ -230,11 +230,49 @@ export class Track {
   }
 
   /**
+   * Nearest sample within ±`window` of `hint` (wraps the lap). Folded
+   * layouts put parallel legs ~15-20 m apart — a global nearest lookup
+   * there can snap to the wrong leg, which let karts beach on infield
+   * grass inside another leg's drivable limit and flipped progress
+   * forward/backward (critic: stuck kart, 4:32 lap, wrong-way flap).
+   * Per-kart callers pass their last index so mapping is continuous.
+   */
+  nearestIndexNear(pos: THREE.Vector3, hint: number, window = 48): number {
+    if (hint < 0) return this.nearestIndex(pos); // unanchored — global lookup
+    const n = this.samples.length;
+    const h = ((Math.round(hint) % n) + n) % n;
+    let best = h;
+    let bestD = this.samples[h].point.distanceToSquared(pos);
+    for (let k = 1; k <= window; k++) {
+      const a = (h + k) % n;
+      const da = this.samples[a].point.distanceToSquared(pos);
+      if (da < bestD) {
+        bestD = da;
+        best = a;
+      }
+      const b = (((h - k) % n) + n) % n;
+      const db = this.samples[b].point.distanceToSquared(pos);
+      if (db < bestD) {
+        bestD = db;
+        best = b;
+      }
+    }
+    return best;
+  }
+
+  /**
    * Signed lateral distance from centerline (positive = left of travel
    * direction) and the local tangent. Used by kart constraint + spawn.
+   * `hint` keeps the lookup on the kart's own leg through foldbacks.
    */
-  query(pos: THREE.Vector3): { lateral: number; tangent: THREE.Vector3 } {
-    const i = this.nearestIndex(pos);
+  query(
+    pos: THREE.Vector3,
+    hint?: number,
+  ): { lateral: number; tangent: THREE.Vector3; index: number } {
+    const i =
+      hint === undefined
+        ? this.nearestIndex(pos)
+        : this.nearestIndexNear(pos, hint);
     // Refine by checking neighbors — nearest vertex isn't always the closest
     // segment point on a curvy section, but sample density keeps error <0.2 m.
     let bestI = i;
@@ -249,7 +287,7 @@ export class Track {
     }
     const s = this.samples[bestI];
     const rel = pos.clone().sub(s.point);
-    return { lateral: rel.dot(s.left), tangent: s.tangent };
+    return { lateral: rel.dot(s.left), tangent: s.tangent, index: bestI };
   }
 
   /** Gravel zone containing a sample index, or null. `margin` shrinks the
@@ -278,35 +316,55 @@ export class Track {
   /** Kart-position shortcut test: mid-apron lateral only when the kart is
    *  INSIDE a zone past the entry margin — approaching early steered bots
    *  into the wall face just before the gap opens. */
-  gravelBiasInside(pos: THREE.Vector3, margin = 0.008): number | null {
-    const z = this.zoneAt(this.nearestIndex(pos), margin);
+  gravelBiasInside(
+    pos: THREE.Vector3,
+    margin = 0.008,
+    hint?: number,
+  ): number | null {
+    const i =
+      hint === undefined
+        ? this.nearestIndex(pos)
+        : this.nearestIndexNear(pos, hint);
+    const z = this.zoneAt(i, margin);
     if (!z) return null;
     return z.side * (TRACK.roadHalfWidth + TRACK.gravelWidth * 0.35);
   }
 
   /** Surface under a position: 'gravel' on shortcut aprons, else 'road'. */
-  surfaceAt(pos: THREE.Vector3): 'road' | 'gravel' {
-    const i = this.nearestIndex(pos);
+  surfaceAt(pos: THREE.Vector3, hint?: number): 'road' | 'gravel' {
+    const i =
+      hint === undefined
+        ? this.nearestIndex(pos)
+        : this.nearestIndexNear(pos, hint);
     const z = this.zoneAt(i);
     if (!z) return 'road';
-    const { lateral } = this.query(pos);
+    const { lateral } = this.query(pos, i);
     return lateral * z.side > TRACK.roadHalfWidth - 0.5 ? 'gravel' : 'road';
   }
 
   /** Push a position back inside the drivable edge — the edge widens onto
-   *  gravel aprons inside shortcut zones (asymmetric per side). */
-  constrain(pos: THREE.Vector3): { lateral: number; clamped: boolean } {
-    const i = this.nearestIndex(pos);
-    const { lateral } = this.query(pos);
+   *  gravel aprons inside shortcut zones (asymmetric per side). `hint`
+   *  anchors the lookup to the kart's own leg on folded sections. */
+  constrain(
+    pos: THREE.Vector3,
+    hint?: number,
+  ): { lateral: number; clamped: boolean; index: number } {
+    const i =
+      hint === undefined
+        ? this.nearestIndex(pos)
+        : this.nearestIndexNear(pos, hint);
+    const { lateral, index } = this.query(pos, i);
     const roadLimit = TRACK.roadHalfWidth - 0.75; // kart half-width → wall face
-    const z = this.zoneAt(i);
+    const z = this.zoneAt(index);
     // Zone-side edge extends onto gravel; the other edge stays the wall.
     const limit =
       z && Math.sign(lateral) === z.side ? roadLimit + TRACK.gravelWidth : roadLimit;
-    if (Math.abs(lateral) <= limit) return { lateral, clamped: false };
-    const s = this.samples[i];
+    if (Math.abs(lateral) <= limit) {
+      return { lateral, clamped: false, index };
+    }
+    const s = this.samples[index];
     pos.copy(s.point).addScaledVector(s.left, Math.sign(lateral) * limit);
-    return { lateral: Math.sign(lateral) * limit, clamped: true };
+    return { lateral: Math.sign(lateral) * limit, clamped: true, index };
   }
 
   /**
@@ -314,9 +372,27 @@ export class Track {
    * Walks the samples by arc length and interpolates the final segment so the
    * target moves smoothly — used as the AI pure-pursuit lookahead.
    */
-  lookaheadPoint(pos: THREE.Vector3, aheadMeters: number): THREE.Vector3 {
+  lookaheadPoint(
+    pos: THREE.Vector3,
+    aheadMeters: number,
+    hint?: number,
+  ): THREE.Vector3 {
+    return this.lookahead(pos, aheadMeters, hint).point;
+  }
+
+  /** Lookahead that also returns the walked sample index — callers probing
+   *  far ahead should use the index directly (a position→index re-lookup can
+   *  snap to a parallel leg on foldbacks). */
+  lookahead(
+    pos: THREE.Vector3,
+    aheadMeters: number,
+    hint?: number,
+  ): { point: THREE.Vector3; index: number } {
     const n = this.samples.length;
-    const start = this.nearestIndex(pos);
+    const start =
+      hint === undefined
+        ? this.nearestIndex(pos)
+        : this.nearestIndexNear(pos, hint);
     let i = start;
     let acc = 0;
     while (acc < aheadMeters) {
@@ -333,7 +409,7 @@ export class Track {
       segLen > 1e-6
         ? THREE.MathUtils.clamp(1 - (acc - aheadMeters) / segLen, 0, 1)
         : 1;
-    return prev.clone().lerp(cur, t);
+    return { point: prev.clone().lerp(cur, t), index: i };
   }
 
   /** Unit tangent of the travel direction at a centerline sample index. */
@@ -374,9 +450,12 @@ export class Track {
 
   /** Road surface height at a world position — projects onto the two
    *  centerline segments adjacent to the nearest sample and interpolates. */
-  heightAt(pos: THREE.Vector3): number {
+  heightAt(pos: THREE.Vector3, hint?: number): number {
     const n = this.samples.length;
-    const i = this.nearestIndex(pos);
+    const i =
+      hint === undefined
+        ? this.nearestIndex(pos)
+        : this.nearestIndexNear(pos, hint);
     let bestY = this.samples[i].point.y;
     let bestD = Infinity;
     for (const [a, b] of [

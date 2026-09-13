@@ -206,12 +206,15 @@ export class Items {
       const p = kart.position.clone();
       const v = kart.velocity.clone();
       const h = kart.heading;
+      const ti = kart.trackIdx;
       kart.position.copy(other.position);
       kart.velocity.copy(other.velocity);
       kart.heading = other.heading;
+      kart.trackIdx = other.trackIdx; // continuity hint follows the teleport
       other.position.copy(p);
       other.velocity.copy(v);
       other.heading = h;
+      other.trackIdx = ti;
       return item;
     }
     if (item === 'ink') {
@@ -243,7 +246,7 @@ export class Items {
       const pos = kart.position
         .clone()
         .addScaledVector(kart.forward(), -2.6);
-      pos.y = this.track.heightAt(pos) + 0.11;
+      pos.y = this.track.heightAt(pos, kart.trackIdx) + 0.11;
       mesh.position.copy(pos);
       this.group.add(mesh);
       this.slicks.push({
@@ -261,7 +264,10 @@ export class Items {
     this.group.add(mesh);
     this.missiles.push({
       mesh,
-      progressIdx: this.track.nearestIndex(kart.position),
+      progressIdx:
+        kart.trackIdx >= 0
+          ? this.track.nearestIndexNear(kart.position, kart.trackIdx)
+          : this.track.nearestIndex(kart.position),
       speed: Math.max(MISSILE_SPEED, kart.speed + 8),
       travelled: 0,
       owner: kart,

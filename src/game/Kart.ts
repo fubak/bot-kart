@@ -65,6 +65,12 @@ export class Kart {
   slopePitch = 0; // road pitch under the kart — drives body tilt
   slopeRoll = 0;
   onGravel = false; // off-road apron — heavy drag + rumble (shortcut cost)
+  /** Continuity hint for centerline lookups — the sample index this kart
+   *  was last constrained against. Folded layouts put parallel legs close
+   *  together; a global nearest-sample lookup can snap to the wrong leg
+   *  there (critic: kart beached on infield grass inside another leg's
+   *  limit). Reset via syncTrackIndex after any teleport. */
+  trackIdx = 0;
 
   private readonly wheels: THREE.Mesh[] = [];
   private readonly frontAxle = new THREE.Group();
@@ -290,12 +296,14 @@ export class Kart {
     this.inkedUntil = 0;
     this.inked = false;
     this.celebrating = false;
+    this.trackIdx = -1; // teleported — re-anchor globally on next update
     this.syncVisual();
   }
 
   update(dt: number, input: ControlState, track: Track, simTime: number): void {
     this.lastSimTime = simTime;
     this.isSpinning = simTime < this.spinUntil;
+    if (this.trackIdx < 0) this.trackIdx = track.nearestIndex(this.position);
     // Spin-out (item hits): yaw whips freely, controls dead, velocity decays.
     if (this.isSpinning) {
       this.heading += 11 * dt;
@@ -303,8 +311,8 @@ export class Kart {
       this.driftDir = 0;
       this.driftCharge = 0;
       this.position.addScaledVector(this.velocity, dt);
-      track.constrain(this.position);
-      const gy = track.heightAt(this.position);
+      this.trackIdx = track.constrain(this.position, this.trackIdx).index;
+      const gy = track.heightAt(this.position, this.trackIdx);
       if (this.position.y < gy) this.position.y = gy;
       this.syncVisual();
       return;
@@ -420,7 +428,8 @@ export class Kart {
     // per step — sustained contact slides with a light scrub (critic tar-pit).
     const before = this.position.clone();
     this.position.addScaledVector(this.velocity, dt);
-    const c = track.constrain(this.position);
+    const c = track.constrain(this.position, this.trackIdx);
+    this.trackIdx = c.index;
     if (c.clamped) {
       // Push-back direction = inward wall normal.
       const normal = before.sub(this.position);
@@ -463,7 +472,7 @@ export class Kart {
     // --- elevation: follow road height, catch air over crests ---
     // Grounded karts track the surface upward (climb); cresting fast leaves
     // groundY below position.y → gravity pulls back down = real airtime.
-    const groundY = track.heightAt(this.position);
+    const groundY = track.heightAt(this.position, this.trackIdx);
     this.vy -= KART.gravity * dt;
     this.position.y += this.vy * dt;
     if (this.position.y <= groundY) {
@@ -485,15 +494,15 @@ export class Kart {
     }
     // Slope gravity (grounded only): uphill bleeds speed, downhill adds it.
     const fwdE = this.forward();
-    const hA = track.heightAt(this.position.clone().addScaledVector(fwdE, 1.4));
-    const hB = track.heightAt(this.position.clone().addScaledVector(fwdE, -1.4));
+    const hA = track.heightAt(this.position.clone().addScaledVector(fwdE, 1.4), this.trackIdx);
+    const hB = track.heightAt(this.position.clone().addScaledVector(fwdE, -1.4), this.trackIdx);
     this.slopePitch = Math.atan2(hA - hB, 2.8);
     if (this.grounded) {
       this.velocity.addScaledVector(fwdE, -Math.sin(this.slopePitch) * KART.slopeForce * dt);
     }
     const rE = this.right();
-    const hR = track.heightAt(this.position.clone().addScaledVector(rE, 0.9));
-    const hL = track.heightAt(this.position.clone().addScaledVector(rE, -0.9));
+    const hR = track.heightAt(this.position.clone().addScaledVector(rE, 0.9), this.trackIdx);
+    const hL = track.heightAt(this.position.clone().addScaledVector(rE, -0.9), this.trackIdx);
     this.slopeRoll = Math.atan2(hR - hL, 1.8);
 
     // Actual slip angle (velocity vs heading) drives the drift visual.
@@ -504,7 +513,7 @@ export class Kart {
 
     // Off-road surface: gravel aprons (shortcut zones) — heavy drag, hard
     // cap, rumble jitter + brown dust. Shorter path, slower surface.
-    this.onGravel = track.surfaceAt(this.position) === 'gravel';
+    this.onGravel = track.surfaceAt(this.position, this.trackIdx) === 'gravel';
     if (this.onGravel && this.grounded) {
       const fs = this.velocity.dot(fwd);
       this.velocity.addScaledVector(fwd, -Math.sign(fs) * Math.min(Math.abs(fs), KART.gravelDrag * dt));

@@ -202,13 +202,16 @@
   ],
   "agents": {},
   "latestCritic": {
-    "id": "release-critic",
+    "id": "wave4-critic3",
     "score": 8.0,
     "verdict": "pass",
+    "report": "docs/gauntlet/evidence/wave4/CRITIC3_REPORT.md",
     "fixed": [
-      "pause-softlock",
-      "space-while-paused",
-      "pause-coverage"
+      "gp-state-leak (HIGH, re-verified)",
+      "foldback-beaching (HIGH, re-verified)",
+      "n-through-pause",
+      "stuck-hint",
+      "leg-points-display"
     ]
   },
   "wave3": {

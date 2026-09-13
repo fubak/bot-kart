@@ -94,12 +94,22 @@ export class Game {
     );
   }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
+  private stuckFor = 0; // seconds throttle-held below 1.5 m/s (D4 hint)
   // Grand Prix cup: race all tracks in order for championship points.
   private gpMode = false;
   private gpLeg = 0;
   private readonly gpPoints: number[] = [0, 0, 0, 0];
   private gpDone = false;
   private static readonly GP_POINTS = [10, 7, 5, 3];
+
+  /** Cup progress only exists while racing it — title returns and restarts
+   *  from final standings always present a fresh cup (critic: the title
+   *  showed "leg 4/3" and a post-cup race rendered the old standings). */
+  private resetCup(): void {
+    this.gpLeg = 0;
+    this.gpDone = false;
+    this.gpPoints.fill(0);
+  }
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -151,7 +161,9 @@ export class Game {
       if (this.race.phase === 'title' && e.code !== 'Backquote') {
         // Title-phase keys: T cycles the track (rebuilds the world), O
         // opens options — everything else starts the race.
-        if (e.code === 'KeyT' && !this.settings.open) {
+        // T cycles the track for single races — no-op while a cup is
+        // armed since its circuit order is fixed (PG → SR → NN).
+        if (e.code === 'KeyT' && !this.settings.open && !this.gpMode) {
           this.buildWorld((this.trackIdx + 1) % TRACKS.length);
           return;
         }
@@ -159,9 +171,7 @@ export class Game {
         // first circuit; single-race mode uses the selected track.
         if (e.code === 'KeyG' && !this.settings.open) {
           this.gpMode = !this.gpMode;
-          this.gpLeg = 0;
-          this.gpDone = false;
-          this.gpPoints.fill(0);
+          this.resetCup();
           if (this.gpMode) this.buildWorld(0);
           return;
         }
@@ -218,7 +228,7 @@ export class Game {
       // Respawn (Backspace): lakitu-style reset onto the racing line at the
       // nearest sample — recovers wall-pinned karts (critic D3).
       if (e.code === 'Backspace' && this.race.phase === 'racing' && !this.paused) {
-        const i = this.track.nearestIndex(this.kart.position);
+        const i = this.track.nearestIndexNear(this.kart.position, this.kart.trackIdx);
         const t = this.track.tangentAt(i);
         this.kart.reset(this.track.pointAt(i), Math.atan2(-t.x, -t.z));
       }
@@ -227,8 +237,10 @@ export class Game {
         this.restartRace('title');
       }
       // Grand Prix advance: N on the results screen scores the leg and
-      // loads the next circuit (last leg → final standings shown).
-      if (e.code === 'KeyN' && this.gpMode && this.race.phase === 'finished' && !this.gpDone) {
+      // loads the next circuit (last leg → final standings shown). Gated
+      // on !paused — an advance under the PAUSED overlay carried it into
+      // the next leg (critic D3: countdown froze behind PAUSED).
+      if (e.code === 'KeyN' && this.gpMode && this.race.phase === 'finished' && !this.gpDone && !this.paused) {
         const order = [...this.race.racers.keys()].sort(
           (a, b) => this.race.positionOf(a) - this.race.positionOf(b),
         );
@@ -243,9 +255,19 @@ export class Game {
           this.buildWorld(this.gpLeg);
           this.race.beginCountdown(this.simTime);
         }
+        this.paused = false; // a phase transition never carries pause over
       }
       if (e.code === 'KeyR') {
-        this.restartRace();
+        if (this.gpDone) {
+          // Final standings: restart = a fresh cup from leg 1 — replaying
+          // a phantom "leg 4" kept the old points frozen on screen.
+          this.resetCup();
+          this.buildWorld(0);
+          this.paused = false;
+          this.race.beginCountdown(this.simTime);
+        } else {
+          this.restartRace();
+        }
       }
     });
 
@@ -347,6 +369,13 @@ export class Game {
     this.celebrated.length = 0;
     this.paused = false;
     this.settings.open = false;
+    if (phase === 'title' && this.gpMode) {
+      // Abandoning/finishing a cup → title always re-arms a fresh cup on
+      // its first circuit (the G-toggle state itself persists).
+      this.resetCup();
+      this.buildWorld(0);
+      return;
+    }
     this.items.reset();
     const s = this.track.spawn();
     this.kart.reset(s.position, s.heading);
@@ -371,6 +400,14 @@ export class Game {
     const input = pollInput();
     if (!this.paused) this.accumulator += frameDt;
     const canDrive = this.race.allowsDrive && !this.paused;
+    // Wall-pin discovery aid: throttle held but barely moving for ~2 s →
+    // the HUD points at ⌫/S recovery (critic D4: new players think they're
+    // hard-stuck when they never discover the respawn key).
+    if (canDrive && input.throttle > 0 && this.kart.speed < 1.5 && !this.kart.isSpinning) {
+      this.stuckFor += frameDt;
+    } else {
+      this.stuckFor = 0;
+    }
     while (!this.paused && this.accumulator >= SIM.fixedDt) {
       this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime);
       const allKarts = [this.kart, ...this.aiKarts];
@@ -429,6 +466,7 @@ export class Game {
         points: this.gpPoints,
         done: this.gpDone,
       },
+      this.stuckFor > 2,
     );
     this.minimap.update(
       [this.kart, ...this.aiKarts],
@@ -471,8 +509,8 @@ export class Game {
           b.velocity.multiplyScalar(0.98);
           if (a === this.kart || b === this.kart) this.kart.lastWallHit = this.simTime;
         }
-        this.track.constrain(a.position);
-        this.track.constrain(b.position);
+        a.trackIdx = this.track.constrain(a.position, a.trackIdx).index;
+        b.trackIdx = this.track.constrain(b.position, b.trackIdx).index;
       }
     }
   }

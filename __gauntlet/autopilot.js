@@ -16,11 +16,11 @@
     if (!g.race.allowsDrive) { releaseAll(); return; }
     if (g.race.player.finished) { releaseAll(); return; }
     const fwd = k.velocity.dot(k.forward());
-    const q = tr.query(k.position);
+    const q = tr.query(k.position, k.trackIdx);
     const lateral = q.lateral, tanNow = q.tangent;
     let look = Math.min(7 + 0.55 * Math.max(0, fwd), 26);
     if (Math.abs(lateral) > 3.5) look *= 0.5;
-    const p = tr.lookaheadPoint(k.position, look);
+    const p = tr.lookaheadPoint(k.position, look, k.trackIdx);
     const toT = p.clone().sub(k.position).setY(0);
     let steer = 0;
     if (toT.lengthSq() > 1e-6) {
@@ -34,16 +34,16 @@
     let minR = Infinity;
     for (const f of [0.35, 0.7, 1.0]) {
       const d = Math.max(horizon * f, 1);
-      const pp = tr.lookaheadPoint(k.position, d);
-      const tan = tr.tangentAt(tr.nearestIndex(pp));
+      const pp = tr.lookahead(k.position, d, k.trackIdx);
+      const tan = tr.tangentAt(pp.index);
       const ang = Math.abs(sAng(tanNow, tan));
       if (ang > 1e-4) minR = Math.min(minR, d / ang);
     }
     let target = 28;
     if (minR < Infinity) target = Math.min(target, Math.max(Math.sqrt(26 * minR), 8));
     const nearD = Math.max(look * 0.6, 6);
-    const np = tr.lookaheadPoint(k.position, nearD);
-    const tanN = tr.tangentAt(tr.nearestIndex(np));
+    const np = tr.lookahead(k.position, nearD, k.trackIdx);
+    const tanN = tr.tangentAt(np.index);
     const turnN = sAng(tanNow, tanN);
     const rNow = Math.abs(turnN) > 1e-4 ? nearD / Math.abs(turnN) : Infinity;
     const drifting = k.driftDir !== 0;

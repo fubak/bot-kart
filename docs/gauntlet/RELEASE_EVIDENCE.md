@@ -42,6 +42,7 @@ All captures are live in-game (Playwright-driven Chromium at :5173).
 | Live critic #2 | 5/10 FAIL | drift runaway, wall rebound, camera lag fixed |
 | Live critic #3 | 7.5/10 PASS | results DNF-freeze, landing feedback, cosmetics fixed |
 | Release critic | 8/10 PASS | all wave-3 verified; pause soft-lock + item leak fixed |
+| Wave-4 critic3 | 8/10 PASS | GP leak + foldback beaching fixed & re-verified; 3 LOW fixed post-report |
 
 ## Release-critic highlights (wave-3)
 
@@ -155,3 +156,38 @@ traffic lock 7.8% unchanged.
 - **Critic2 post-fixes verified live** — modal menu (kart 0.0 m/s while
   arrows adjust), items cleared on R, Q→title, Backspace→centerline,
   Escape no longer starts race.
+
+## Wave 4 — Critic3 pass (8/10) + fix batch
+
+Full report: `wave4/CRITIC3_REPORT.md` (HARD difficulty, all 3 tracks,
+full Grand Prix, 20-item verified-working list, clean console).
+
+**HIGH defects — fixed mid-session + critic re-verified at runtime:**
+- **D1 Grand Prix state leak** — post-cup title read "leg 4/3" and a
+  later normal race rendered stale FINAL STANDINGS
+  (`critic3-gp-leg43.png`, `critic3-gp-stale-standings.png`). Fix:
+  `resetCup()` + title-return re-arms a fresh cup on PG + R on final
+  standings starts a new cup + T locked while a cup is armed.
+  Re-verified: fresh "leg 1/3" after abandon AND completion;
+  `gp-final-v2.png` shows a second complete cup (BOT-B 27★).
+- **D2 Foldback beaching** — global `nearestIndex` snapped karts/queries
+  to parallel legs; a kart could sit on infield grass inside another
+  leg's limit (`critic3-stuck.png`, `critic3-sb-stuck.png`). Fix:
+  `Track.nearestIndexNear` (±48-sample windowed lookup) + per-kart
+  `trackIdx` continuity hints through constrain/query/surfaceAt/
+  heightAt/lookahead/progress + swap/respawn re-anchoring. Verified:
+  mid-infield teleport clamps back to `lat -5.25` on-road.
+
+**LOW defects — fixed post-report:**
+- **D3 pause-input leak** — N advanced the cup behind the PAUSED
+  overlay; now pause-gated + pause cleared on leg transition.
+  Verified: N inert while paused, advances after unpause.
+- **D4 wall-pin recovery** — new players couldn't discover ⌫/S;
+  HUD now shows "STUCK? ⌫ respawn · S reverse" after ~2 s of
+  throttle-held crawling <1.5 m/s (`wave4/d4-stuck-hint.png`).
+- **D5 leg points presentation** — results rows show "+earned → total"
+  instead of stale "0 pts".
+
+**AI smoke post-refactor (all 3 tracks):** PG identical baseline
+(0 hits, 22.22/18.72/17.72); SR 0 hits (best 21.5); NN 3 laps all
+skills, 3-4 hits at frac ~0.61 (first NN baseline — watch item).
