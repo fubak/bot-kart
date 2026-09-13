@@ -80,6 +80,8 @@ export class Kart {
   private glbWheels: THREE.Object3D[] = [];
   private wheelSpin = 0;
   private steerVisual = 0;
+  private pedalL = 0; // brake held — left leg press
+  private pedalR = 0; // throttle held — right leg press
   private lastDt = 0;
   private readonly tint: THREE.Color | null;
   private readonly botUrl: string;
@@ -229,7 +231,7 @@ export class Kart {
         // Seat-base origin → place at cockpit floor, slightly behind center.
         bot.position.set(0, 0.62, 0.28);
         for (const o of this.placeholderDriver) o.visible = false;
-        for (const name of ['arm_l', 'arm_r', 'head']) {
+        for (const name of ['arm_l', 'arm_r', 'head', 'leg_l', 'leg_r']) {
           const node = bot.getObjectByName(name);
           if (node) this.limbs[name] = { node, base: node.rotation.clone() };
         }
@@ -319,6 +321,10 @@ export class Kart {
     }
     const fwd = this.forward();
     const fwdSpeed = this.velocity.dot(fwd);
+    // Pedal work for the driver rig: right leg presses with throttle,
+    // left with brake (CHAR: static legs were the last rig gap).
+    this.pedalR = input.throttle;
+    this.pedalL = input.brake;
 
     // --- throttle / brake ---
     const boosting = this.boostTimer > 0;
@@ -596,6 +602,8 @@ export class Kart {
     const armL = this.limbs['arm_l'];
     const armR = this.limbs['arm_r'];
     const headN = this.limbs['head'];
+    const legL = this.limbs['leg_l'];
+    const legR = this.limbs['leg_r'];
     if (this.celebrating) {
       // Victory bounce — the winner (finishRank 1) pumps an arm high while
       // other finishers give a smaller gracious hop with a dipped head.
@@ -613,12 +621,18 @@ export class Kart {
         );
       }
       if (armL) armL.node.rotation.set(armL.base.x - (winner ? 1.4 : 0.3), armL.base.y, armL.base.z + Math.sin(t * 9 + 1) * 0.3 * amp);
+      // Legs kick with the hop — the whole driver celebrates.
+      if (legL) legL.node.rotation.set(legL.base.x - 0.35 + Math.sin(t * 9) * 0.15, legL.base.y, legL.base.z);
+      if (legR) legR.node.rotation.set(legR.base.x - 0.35 + Math.sin(t * 9 + 1.6) * 0.15, legR.base.y, legR.base.z);
       return;
     }
     if (this.isSpinning) {
       if (armL) armL.node.rotation.set(armL.base.x - 2.2, armL.base.y, armL.base.z + Math.sin(t * 30) * 0.5);
       if (armR) armR.node.rotation.set(armR.base.x - 2.2, armR.base.y, armR.base.z - Math.sin(t * 30) * 0.5);
       if (headN) headN.node.rotation.set(headN.base.x + 0.3, headN.base.y + Math.sin(t * 20) * 0.4, headN.base.z);
+      // Legs kick with the flail.
+      if (legL) legL.node.rotation.set(legL.base.x - 0.5 + Math.sin(t * 26) * 0.25, legL.base.y, legL.base.z);
+      if (legR) legR.node.rotation.set(legR.base.x - 0.5 + Math.sin(t * 26 + 1.6) * 0.25, legR.base.y, legR.base.z);
     } else {
       if (armL) armL.node.rotation.copy(armL.base);
       if (armR) armR.node.rotation.copy(armR.base);
@@ -628,6 +642,20 @@ export class Kart {
           headN.base.x,
           headN.base.y - this.steerVisual * 0.45 - slip * 0.25,
           headN.base.z,
+        );
+      // Pedal work: right leg presses with throttle, left with brake —
+      // the driver visibly works the kart (CHAR: static legs).
+      if (legL)
+        legL.node.rotation.set(
+          legL.base.x - this.pedalL * 0.22 + Math.sin(t * 2.3) * 0.015,
+          legL.base.y,
+          legL.base.z,
+        );
+      if (legR)
+        legR.node.rotation.set(
+          legR.base.x - this.pedalR * 0.22 + Math.sin(t * 2.3 + 1.6) * 0.015,
+          legR.base.y,
+          legR.base.z,
         );
     }
     // Blink: brief 120 ms eye squash every 2.5–5.5 s — bots feel alive.
