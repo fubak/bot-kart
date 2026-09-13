@@ -11,7 +11,7 @@ import { KART } from '../config/tuning';
 // Items (v1): BOOST — burst of speed; MISSILE — homes forward along the
 // centerline and spins out the first kart it tags.
 
-export type ItemKind = 'boost' | 'missile' | 'slick';
+export type ItemKind = 'boost' | 'missile' | 'slick' | 'shield';
 
 const BOX_RADIUS = 1.6; // pickup distance, m
 const RESPAWN_S = 7;
@@ -70,6 +70,14 @@ const slickMat = new THREE.MeshStandardMaterial({
   emissive: 0x7a5c00,
   flatShading: true,
 });
+const shieldGeo = new THREE.SphereGeometry(1.9, 16, 12);
+const shieldMat = new THREE.MeshStandardMaterial({
+  color: 0x60d0ff,
+  emissive: 0x1a5a80,
+  transparent: true,
+  opacity: 0.28,
+  depthWrite: false,
+});
 const padGeo = new THREE.PlaneGeometry(2.2, 3.2);
 const padMat = new THREE.MeshStandardMaterial({
   color: 0x30e8a0,
@@ -89,10 +97,20 @@ export class Items {
   private readonly slicks: Slick[] = [];
   private readonly pads: Pad[] = [];
   private readonly karts: Kart[] = [];
+  /** Per-kart shield expiry (sim-time) + bubble mesh while active. */
+  readonly shieldUntil: number[] = [];
+  private readonly shieldMeshes: THREE.Mesh[] = [];
 
   constructor(private readonly track: Track, karts: Kart[]) {
     this.karts = karts;
     this.held = karts.map(() => null);
+    for (let i = 0; i < karts.length; i++) {
+      this.shieldUntil.push(0);
+      const bubble = new THREE.Mesh(shieldGeo, shieldMat);
+      bubble.visible = false;
+      this.group.add(bubble);
+      this.shieldMeshes.push(bubble);
+    }
     // Rows of 3 boxes at ~1/8-lap intervals, staggered across the road.
     const n = track.sampleCount;
     const spreads = [-3, 0, 3];
@@ -139,7 +157,7 @@ export class Items {
   /** Roll a random item — boost most common, then missile, then slick. */
   private roll(): ItemKind {
     const r = Math.random();
-    return r < 0.45 ? 'boost' : r < 0.75 ? 'missile' : 'slick';
+    return r < 0.38 ? 'boost' : r < 0.68 ? 'missile' : r < 0.86 ? 'slick' : 'shield';
   }
 
   /** Fire kart `k`'s held item. Returns the item used (or null). */
@@ -150,6 +168,11 @@ export class Items {
     const kart = this.karts[kartIdx];
     if (item === 'boost') {
       kart.boostTimer = Math.max(kart.boostTimer, KART.boostTime[1]);
+      return item;
+    }
+    if (item === 'shield') {
+      // Defensive bubble — absorbs the next missile/slick hit for ~8 s.
+      this.shieldUntil[kartIdx] = simTime + 8;
       return item;
     }
     if (item === 'slick') {
@@ -234,14 +257,19 @@ export class Items {
         t.clone().negate(), // cone +Y tip faces -tangent? keep nose forward
       );
       let hit = false;
-      for (const kart of this.karts) {
+      for (let k = 0; k < this.karts.length; k++) {
+        const kart = this.karts[k];
         if (kart === m.owner) continue;
         const d = kart.position.distanceTo(m.mesh.position);
         if (d < MISSILE_HIT) {
-          kart.velocity.multiplyScalar(MISSILE_SLOW);
-          kart.lastWallHit = simTime;
-          kart.lastWallImpact = 0.7;
-          kart.spinUntil = simTime + 0.9;
+          if (simTime < this.shieldUntil[k]) {
+            this.shieldUntil[k] = 0; // shield absorbs the hit, consumed
+          } else {
+            kart.velocity.multiplyScalar(MISSILE_SLOW);
+            kart.lastWallHit = simTime;
+            kart.lastWallImpact = 0.7;
+            kart.spinUntil = simTime + 0.9;
+          }
           hit = true;
           break;
         }
@@ -260,19 +288,35 @@ export class Items {
         continue;
       }
       s.mesh.rotation.y += dt * 0.8;
-      for (const kart of this.karts) {
+      for (let k = 0; k < this.karts.length; k++) {
+        const kart = this.karts[k];
         if (kart === s.owner && simTime < s.spawnedAt + 1.2) continue;
         const dx = kart.position.x - s.pos.x;
         const dz = kart.position.z - s.pos.z;
         if (dx * dx + dz * dz < 1.2) {
-          kart.velocity.multiplyScalar(0.3);
-          kart.lastWallHit = simTime;
-          kart.lastWallImpact = 0.55;
-          kart.spinUntil = simTime + 1.1;
+          if (simTime < this.shieldUntil[k]) {
+            this.shieldUntil[k] = 0; // shield absorbs the hit, consumed
+          } else {
+            kart.velocity.multiplyScalar(0.3);
+            kart.lastWallHit = simTime;
+            kart.lastWallImpact = 0.55;
+            kart.spinUntil = simTime + 1.1;
+          }
           this.group.remove(s.mesh);
           this.slicks.splice(i, 1);
           break;
         }
+      }
+    }
+    // Shield bubbles follow their kart while active.
+    for (let k = 0; k < this.karts.length; k++) {
+      const active = simTime < this.shieldUntil[k];
+      const b = this.shieldMeshes[k];
+      b.visible = active;
+      if (active) {
+        b.position.copy(this.karts[k].position);
+        b.position.y += 0.9;
+        b.scale.setScalar(1 + Math.sin(simTime * 6 + k) * 0.04);
       }
     }
     // Compact dead missiles occasionally
