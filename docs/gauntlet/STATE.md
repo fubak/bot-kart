@@ -10,21 +10,22 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Wave 1 spine is shipped and stable. Now deepening the game: AI opponents are
-integrated and racing; next gaps are rival-asset distinctness, track
-identity, items, and the live-race critique currently in flight.
+Wave 2 depth pass: elevation, items, distinct rivals, race results, and
+traffic-aware AI are all integrated. A fresh whole-game critic is evaluating
+the current build; next targets are whatever it flags plus music/menu/minimap
+polish and the whole-game + final-release gauntlets.
 
 ---
 
 ## Active Managed Devins
 
-- Gameplay Critic (background, subagent_general): live 4-kart race critique —
-  pacing, collision feel, grid start, race integrity, stuck-AI detection.
+- Whole-Game Critic #3 (background, subagent_general): live critique of the
+  elevation+items build — re-verifying finish ranking, pair-lock, drift
+  economy, plus pads/chevrons/airtime.
 
-Prior agents this wave: Gameplay Critic #1 (slice FAIL 4/10, static audit),
-Critic #2 (live drive FAIL 5/10 — drift model rebuilt), Grok Concept Builder
-(3 bot candidates; A canonical), Blender Asset Builder (kart-a.glb +
-grokbot-a.glb + bot-a.glb delivered), AI Builder (AiDriver.ts + smoke harness).
+Prior agents: Critics #1 (4/10) and #2 (5/10 — both fixed), Grok Concept
+Builder (A canonical), Blender Asset Builders (kart-a, grokbot-a, bot-a,
+grokbot-b, grokbot-c + seated variants), AI Builder (AiDriver + smoke).
 
 ---
 
@@ -38,14 +39,11 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. **Rival distinctness** — AI karts differ only by tint; need Bot B/C
-   geometry + personality (heavy/power, speed archetypes).
-2. **Track identity** — flat circuit; needs signature corner, elevation,
-   curb alternation, corner signage. AI grazes walls at idx 380/430/701.
-3. **Items/pickups** — none exist; needed for kart-genre depth.
-4. **AI-vs-player interplay** — collision works; no AI avoidance of each
-   other yet (they share the centerline).
-5. Finish = banner only; no results screen.
+1. Whatever critic #3 flags on the current build.
+2. **Audio depth** — SFX only; no music, no positional/racer audio.
+3. **Read-only spectate polish** — minimap, podium/finish camera, menu flow.
+4. **Item variety** — boost + missile only; genre wants 4-6 kinds.
+5. Kart meshes still shared Kart A tinted — distinct kart geometry per rival.
 
 ---
 
