@@ -28,8 +28,11 @@ export class Kart {
   driftCharge = 0;
   boostTimer = 0;
   state: DriveState = 'grip';
-  lastWallHit = -1; // sim-time of last wall impact (feedback hooks consume)
+  lastWallHit = -1; // sim-time of last impact w/ feedback (walls + landings)
   lastWallImpact = 0; // 0..1 severity of the last impact (camera/audio scale)
+  /** True wall impacts only — the QA metric (lastWallHit also fires on
+   *  landings and item hits, which legitimately shake/thump). */
+  wallHitCount = 0;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
   private wallContact = false;
   private steerSmooth = 0;
@@ -225,6 +228,7 @@ export class Kart {
     this.steerSmooth = 0;
     this.impactSquash = 0;
     this.slipAngle = 0;
+    this.wallHitCount = 0;
     this.syncVisual();
   }
 
@@ -372,6 +376,7 @@ export class Kart {
           const fNow = this.velocity.dot(fwd);
           if (fNow < 0) this.velocity.addScaledVector(fwd, -fNow);
           this.lastWallHit = simTime;
+          this.wallHitCount++;
           this.impactSquash = 0.4 + 0.6 * impact;
           this.wallContact = true;
         } else {

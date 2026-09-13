@@ -41,7 +41,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
   const dt = SIM.fixedDt;
   let simTime = 0;
   let wallHits = 0;
-  let lastWall = -1;
+  let lastWall = 0; // wallHitCount starts at 0 — landings don't count here
   let maxLat = 0;
   let driftSteps = 0;
   let speedSum = 0;
@@ -71,9 +71,9 @@ function runOne(skill: number, simSeconds: number): RunResult {
       );
       if (trace.length > 40) trace.shift();
     }
-    if (kart.lastWallHit > lastWall) {
+    if (kart.wallHitCount > lastWall) {
       wallHits++;
-      lastWall = kart.lastWallHit;
+      lastWall = kart.wallHitCount;
       wallHitIdx.push(track.nearestIndex(kart.position));
       wallHitSpeed.push(Math.round(kart.speed * 10) / 10);
       if (firstHitTrace.length === 0) firstHitTrace = [...trace];
