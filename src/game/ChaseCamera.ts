@@ -33,9 +33,9 @@ export class ChaseCamera {
       .addScaledVector(fwd, -dist)
       .add(new THREE.Vector3(0, CAMERA.height, 0));
 
-    // Countdown intro: slow orbit that sweeps toward the chase position and
-    // hands over smoothly at GO (the normal lerp lands it behind the kart).
-    const inCountdown = !!race && race.phase === 'countdown';
+    // Title + countdown: slow orbit that sweeps toward the chase position
+    // and hands over smoothly at GO (the normal lerp lands it behind).
+    const inCountdown = !!race && (race.phase === 'countdown' || race.phase === 'title');
     if (inCountdown) {
       this.introAngle += dt * 0.55;
       const a = this.introAngle;

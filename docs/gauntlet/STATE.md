@@ -2,7 +2,7 @@
 
 Last Updated: 2026-09-13
 Coordinator: Devin Desktop (primary session)
-Current Wave: 1→2 transition
+Current Wave: 2→3 transition
 Project Phase: Execution
 Overall Status: EXECUTING
 
@@ -10,18 +10,16 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Wave 2 depth pass: elevation, items, distinct rivals, race results, and
-traffic-aware AI are all integrated. A fresh whole-game critic is evaluating
-the current build; next targets are whatever it flags plus music/menu/minimap
-polish and the whole-game + final-release gauntlets.
+Critic #3 returned 7.5/10 — all three flagged defects fixed and verified
+live (results DNF-freeze, landing feedback, cosmetics). Now building Wave 3
+polish: title/press-to-start flow, pause, minimap, bot expressiveness,
+third item type, accessibility — then whole-game + release gauntlets.
 
 ---
 
 ## Active Managed Devins
 
-- Whole-Game Critic #3 (background, subagent_general): live critique of the
-  elevation+items build — re-verifying finish ranking, pair-lock, drift
-  economy, plus pads/chevrons/airtime.
+None running.
 
 Prior agents: Critics #1 (4/10) and #2 (5/10 — both fixed), Grok Concept
 Builder (A canonical), Blender Asset Builders (kart-a, grokbot-a, bot-a,
@@ -39,11 +37,12 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. Whatever critic #3 flags on the current build.
-2. **Audio depth** — SFX only; no music, no positional/racer audio.
-3. **Read-only spectate polish** — minimap, podium/finish camera, menu flow.
+1. **Menu flow** — race auto-starts on load; needs press-to-start + pause.
+2. **Minimap** — kart-racing staple, absent.
+3. **Bot expressiveness** — drivers are static; need idle motion/reactions.
 4. **Item variety** — boost + missile only; genre wants 4-6 kinds.
-5. Kart meshes still shared Kart A tinted — distinct kart geometry per rival.
+5. **Accessibility** — no reduced-motion/colorblind/remap options yet.
+6. Kart meshes still shared Kart A tinted — distinct kart geometry per rival.
 
 ---
 
@@ -65,9 +64,13 @@ None.
 ## Latest Critic Results
 
 - Slice critic (static audit): FAIL 4/10 — all findings fixed.
-- Live critic #2: FAIL 5/10 — drift yaw runaway (62–80° slip) rebuilt and
-  re-verified (stable ~28° slip, tier-1 charge); wall rebound + camera lag
-  fixed. Live race critic: RUNNING.
+- Live critic #2: FAIL 5/10 — drift yaw runaway + wall + camera fixed.
+- Live critic #3: PASS 7.5/10 — re-verified all 4 wave-2 fixes working
+  (finish ranking math, traffic model 3-4% contact, drift economy
+  14-20s boost/racer, elevation+airtime). Defects fixed post-report:
+  results DNF-freeze (2 Hz live re-render), landing squash/dust/thump,
+  FINISH text overlap, -0 km/h. Minor noted: crest-lip contact 1/12
+  passes, missiles beat off-line karts, no grass state.
 
 ---
 

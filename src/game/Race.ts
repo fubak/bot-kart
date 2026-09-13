@@ -8,7 +8,7 @@ import { RACE } from '../config/tuning';
 // Each racer (player + AI) gets a RacerProgress tracker; positions rank by
 // lap+progress. Race phase follows the PLAYER (racer 0).
 
-export type RacePhase = 'countdown' | 'racing' | 'finished';
+export type RacePhase = 'title' | 'countdown' | 'racing' | 'finished';
 
 const GATE_FRACTIONS = [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0];
 
@@ -117,7 +117,7 @@ export class RacerProgress {
 }
 
 export class Race {
-  phase: RacePhase = 'countdown';
+  phase: RacePhase = 'title';
   countdownLeft = RACE.countdown;
   goFlash = 0; // brief "GO!" display window after countdown
   raceStart = 0;
@@ -139,8 +139,16 @@ export class Race {
   /** Human-readable countdown label: '3' | '2' | '1' | 'GO!' | '' */
   get countdownLabel(): string {
     if (this.phase === 'countdown') return String(Math.ceil(this.countdownLeft));
-    if (this.goFlash > 0) return 'GO!';
+    if (this.phase === 'racing' && this.goFlash > 0) return 'GO!';
     return '';
+  }
+
+  /** Title → countdown transition (called on the start gesture). */
+  beginCountdown(simTime: number): void {
+    if (this.phase !== 'title') return;
+    this.phase = 'countdown';
+    this.countdownLeft = RACE.countdown;
+    this.raceStart = simTime;
   }
 
   // Player-facing accessors (racer 0).
@@ -166,7 +174,7 @@ export class Race {
     return this.player.wrongWay;
   }
   get raceTime(): number {
-    if (this.phase === 'countdown') return 0;
+    if (this.phase === 'countdown' || this.phase === 'title') return 0;
     const end = this.player.finished ? this.player.finishTime : this.lastSimTime;
     return end - this.raceStart;
   }
@@ -187,6 +195,7 @@ export class Race {
 
   update(positions: THREE.Vector3[], simTime: number, dt: number): void {
     this.lastSimTime = simTime;
+    if (this.phase === 'title') return;
     if (this.phase === 'countdown') {
       this.countdownLeft -= dt;
       if (this.countdownLeft <= 0) {
@@ -204,8 +213,12 @@ export class Race {
     if (this.phase === 'racing' && this.player.finished) this.phase = 'finished';
   }
 
-  restart(spawnPositions: THREE.Vector3[], simTime: number): void {
-    this.phase = 'countdown';
+  restart(
+    spawnPositions: THREE.Vector3[],
+    simTime: number,
+    phase: RacePhase = 'countdown',
+  ): void {
+    this.phase = phase;
     this.countdownLeft = RACE.countdown;
     this.goFlash = 0;
     this.raceStart = 0;

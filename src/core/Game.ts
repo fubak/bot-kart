@@ -38,6 +38,7 @@ export class Game {
   private accumulator = 0;
   private lastMs = 0;
   private simTime = 0;
+  private paused = false;
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -75,14 +76,23 @@ export class Game {
       spawnPositions.push(slot.position.clone());
     }
     this.race = new Race(this.track, undefined, 1 + AI_COUNT);
-    this.race.restart(spawnPositions, 0);
+    this.race.restart(spawnPositions, 0, 'title');
     this.items = new Items(this.track, [this.kart, ...this.aiKarts]);
     this.scene.add(this.items.group);
 
-    // R = restart race (input-edge handled here, not in ControlState).
+    // Input edges handled here (not in ControlState): title→start, pause,
+    // item fire, restart.
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !e.repeat) this.items.use(0, this.simTime);
-      if (e.code === 'KeyR' && !e.repeat) {
+      if (e.repeat) return;
+      if (this.race.phase === 'title' && e.code !== 'Backquote') {
+        this.race.beginCountdown(this.simTime);
+        return;
+      }
+      if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase === 'racing') {
+        this.paused = !this.paused;
+      }
+      if (e.code === 'Space') this.items.use(0, this.simTime);
+      if (e.code === 'KeyR') {
         const s = this.track.spawn();
         this.kart.reset(s.position, s.heading);
         const positions = [s.position.clone()];
@@ -139,9 +149,9 @@ export class Game {
     this.lastMs = ms;
 
     const input = pollInput();
-    this.accumulator += frameDt;
-    const canDrive = this.race.allowsDrive;
-    while (this.accumulator >= SIM.fixedDt) {
+    if (!this.paused) this.accumulator += frameDt;
+    const canDrive = this.race.allowsDrive && !this.paused;
+    while (!this.paused && this.accumulator >= SIM.fixedDt) {
       this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime);
       const allKarts = [this.kart, ...this.aiKarts];
       for (let i = 0; i < this.aiKarts.length; i++) {
@@ -163,7 +173,7 @@ export class Game {
     this.chaseCam.update(frameDt, this.kart, this.race);
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
-    this.raceHud.update(this.race, this.kart, this.simTime, this.items.held[0]);
+    this.raceHud.update(this.race, this.kart, this.simTime, this.items.held[0], this.paused);
     this.audio.update(this.kart, this.race, this.simTime);
     this.renderer.render(this.scene, this.chaseCam.camera);
   }

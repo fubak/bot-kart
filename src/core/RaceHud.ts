@@ -49,13 +49,61 @@ export class RaceHud {
       'font-weight:700;color:#fff;background:rgba(10,16,28,.82);padding:22px 34px;' +
       'border-radius:10px;display:none;text-align:left;line-height:1.9;min-width:320px',
     );
+    this.titleEl = mk(
+      'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;' +
+      'color:#fff;display:none',
+    );
+    this.titleEl.innerHTML =
+      `<div style="font-size:64px;font-weight:900;letter-spacing:.06em;` +
+      `background:linear-gradient(180deg,#fff,#7be8ff);-webkit-background-clip:text;` +
+      `-webkit-text-fill-color:transparent">GROK KART</div>` +
+      `<div style="font-size:15px;color:#9fb4d0;margin-top:6px">a grok bots racing game</div>` +
+      `<div style="font-size:26px;font-weight:800;margin-top:26px;color:#ffe28a">` +
+      `PRESS ENTER</div>` +
+      `<div style="font-size:13px;color:#9fb4d0;margin-top:14px;line-height:1.8">` +
+      `WASD / arrows — drive &nbsp;·&nbsp; SHIFT — drift &nbsp;·&nbsp; ` +
+      `SPACE — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; R — restart</div>`;
+    this.pauseEl = mk(
+      'top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;' +
+      'font-weight:900;color:#fff;display:none;text-align:center',
+    );
+    this.pauseEl.innerHTML =
+      'PAUSED<div style="font-size:15px;color:#9fb4d0;margin-top:8px">P / Esc to resume</div>';
   }
 
   private readonly itemEl: HTMLDivElement;
   private readonly resultsEl: HTMLDivElement;
+  private readonly titleEl: HTMLDivElement;
+  private readonly pauseEl: HTMLDivElement;
   private resultsRenderedAt = -1;
+  private titlePulseAt = 0;
 
-  update(race: Race, kart: Kart, simTime: number, heldItem?: string | null): void {
+  update(
+    race: Race,
+    kart: Kart,
+    simTime: number,
+    heldItem?: string | null,
+    paused = false,
+  ): void {
+    this.titleEl.style.display = race.phase === 'title' ? 'block' : 'none';
+    if (race.phase === 'title') {
+      // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
+      if (simTime - this.titlePulseAt > 0.06) {
+        this.titlePulseAt = simTime;
+        const a = 0.55 + 0.45 * Math.sin(simTime * 3.2);
+        const press = this.titleEl.children[2] as HTMLElement;
+        press.style.opacity = a.toFixed(2);
+      }
+      this.center.textContent = '';
+      this.lapEl.textContent = '';
+      this.timesEl.innerHTML = '';
+      this.itemEl.textContent = '';
+      this.warnEl.style.display = 'none';
+      this.resultsEl.style.display = 'none';
+      this.pauseEl.style.display = 'none';
+      return;
+    }
+    this.pauseEl.style.display = paused ? 'block' : 'none';
     const justFinished =
       race.phase === 'finished' && simTime - race.player.finishTime < 1.5;
     this.center.textContent =
@@ -82,7 +130,8 @@ export class RaceHud {
       `LAST&nbsp;${fmt(race.lastLapTime)}<br>` +
       `BEST&nbsp;${fmt(race.bestLapTime)}`;
 
-    this.warnEl.style.display = race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
+    this.warnEl.style.display =
+      !paused && race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
     this.itemEl.textContent =
       race.phase === 'racing' && heldItem ? `${heldItem.toUpperCase()} [space]` : '';
 
