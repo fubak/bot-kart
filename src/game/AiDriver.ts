@@ -20,6 +20,7 @@ export class AiDriver {
 
   private driftTime = 0;
   private recovering = false;
+  private prevLateral = 0;
 
   constructor(skill = 1.0) {
     this.skill = THREE.MathUtils.clamp(skill, 0.8, 1.1);
@@ -29,6 +30,7 @@ export class AiDriver {
   reset(): void {
     this.driftTime = 0;
     this.recovering = false;
+    this.prevLateral = 0;
   }
 
   update(kart: Kart, track: Track, dt: number): ControlState {
@@ -37,6 +39,14 @@ export class AiDriver {
 
     // Local track frame: lateral offset + travel-direction tangent.
     const { lateral, tangent: tanNow } = track.query(kart.position);
+    // Lateral velocity (m/s, signed) — how fast the slide is carrying the
+    // kart toward a wall. Clamped: centerline index jumps can spike it.
+    const latVel = THREE.MathUtils.clamp(
+      dt > 1e-6 ? (lateral - this.prevLateral) / dt : 0,
+      -15,
+      15,
+    );
+    this.prevLateral = lateral;
 
     // --- recovery: nose pointing backward along the track ---
     // Post-wall-hit spins can leave the kart facing >160° off the travel
@@ -140,11 +150,15 @@ export class AiDriver {
       const cornerFlipped =
         Math.abs(turnNear) > AI.driftFlipAngle &&
         Math.sign(turnNear) === kart.driftDir; // bends opposite the slide
+      // Project the slide forward: |lat| alone reacts too late — an outward
+      // slide at 5 m/s reaches the barrier ~0.4 s before the margin trips.
+      const latProj = lateral + latVel * AI.driftWallMarginTime;
       const exit =
         radiusNow > AI.driftExitRadius ||
         fwdSpeed < AI.driftMinSpeed * 0.7 ||
         this.driftTime > AI.driftMaxTime ||
-        cornerFlipped;
+        cornerFlipped ||
+        Math.abs(latProj) > AI.driftWallMargin;
       if (exit) {
         this.driftTime = 0; // release now → charged boost fires on corner exit
       } else {

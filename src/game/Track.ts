@@ -148,6 +148,15 @@ export class Track {
     return this.samples.length;
   }
 
+  /** Grid slot: `backSamples` behind the start line, `lateral` offset (m). */
+  gridSlot(backSamples: number, lateral: number): { position: THREE.Vector3; heading: number } {
+    const n = this.samples.length;
+    const i = ((Math.floor(n * 0.01) - backSamples) % n + n) % n;
+    const s = this.samples[i];
+    const position = s.point.clone().addScaledVector(s.left, lateral);
+    return { position, heading: Math.atan2(-s.tangent.x, -s.tangent.z) };
+  }
+
   /** Spawn transform: on the grid just past the start line, facing tangent. */
   spawn(): { position: THREE.Vector3; heading: number } {
     const s = this.samples[Math.floor(this.samples.length * 0.01)];

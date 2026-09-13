@@ -48,8 +48,11 @@ export class RaceHud {
       race.phase === 'finished'
         ? 'FINISH'
         : race.countdownLabel;
+    const pos = race.positionOf(0);
     this.lapEl.textContent =
-      race.phase === 'countdown' ? '' : `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}`;
+      race.phase === 'countdown'
+        ? ''
+        : `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}   P${pos}/${race.racers.length}`;
 
     const cur = race.phase === 'racing' ? simTime - race.lapStart : 0;
     this.timesEl.innerHTML =

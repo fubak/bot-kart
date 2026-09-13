@@ -110,7 +110,7 @@ export const AI = {
   steerGain: 2.4,
 
   // Corner speed model: vTarget = sqrt(cornerAccel * turnRadius).
-  cornerAccel: 23, // m/s² lateral budget — raise for faster cornering
+  cornerAccel: 26, // m/s² lateral budget — raise for faster cornering
   cornerMinSpeed: 8, // never slow below this for a corner (m/s)
   // Brake only when speed exceeds target*brakeMargin; pressure ramps up over
   // brakeBand m/s of overspeed so light overshoot gets a light tap.
@@ -120,7 +120,7 @@ export const AI = {
   // Braking horizon = max(lookahead*brakeLookMul, speed*brakeTimeAhead); the
   // worst curvature found at these horizon fractions sets the target speed.
   brakeLookMul: 1.4,
-  brakeTimeAhead: 1.25,
+  brakeTimeAhead: 1.1,
   curveSampleFracs: [0.35, 0.7, 1.0],
 
   // Off-line rejoin: beyond this |lateral| (m) shrink the lookahead so the bot
@@ -136,10 +136,15 @@ export const AI = {
   driftExitRadius: 30,
   driftMinSpeed: 13,
   driftMaxTime: 2.4,
+  // Wall margin: release the drift when the slide arc reaches the barrier —
+  // compares driftWallMargin against |lateral + latVel*driftWallMarginTime|
+  // (position projected forward by slide velocity, so it fires ~0.4s early).
+  driftWallMargin: 4.4,
+  driftWallMarginTime: 0.45,
   // While drifting: steer = pursuit*driftPursuitMul + driftDir*driftSteerBias —
   // holds the slide but lets the pursuit term modulate the line.
   driftPursuitMul: 0.6,
-  driftSteerBias: 0.5,
+  driftSteerBias: 0.4,
   // S-curve guard: release drift if the corner bends opposite the drift dir
   // by more than this tangent angle (rad).
   driftFlipAngle: 0.15,

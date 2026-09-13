@@ -21,6 +21,7 @@ interface RunResult {
   wallHits: number;
   wallHitIdx: number[]; // centerline index at each hit — finds hot spots
   wallHitSpeed: number[];
+  firstHitTrace: string[]; // ~2s of state before the first wall hit
   maxLateral: number;
   driftPct: number;
   avgSpeed: number;
@@ -35,7 +36,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
   const race = new Race(track);
   const spawn = track.spawn();
   kart.reset(spawn.position, spawn.heading);
-  race.restart(spawn.position, 0);
+  race.restart([spawn.position], 0);
 
   const dt = SIM.fixedDt;
   let simTime = 0;
@@ -48,21 +49,34 @@ function runOne(skill: number, simSeconds: number): RunResult {
   let wrongWaySteps = 0;
   const wallHitIdx: number[] = [];
   const wallHitSpeed: number[] = [];
+  // Ring-buffer trace for post-mortem around the first wall hit.
+  const trace: string[] = [];
+  let firstHitTrace: string[] = [];
   const steps = Math.round(simSeconds / dt);
 
   for (let i = 0; i < steps; i++) {
     const ctl = race.allowsDrive ? ai.update(kart, track, dt) : IDLE;
     kart.update(dt, ctl, track, simTime);
-    race.update(kart.position, simTime, dt);
+    race.update([kart.position], simTime, dt);
     simTime += dt;
 
     const { lateral } = track.query(kart.position);
     if (Math.abs(lateral) > maxLat) maxLat = Math.abs(lateral);
+    if (i % 6 === 0) {
+      trace.push(
+        `t=${simTime.toFixed(1)} i=${track.nearestIndex(kart.position)} ` +
+          `lat=${lateral.toFixed(1)} v=${kart.speed.toFixed(1)} ` +
+          `fwd=${kart.forwardSpeed.toFixed(1)} drift=${kart.driftDir} ` +
+          `steer=${ctl.steer.toFixed(2)} thr=${ctl.throttle} brk=${ctl.brake.toFixed(2)}`,
+      );
+      if (trace.length > 40) trace.shift();
+    }
     if (kart.lastWallHit > lastWall) {
       wallHits++;
       lastWall = kart.lastWallHit;
       wallHitIdx.push(track.nearestIndex(kart.position));
       wallHitSpeed.push(Math.round(kart.speed * 10) / 10);
+      if (firstHitTrace.length === 0) firstHitTrace = [...trace];
     }
     if (kart.driftDir !== 0) driftSteps++;
     if (race.wrongWay) wrongWaySteps++;
@@ -81,6 +95,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
     wallHits,
     wallHitIdx,
     wallHitSpeed,
+    firstHitTrace,
     maxLateral: Math.round(maxLat * 100) / 100,
     driftPct: Math.round((driftSteps / steps) * 1000) / 10,
     avgSpeed: Math.round((speedSum / steps) * 100) / 100,
@@ -90,7 +105,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
 }
 
 try {
-  const results = [0.85, 1.0, 1.1].map((s) => runOne(s, 90));
+  const results = [1.0].map((s) => runOne(s, 60));
   const json = JSON.stringify(results, null, 2);
   const el = document.getElementById('out');
   if (el) el.textContent = json;
