@@ -40,6 +40,12 @@ export class Track {
   readonly group = new THREE.Group();
   private readonly curve: THREE.CatmullRomCurve3;
   private readonly samples: Sample[] = [];
+  // Gravel shortcut aprons: index-range zones where the drivable edge extends
+  // gravelWidth past the road on `side` (-1 = right, +1 = left). The hairpin
+  // apex (frac ~0.62, right-hander) gets an inside cut — shorter, slower.
+  private readonly gravelZones = [
+    { i0: 0.6, i1: 0.662, side: -1 },
+  ];
 
   constructor() {
     this.curve = new THREE.CatmullRomCurve3(
@@ -101,12 +107,36 @@ export class Track {
     return { lateral: rel.dot(s.left), tangent: s.tangent };
   }
 
-  /** Push a position back inside the road if it exceeds the drivable edge. */
-  constrain(pos: THREE.Vector3): { lateral: number; clamped: boolean } {
-    const { lateral } = this.query(pos);
-    const limit = TRACK.roadHalfWidth - 0.75; // kart half-width → edge at wall face
-    if (Math.abs(lateral) <= limit) return { lateral, clamped: false };
+  /** Gravel zone containing a sample index, or null. */
+  private zoneAt(index: number): { i0: number; i1: number; side: number } | null {
+    const n = this.samples.length;
+    const frac = index / n;
+    for (const z of this.gravelZones) {
+      if (frac >= z.i0 && frac <= z.i1) return z;
+    }
+    return null;
+  }
+
+  /** Surface under a position: 'gravel' on shortcut aprons, else 'road'. */
+  surfaceAt(pos: THREE.Vector3): 'road' | 'gravel' {
     const i = this.nearestIndex(pos);
+    const z = this.zoneAt(i);
+    if (!z) return 'road';
+    const { lateral } = this.query(pos);
+    return lateral * z.side > TRACK.roadHalfWidth - 0.5 ? 'gravel' : 'road';
+  }
+
+  /** Push a position back inside the drivable edge — the edge widens onto
+   *  gravel aprons inside shortcut zones (asymmetric per side). */
+  constrain(pos: THREE.Vector3): { lateral: number; clamped: boolean } {
+    const i = this.nearestIndex(pos);
+    const { lateral } = this.query(pos);
+    const roadLimit = TRACK.roadHalfWidth - 0.75; // kart half-width → wall face
+    const z = this.zoneAt(i);
+    // Zone-side edge extends onto gravel; the other edge stays the wall.
+    const limit =
+      z && Math.sign(lateral) === z.side ? roadLimit + TRACK.gravelWidth : roadLimit;
+    if (Math.abs(lateral) <= limit) return { lateral, clamped: false };
     const s = this.samples[i];
     pos.copy(s.point).addScaledVector(s.left, Math.sign(lateral) * limit);
     return { lateral: Math.sign(lateral) * limit, clamped: true };
@@ -298,16 +328,25 @@ export class Track {
       // Wall face sits just past the clamp edge so contact visually touches.
       const off = hw + 0.05;
       const h = TRACK.wallHeight;
+      // Skip samples inside this side's gravel zone → a visible gap where
+      // the shortcut apron opens (karts drive onto dirt, not through wall).
       for (let i = 0; i <= n; i++) {
         const s = this.samples[i % n];
+        const z = this.zoneAt(i % n);
+        const gapped = !!z && z.side === side;
         const bx = s.point.x + s.left.x * side * off;
         const bz = s.point.z + s.left.z * side * off;
+        const base = wallPos.length / 3;
         wallPos.push(bx, s.point.y, bz, bx, s.point.y + h, bz);
+        // Emit quads only when this AND the next sample are both ungapped.
         if (i < n) {
-          const a = i * 2;
-          // CCW when viewed from the road side.
-          if (side > 0) wallIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-          else wallIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+          const zNext = this.zoneAt((i + 1) % n);
+          const gapNext = !!zNext && zNext.side === side;
+          if (!gapped && !gapNext) {
+            const a = base;
+            if (side > 0) wallIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+            else wallIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+          }
         }
       }
       const wallGeo = new THREE.BufferGeometry();
@@ -315,6 +354,58 @@ export class Track {
       wallGeo.setIndex(wallIdx);
       wallGeo.computeVertexNormals();
       this.group.add(new THREE.Mesh(wallGeo, wallMat));
+    }
+
+    // Gravel aprons: dirt ribbon from the road edge outward, plus a low berm
+    // at the far edge (the new wall line). Reads as a rough cut-through.
+    const gravelMat = new THREE.MeshStandardMaterial({
+      color: 0xa08658,
+      roughness: 1,
+      side: THREE.DoubleSide,
+    });
+    for (const z of this.gravelZones) {
+      const gPos: number[] = [];
+      const gIdx: number[] = [];
+      const inner = hw - 0.6;
+      const outer = hw + TRACK.gravelWidth + 0.9;
+      const i0 = Math.floor(z.i0 * n);
+      const i1 = Math.floor(z.i1 * n);
+      for (let i = i0; i <= i1; i++) {
+        const s = this.samples[i];
+        const a = (i - i0) * 2;
+        gPos.push(
+          s.point.x + s.left.x * z.side * inner, s.point.y - 0.015, s.point.z + s.left.z * z.side * inner,
+          s.point.x + s.left.x * z.side * outer, s.point.y - 0.015, s.point.z + s.left.z * z.side * outer,
+        );
+        if (i < i1) {
+          gIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
+        }
+      }
+      const gGeo = new THREE.BufferGeometry();
+      gGeo.setAttribute('position', new THREE.Float32BufferAttribute(gPos, 3));
+      gGeo.setIndex(gIdx);
+      gGeo.computeVertexNormals();
+      this.group.add(new THREE.Mesh(gGeo, gravelMat));
+      // Dirt berm at the gravel's outer edge — low soft mounds marking the
+      // new boundary (reads as piled earth, not barriers).
+      const bermGeo = new THREE.CylinderGeometry(1.6, 2.0, 0.34, 8);
+      const bermMat = new THREE.MeshStandardMaterial({ color: 0x94784f, roughness: 1 });
+      const bermCount = Math.floor((i1 - i0) / 4);
+      const berms = new THREE.InstancedMesh(bermGeo, bermMat, bermCount);
+      const bm = new THREE.Matrix4();
+      const bq = new THREE.Quaternion();
+      const bup = new THREE.Vector3(0, 1, 0);
+      for (let c = 0; c < bermCount; c++) {
+        const s = this.samples[i0 + c * 4];
+        bq.setFromAxisAngle(bup, Math.atan2(s.tangent.x, s.tangent.z) + Math.PI / 2);
+        bm.compose(
+          s.point.clone().addScaledVector(s.left, z.side * (outer + 0.5)).setY(s.point.y + 0.05),
+          bq,
+          new THREE.Vector3(1, 1, 1),
+        );
+        berms.setMatrixAt(c, bm);
+      }
+      this.group.add(berms);
     }
 
     // Embankment skirts: grass ribbon from each road edge outward+down to

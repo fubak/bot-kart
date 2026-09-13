@@ -45,6 +45,7 @@ export class Kart {
   airTime = 0; // seconds airborne — landing feedback scales with it
   slopePitch = 0; // road pitch under the kart — drives body tilt
   slopeRoll = 0;
+  onGravel = false; // off-road apron — heavy drag + rumble (shortcut cost)
 
   private readonly wheels: THREE.Mesh[] = [];
   private readonly frontAxle = new THREE.Group();
@@ -429,6 +430,25 @@ export class Kart {
     const lat = this.velocity.clone().addScaledVector(this.forward(), -fAmt2);
     const latSigned = lat.dot(this.right());
     this.slipAngle = this.speed > 0.5 ? Math.atan2(latSigned, Math.abs(fAmt2)) : 0;
+
+    // Off-road surface: gravel aprons (shortcut zones) — heavy drag, hard
+    // cap, rumble jitter + brown dust. Shorter path, slower surface.
+    this.onGravel = track.surfaceAt(this.position) === 'gravel';
+    if (this.onGravel && this.grounded) {
+      const fs = this.velocity.dot(fwd);
+      this.velocity.addScaledVector(fwd, -Math.sign(fs) * Math.min(Math.abs(fs), KART.gravelDrag * dt));
+      // Hard speed cap on gravel — entering fast scrubs down to the limit
+      // immediately (previous exp decay at 120 Hz killed speed to ~0).
+      if (this.speed > KART.gravelMaxSpeed) {
+        this.velocity.multiplyScalar(KART.gravelMaxSpeed / this.speed);
+      }
+      if (this.speed > 8 && Math.random() < 0.5) {
+        this.vfx.wallChips(
+          this.position.clone().setY(this.position.y + 0.1),
+          new THREE.Vector3(0, 1, 0),
+        );
+      }
+    }
     // Held-slip ceiling: while drifting, heading may lead velocity by at most
     // driftMaxSlip — settles into a held ~30° slide instead of a spin-out.
     if (drifting && Math.abs(this.slipAngle) > KART.driftMaxSlip) {
@@ -492,7 +512,8 @@ export class Kart {
     // Driver expressiveness: idle bob, lean with steering, eyes track the
     // slide, flinch back on impacts — sells the bots as characters.
     const t = this.lastSimTime + this.driverPhase;
-    this.driver.position.y = Math.sin(t * 2.3) * 0.022;
+    this.driver.position.y =
+      Math.sin(t * 2.3) * 0.022 + (this.onGravel ? Math.sin(t * 43) * 0.02 : 0);
     this.driver.rotation.z = -this.steerVisual * 0.16 - slip * 0.1;
     this.driver.rotation.y = -slip * 0.5;
     this.driver.rotation.x = -s * 0.3 + (this.grounded ? 0 : -0.12);

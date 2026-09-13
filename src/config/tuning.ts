@@ -73,6 +73,11 @@ export const KART = {
   wallImpactLoss: 0.5, // fraction of speed lost at max impact (scaled by hit)
   wallScrub: 3.2, // per-second velocity scrub while grinding along the wall
   wallGrindCap: 0.7, // fraction of maxSpeed while grinding — contact costs you
+
+  // Off-road (gravel shortcut aprons): heavy drag + rumble — shorter path,
+  // slower surface. The route decision is real.
+  gravelDrag: 9, // extra deceleration while on gravel
+  gravelMaxSpeed: 15, // hard cap on gravel (~54 km/h vs 100 on asphalt)
 } as const;
 
 export const CAMERA = {
@@ -98,6 +103,7 @@ export const TRACK = {
   roadHalfWidth: 6, // 12 m road
   samples: 1024, // centerline lookup resolution
   wallHeight: 0.55,
+  gravelWidth: 3.4, // gravel apron extends this far past the road edge
 } as const;
 
 export const RACE = {
