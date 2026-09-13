@@ -6,28 +6,79 @@ import { TRACK } from '../config/tuning';
 // kart constraint (on-road test + wall push-back). Flat for the Wave 1 slice;
 // elevation becomes its own quality unit.
 
-// Control points (X, Y, Z — meters). Roughly a 190×100 m circuit: long back
-// straight, sweeping right hander over a CREST (climb-and-dive corner),
-// roller-coaster ridge through the S-curves, hairpin. Clockwise.
-const CONTROL_POINTS: ReadonlyArray<readonly [number, number, number]> = [
-  [0, 0, 0],
-  [55, 0, 0],
-  [88, 1.2, 8],
-  [102, 3.6, 32],
-  [92, 6.0, 58],
-  [62, 3.8, 66],
-  [52, 1.0, 88],
-  [24, 0, 96],
-  [-4, 0, 86],
-  [-18, 0, 62],
-  [-34, 1.0, 48],
-  [-48, 3.0, 60],
-  [-70, 4.5, 58],
-  [-84, 2.0, 38],
-  [-78, 0.4, 14],
-  [-56, 0, 4],
-  [-30, 0, -6],
-  [-12, 0, -4],
+// A track layout: closed Catmull-Rom control points (X, Y, Z — meters) plus
+// gravel shortcut zones (index-range aprons extending the drivable edge).
+export interface TrackLayout {
+  readonly name: string;
+  readonly points: ReadonlyArray<readonly [number, number, number]>;
+  readonly gravel: ReadonlyArray<{ i0: number; i1: number; side: -1 | 1 }>;
+}
+
+export const TRACKS: readonly TrackLayout[] = [
+  {
+    name: 'PROVING GROUNDS',
+    // ~190×100 m circuit: long back straight, sweeping right hander over a
+    // CREST (climb-and-dive), roller-coaster ridge through the S-curves,
+    // hairpin. Clockwise.
+    points: [
+      [0, 0, 0],
+      [55, 0, 0],
+      [88, 1.2, 8],
+      [102, 3.6, 32],
+      [92, 6.0, 58],
+      [62, 3.8, 66],
+      [52, 1.0, 88],
+      [24, 0, 96],
+      [-4, 0, 86],
+      [-18, 0, 62],
+      [-34, 1.0, 48],
+      [-48, 3.0, 60],
+      [-70, 4.5, 58],
+      [-84, 2.0, 38],
+      [-78, 0.4, 14],
+      [-56, 0, 4],
+      [-30, 0, -6],
+      [-12, 0, -4],
+    ],
+    gravel: [
+      // Hairpin at ~0.63 bends LEFT (+1.79 rad) — inside is the left edge.
+      { i0: 0.6, i1: 0.662, side: 1 },
+      // Left-hander at ~0.36 (crest area): inside cut on the left edge.
+      { i0: 0.352, i1: 0.382, side: 1 },
+    ],
+  },
+  {
+    name: 'SWITCHBACK RIDGE',
+    // ~200×90 m technical course: plateau climb, switchback descent,
+    // ridge dive — slower, more corner management than Proving Grounds.
+    points: [
+      [0, 0, 0],
+      [56, 0, 0],
+      [92, 0.8, 10],
+      [106, 3.0, 38],
+      [96, 6.0, 66],
+      [62, 6.5, 78],
+      [30, 5.0, 70],
+      [8, 2.5, 48],
+      [14, 1.0, 20],
+      [-16, 0.6, 12],
+      [-44, 1.5, 26],
+      [-70, 3.5, 46],
+      [-92, 4.0, 70],
+      [-108, 2.0, 44],
+      [-96, 0.4, 14],
+      [-66, 0, 0],
+      [-32, 0, -2],
+    ],
+    gravel: [
+      // Switchback at ~0.50 bends RIGHT (-0.51 rad) — inside is the right
+      // edge (-1). Tight apex cut through the S-sequence.
+      { i0: 0.485, i1: 0.535, side: -1 },
+      // Ridge dive at ~0.71 bends LEFT (+0.76 rad, sharpest on course) —
+      // inside is the left edge (+1).
+      { i0: 0.68, i1: 0.73, side: 1 },
+    ],
+  },
 ];
 
 interface Sample {
@@ -38,28 +89,32 @@ interface Sample {
 
 export class Track {
   readonly group = new THREE.Group();
+  readonly name: string;
   private readonly curve: THREE.CatmullRomCurve3;
   private readonly samples: Sample[] = [];
-  // Gravel shortcut aprons: index-range zones where the drivable edge extends
-  // gravelWidth past the road on `side` (-1 = right, +1 = left). The hairpin
-  // apex (frac ~0.62, right-hander) gets an inside cut — shorter, slower.
-  private readonly gravelZones = [
-    // Hairpin at ~0.63 bends LEFT (+1.79 rad tangent delta) — inside is the
-    // left edge (+1). Cutting the apex across gravel is the shortcut.
-    { i0: 0.6, i1: 0.662, side: 1 },
-    // Left-hander at ~0.36 (crest area): inside cut on the left edge —
-    // a second, tighter route decision earlier in the lap.
-    { i0: 0.352, i1: 0.382, side: 1 },
-  ];
+  private readonly gravelZones: TrackLayout['gravel'];
 
-  constructor() {
+  constructor(layout: TrackLayout = TRACKS[0]) {
+    this.name = layout.name;
+    this.gravelZones = layout.gravel;
     this.curve = new THREE.CatmullRomCurve3(
-      CONTROL_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+      layout.points.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
       true,
       'centripetal',
     );
     this.buildSamples();
     this.buildMeshes();
+  }
+
+  // Free GPU resources when the world is rebuilt (track select).
+  dispose(): void {
+    this.group.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        o.geometry.dispose();
+        const m = o.material;
+        for (const mm of Array.isArray(m) ? m : [m]) mm.dispose();
+      }
+    });
   }
 
   private buildSamples(): void {

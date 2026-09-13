@@ -69,10 +69,11 @@ export class RaceHud {
       `<div style="font-size:15px;color:#9fb4d0;margin-top:6px">a grok bots racing game</div>` +
       `<div style="font-size:26px;font-weight:800;margin-top:26px;color:#ffe28a">` +
       `PRESS ENTER</div>` +
+      `<div style="font-size:16px;font-weight:800;margin-top:12px;color:#7be8ff"></div>` +
       `<div style="font-size:13px;color:#9fb4d0;margin-top:14px;line-height:1.8">` +
       `WASD / arrows — drive &nbsp;·&nbsp; SHIFT — drift &nbsp;·&nbsp; ` +
       `SPACE — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; R — restart &nbsp;·&nbsp; ` +
-      `M — reduce motion &nbsp;·&nbsp; O — options</div>`;
+      `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track</div>`;
     this.pauseEl = mk(
       'top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;' +
       'font-weight:900;color:#fff;display:none;text-align:center',
@@ -113,6 +114,7 @@ export class RaceHud {
     heldItem?: string | null,
     paused = false,
     opts?: OptionsState,
+    trackName?: string,
   ): void {
     // Options overlay renders in every phase (openable from pause or title).
     if (opts?.open) {
@@ -141,6 +143,9 @@ export class RaceHud {
     }
     this.titleEl.style.display = race.phase === 'title' ? 'block' : 'none';
     if (race.phase === 'title') {
+      // Track line under PRESS ENTER (children[3]).
+      (this.titleEl.children[3] as HTMLElement).textContent =
+        trackName ? `◂ ${trackName} ▸   [T]` : '';
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
       if (simTime - this.titlePulseAt > 0.06) {
         this.titlePulseAt = simTime;

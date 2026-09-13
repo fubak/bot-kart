@@ -11,6 +11,7 @@ import { Audio } from './Audio';
 import { AiDriver } from '../game/AiDriver';
 import { Items } from '../game/Items';
 import { Minimap } from './Minimap';
+import { TRACKS } from '../game/Track';
 import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
 import botCUrl from '../../assets/exported/characters/grokbot-c-seated.glb?url';
 import kartBUrl from '../../assets/exported/karts/kart-b.glb?url';
@@ -30,13 +31,14 @@ export class Game {
   private readonly scene = new THREE.Scene();
   private readonly chaseCam: ChaseCamera;
   private readonly hud: DebugHud;
-  private readonly track = new Track();
+  private track!: Track;
   private readonly kart = new Kart();
   private readonly aiKarts: Kart[] = [];
   private readonly aiDrivers: AiDriver[] = [];
   private items!: Items;
   private minimap!: Minimap;
-  private readonly race: Race;
+  private race!: Race;
+  private trackIdx = 0;
   private readonly raceHud = new RaceHud();
   private readonly audio = new Audio();
   private accumulator = 0;
@@ -85,42 +87,44 @@ export class Game {
     sun.position.set(60, 90, 40);
     this.scene.add(sun);
 
-    this.scene.add(this.track.group, this.kart.group, this.kart.vfx.object);
-
-    // Grid: player at the spawn slot; AI bots staggered behind, alternating
-    // lateral offset. Different skills → visibly different pace/personality.
-    const spawn = this.track.spawn();
-    this.kart.reset(spawn.position, spawn.heading);
-    const spawnPositions = [spawn.position.clone()];
-    // Skill maps to archetype: Bot B heavy = slower, Bot C speed = fastest.
-    const skills = [0.95, 1.05, 1.0];
+    // Build the kart field once (karts persist across track swaps — only
+    // the world geometry/race/items/minimap are rebuilt by buildWorld).
+    this.scene.add(this.kart.group, this.kart.vfx.object);
     const tints = [0xff9040, 0xc070ff, 0xffd454]; // orange / violet / yellow rivals
     const bots = [botBUrl, botCUrl, undefined]; // Bot B heavy, Bot C speed, Bot A
     const karts = [kartBUrl, kartCUrl, undefined]; // matching chassis
+    const skills = [0.95, 1.05, 1.0];
     const lines = [-1.8, 0.8, 2.2]; // each bot takes its own line
     for (let i = 0; i < AI_COUNT; i++) {
-      const slot = this.track.gridSlot(10 + i * 7, i % 2 === 0 ? 2.2 : -2.2);
       const aiKart = new Kart(tints[i], bots[i], karts[i]);
-      aiKart.reset(slot.position, slot.heading);
       this.aiKarts.push(aiKart);
       // Bot C (index 1, speed archetype) is the shortcut-taker — it dives
       // onto the gravel aprons through the cut zones every lap.
       this.aiDrivers.push(new AiDriver(skills[i], lines[i], i === 1));
       this.scene.add(aiKart.group, aiKart.vfx.object);
-      spawnPositions.push(slot.position.clone());
     }
-    this.race = new Race(this.track, undefined, 1 + AI_COUNT);
-    this.race.restart(spawnPositions, 0, 'title');
-    this.items = new Items(this.track, [this.kart, ...this.aiKarts]);
-    this.scene.add(this.items.group);
-    this.minimap = new Minimap(this.track);
+    this.buildWorld(this.trackIdx);
 
     // Input edges handled here (not in ControlState): title→start, pause,
     // item fire, restart.
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       if (this.race.phase === 'title' && e.code !== 'Backquote') {
-        this.race.beginCountdown(this.simTime);
+        // Title-phase keys: T cycles the track (rebuilds the world), O
+        // opens options — everything else starts the race.
+        if (e.code === 'KeyT' && !this.settings.open) {
+          this.buildWorld((this.trackIdx + 1) % TRACKS.length);
+          return;
+        }
+        if (e.code === 'KeyO') this.settings.open = !this.settings.open;
+        if (this.settings.open) {
+          if (e.code === 'ArrowUp') this.settings.sel = (this.settings.sel + 3) % 4;
+          if (e.code === 'ArrowDown') this.settings.sel = (this.settings.sel + 1) % 4;
+          const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
+          if (dir !== 0) this.adjustSetting(dir);
+          return;
+        }
+        if (e.code !== 'KeyO' && e.code !== 'KeyT') this.race.beginCountdown(this.simTime);
         return;
       }
       // Pause works in any play phase (not title — nothing to freeze there).
@@ -184,9 +188,15 @@ export class Game {
       scene: this.scene,
       kart: this.kart,
       aiKarts: this.aiKarts,
-      items: this.items,
-      track: this.track,
-      race: this.race,
+      get items() {
+        return game.items;
+      },
+      get track() {
+        return game.track;
+      },
+      get race() {
+        return game.race;
+      },
       camera: this.chaseCam.camera,
       chaseCam: this.chaseCam,
       audio: this.audio,
@@ -197,6 +207,36 @@ export class Game {
         },
       },
     };
+  }
+
+  // Rebuild the world for a different track layout: disposes the old track,
+  // items, and minimap; re-grids the karts; resets the race to title.
+  private buildWorld(idx: number): void {
+    this.trackIdx = idx;
+    if (this.track) {
+      this.scene.remove(this.track.group);
+      this.track.dispose();
+      this.scene.remove(this.items.group);
+      this.minimap.dispose();
+    }
+    this.track = new Track(TRACKS[idx]);
+    this.scene.add(this.track.group);
+
+    const spawn = this.track.spawn();
+    this.kart.reset(spawn.position, spawn.heading);
+    const spawnPositions = [spawn.position.clone()];
+    for (let i = 0; i < AI_COUNT; i++) {
+      const slot = this.track.gridSlot(10 + i * 7, i % 2 === 0 ? 2.2 : -2.2);
+      this.aiKarts[i].reset(slot.position, slot.heading);
+      this.aiDrivers[i].reset();
+      spawnPositions.push(slot.position.clone());
+    }
+    this.race = new Race(this.track, undefined, 1 + AI_COUNT);
+    this.race.restart(spawnPositions, 0, 'title');
+    this.items = new Items(this.track, [this.kart, ...this.aiKarts]);
+    this.scene.add(this.items.group);
+    this.minimap = new Minimap(this.track);
+    this.celebrated.length = 0;
   }
 
   start(): void {
@@ -259,6 +299,7 @@ export class Game {
       this.items.held[0],
       this.paused,
       this.settings,
+      this.track.name,
     );
     this.minimap.update(
       [this.kart, ...this.aiKarts],

@@ -15,8 +15,10 @@ ink/swap) with position-weighted rolls, distinct rival chassis, gravel
 inside-cuts at both hairpins (geometry corrected to the true inside edge),
 rubber-band pacing (2.96 s pack spread verified), driver celebrations,
 anti-wedge AI recovery, Bot C AI shortcut-taker, confetti + positional
-audio, title-orbit framing fix. Release evidence at RELEASE_EVIDENCE.md.
-Next candidates: settings menu, second track, skeletal bot animation.
+audio, title-orbit framing fix. Options menu live (`O`): master/music
+volume bars, reduced-motion + minimap toggles — evidence `options.png`.
+Release evidence at RELEASE_EVIDENCE.md.
+Next candidates: second track, skeletal bot animation.
 
 ---
 
@@ -40,7 +42,8 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. **Settings menu** — options exist as key toggles only (M, P, R).
+1. ~~Settings menu~~ — DONE: O options overlay (volumes, reduced-motion,
+   minimap) with arrow navigation.
 2. **Second track** — single circuit; a variant would multiply longevity.
 3. **Bot skeletal animation** — drivers bob/lean/celebrate; no limbs.
 4. ~~Item variety~~ — DONE: 6 kinds + position-weighted rolls.

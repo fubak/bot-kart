@@ -56,6 +56,10 @@ export class Minimap {
   private readonly offX: number;
   private readonly offY: number;
 
+  dispose(): void {
+    this.canvas.remove();
+  }
+
   update(karts: Kart[], show: boolean): void {
     this.canvas.style.display = show ? 'block' : 'none';
     if (!show) return;
