@@ -170,7 +170,8 @@
     "2026-09-13: wall slide verified live (impact 15.5 \u00e2\u2020\u2019 slide 24.3 \u00e2\u2020\u2019 release 28 m/s); road winding + z-fight fixed",
     "2026-09-13: wave4 critic3 PASS 8/10 — all HIGH/LOW defects fixed + committed (ee3770f)",
     "2026-09-13: NN wall-clip resolved — V-kink (R≈6/110°) softened to ~55° lean, AI braking horizon 1.3s/6 probes; 0 hits all tracks (3aaabcd)",
-    "2026-09-13: final regression sweep — full GP autopilot (standings ★BOT-A2 24pts, clean title re-arm), 68.9fps p95 15.1ms, 0 console errors, build clean"
+    "2026-09-13: final regression sweep — full GP autopilot (standings ★BOT-A2 24pts, clean title re-arm), 68.9fps p95 15.1ms, 0 console errors, build clean",
+    "2026-09-13: key remapping shipped (21fdfad) — 6 bind rows + RESET in options, persisted, conflict-safe; all documented feature gaps closed; critic4 playtest launched on the build"
   ],
   "blockers": [],
   "milestones": [

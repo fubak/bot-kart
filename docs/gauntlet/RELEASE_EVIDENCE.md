@@ -223,3 +223,10 @@ no stutter; comfortably above the 60 fps floor.
 **Console audit:** 0 errors / 0 warnings across the full GP session.
 **Build:** `tsc --noEmit` clean; `vite build` clean (677 KB → 177 KB
 gzip; >500 kB chunk advisory is Three.js in the main bundle).
+
+**Key remapping (commit `21fdfad`):** options gains six bind rows
+(THROTTLE/BRAKE/STEER L/STEER R/DRIFT/ITEM) + RESET BINDINGS, persisted
+to `grok-kart-bindings`. Verified live: W→I rebind survives reload, a
+bound key starts the race from title and drives (28 m/s), duplicate
+binds displace to `—`, reserved keys (P) rejected without pausing,
+Esc cancels capture, RESET restores defaults (`options-rebind.png`).

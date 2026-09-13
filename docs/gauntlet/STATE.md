@@ -54,7 +54,8 @@ AI depth, items, track character.
 3. ~~Bot animation~~ — DONE: node-rig emotes + blinks.
 4. ~~Item icons~~ — DONE: colored glyphs.
 5. ~~Grand Prix~~ — DONE: 3-leg cup with standings.
-6. **Key remapping** — fixed bindings only.
+6. ~~Key remapping~~ — DONE: 6 bind rows + RESET in options, persisted,
+   conflict-safe, reserved keys rejected (evidence `options-rebind.png`).
 7. **Bot leg animation** — legs static; arms/head/eyes done.
 4. ~~Item variety~~ — DONE: 6 kinds + position-weighted rolls.
 5. ~~Track shortcut~~ — DONE: 2 inside gravel cuts, cap 15 m/s.
@@ -81,7 +82,9 @@ None.
   standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
 - Console audit: 0 errors / 0 warnings across the GP session.
 - Latest commits: `ee3770f` critic3 fix batch → `3aaabcd` NN geometry +
-  AI braking horizon.
+  AI braking horizon → `d630cf7` sweep evidence → `21fdfad` key remapping.
+- critic4 playtest running on the key-remap build (browser exclusive —
+  no source edits until it finishes).
 
 ---
 
