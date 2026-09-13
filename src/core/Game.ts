@@ -149,6 +149,8 @@ export class Game {
       track: this.track,
       race: this.race,
       camera: this.chaseCam.camera,
+      chaseCam: this.chaseCam,
+      audio: this.audio,
       sim: {
         fixedDt: SIM.fixedDt,
         get time() {

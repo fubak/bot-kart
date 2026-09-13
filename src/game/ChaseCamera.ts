@@ -57,7 +57,9 @@ export class ChaseCamera {
     this.camera.position.lerp(targetPos, kp);
 
     const wantLook = inCountdown
-      ? kart.position.clone().add(new THREE.Vector3(0, 1.0, 0))
+      // Aim at kart height (not +1 m) — looking up framed the start-gantry
+      // banner clipped across the top of the title orbit (critic).
+      ? kart.position.clone().add(new THREE.Vector3(0, 0.4, 0))
       : kart.position.clone().addScaledVector(fwd, CAMERA.lookAhead).add(new THREE.Vector3(0, 1.0, 0));
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
