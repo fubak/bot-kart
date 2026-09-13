@@ -397,6 +397,53 @@ export class Track {
     banner.rotation.y = beam.rotation.y;
     this.group.add(banner);
 
+    // Corner chevrons: glowing arrow boards on the outside wall at corner
+    // entries — readable turn direction + severity at speed. Detect corners
+    // by tangent change over ~30 m; board arrows point the turn direction.
+    const chevMat = new THREE.MeshStandardMaterial({
+      color: 0x1a2028,
+      roughness: 0.6,
+      side: THREE.DoubleSide,
+    });
+    const chevGeo = new THREE.PlaneGeometry(1.6, 0.9);
+    const arrowMat = new THREE.MeshStandardMaterial({
+      color: 0xffc23c,
+      emissive: 0xc07818,
+      side: THREE.DoubleSide,
+    });
+    const arrowGeo = new THREE.PlaneGeometry(1.1, 0.5);
+    for (let i = 0; i < n; i += 10) {
+      const ahead = (i + 24) % n;
+      const turn = this.samples[i].tangent.angleTo(this.samples[ahead].tangent);
+      if (turn < 0.35) continue; // only real corners get boards
+      // Sign of turn: cross.y of tangents — negative = right-hand corner,
+      // so boards go on the OUTSIDE (left wall for right turns).
+      const t0 = this.samples[i].tangent;
+      const t1 = this.samples[ahead].tangent;
+      const rightTurn = t0.x * t1.z - t0.z * t1.x < 0;
+      const wallSide = rightTurn ? 1 : -1;
+      // 3 boards staggered across the corner entry.
+      for (let b = 0; b < 3; b++) {
+        const s = this.samples[(i + b * 6) % n];
+        const board = new THREE.Mesh(chevGeo, chevMat);
+        const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+        board.position
+          .copy(s.point)
+          .addScaledVector(s.left, wallSide * (hw + 0.8))
+          .setY(s.point.y + TRACK.wallHeight + 0.75);
+        // Face the approaching driver — normal points back along tangent.
+        board.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z);
+        arrow.position.copy(board.position);
+        arrow.rotation.y = board.rotation.y;
+        arrow.position.addScaledVector(s.tangent, -0.06); // in front of the board face
+        // Chevron arrow: shear/tilt to point the turn direction.
+        arrow.rotation.z = rightTurn ? -0.5 : 0.5;
+        arrow.scale.x = rightTurn ? -1 : 1;
+        this.group.add(board, arrow);
+      }
+      i += 60; // space boards out — skip past this corner
+    }
+
     // Scenery: instanced trees + rocks scattered outside the walls. Pure
     // optical-flow/parallax props — cheap, deterministic pseudo-random.
     const rng = (seed: number) => {

@@ -27,6 +27,12 @@ interface Box {
   respawnAt: number; // sim-time; active when < simTime
 }
 
+interface Pad {
+  mesh: THREE.Mesh;
+  pos: THREE.Vector3;
+  cooldownUntil: number;
+}
+
 interface Missile {
   mesh: THREE.Mesh;
   progressIdx: number; // unwrapped centerline index — travels the racing line
@@ -50,6 +56,14 @@ const missileMat = new THREE.MeshStandardMaterial({
   emissive: 0xa02010,
   flatShading: true,
 });
+const padGeo = new THREE.PlaneGeometry(2.2, 3.2);
+const padMat = new THREE.MeshStandardMaterial({
+  color: 0x30e8a0,
+  emissive: 0x12a060,
+  transparent: true,
+  opacity: 0.9,
+  side: THREE.DoubleSide,
+});
 
 export class Items {
   readonly group = new THREE.Group();
@@ -58,6 +72,7 @@ export class Items {
 
   private readonly boxes: Box[] = [];
   private readonly missiles: Missile[] = [];
+  private readonly pads: Pad[] = [];
   private readonly karts: Kart[] = [];
 
   constructor(private readonly track: Track, karts: Kart[]) {
@@ -80,6 +95,29 @@ export class Items {
         this.group.add(mesh);
         this.boxes.push({ mesh, idx, pos, respawnAt: 0 });
       }
+    }
+    // Boost pads: glowing arrows placed OFF the ideal line — a route decision
+    // (wide line for free boost vs. tight line). Outside of the crest corner,
+    // inside of the hairpin exit, mid straight.
+    const padSpots: Array<[number, number]> = [
+      [0.22, -4.2], // outside on the climb into the crest
+      [0.30, 4.4],  // outside at crest exit — the dive
+      [0.62, -4.0], // inside of the ridge S
+      [0.88, 3.8],  // outside hairpin exit
+    ];
+    for (const [frac, lat] of padSpots) {
+      const idx = Math.floor(frac * n);
+      const pos = track.pointAt(idx).addScaledVector(track.leftAt(idx), lat);
+      pos.y += 0.03;
+      const mesh = new THREE.Mesh(padGeo, padMat);
+      mesh.position.copy(pos);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = -Math.atan2(
+        track.tangentAt(idx).x,
+        track.tangentAt(idx).z,
+      );
+      this.group.add(mesh);
+      this.pads.push({ mesh, pos, cooldownUntil: 0 });
     }
   }
 
@@ -130,6 +168,19 @@ export class Items {
           this.held[k] = this.roll();
           b.respawnAt = simTime + RESPAWN_S;
           b.mesh.visible = false;
+          break;
+        }
+      }
+    }
+    // Boost pads: drive over for a free mini-turbo (1 s cooldown per kart)
+    for (const p of this.pads) {
+      if (simTime < p.cooldownUntil) continue;
+      for (const kart of this.karts) {
+        const dx = kart.position.x - p.pos.x;
+        const dz = kart.position.z - p.pos.z;
+        if (dx * dx + dz * dz < 4.5) {
+          kart.boostTimer = Math.max(kart.boostTimer, KART.boostTime[0]);
+          p.cooldownUntil = simTime + 1.0;
           break;
         }
       }
