@@ -479,3 +479,47 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   new `kart.isSpinning`.
 - **Largest Gap:** recovery is reverse+steer only; no path-replanning if
   the wedge point is re-entered.
+
+### UI-005 — Options menu
+
+- **Domain:** UI/Audio
+- **Status:** Integrated
+- **Evidence:** `wave4/options.png` — O toggles an OPTIONS overlay in any
+  phase (auto-pauses racing): master/music volume bars, reduced-motion
+  and minimap toggles, arrow navigation/adjust. Verified: music vol
+  raised to 9 live, chaseCam.reducedMotion flipped true.
+- **Largest Gap:** no remappable keys; no persistence (settings reset
+  on reload — localStorage would fix).
+
+### TRACK-007 — Second track: Switchback Ridge
+
+- **Domain:** Track
+- **Status:** Integrated
+- **Evidence:** `wave4/track2-title.png`, `wave4/track2-racing.png` —
+  T cycles layouts on the title screen (name shown under PRESS ENTER);
+  buildWorld disposes + rebuilds track/race/items/minimap, karts
+  persist. AI lapped to 2 by ~30 s; both gravel zones probed to true
+  inside edges (curvature-measured: switchback −0.51 rad right, ridge
+  dive +0.76 rad left). Smoke baseline identical on track 1.
+- **Largest Gap:** item boxes share placement fractions across layouts;
+  scenery palette identical (no per-track theme yet).
+
+### CHAR-003 — Driver limb emotes
+
+- **Domain:** Characters
+- **Status:** Integrated
+- **Evidence:** seated-bot GLBs ship a full node rig (arms/legs/head);
+  Kart caches arm_l/arm_r/head + base pose, applies additive deltas —
+  victory arm-pump (arm_r −2.31 rad observed), spin flail, head-yaw-
+  into-turn (−0.45 rad hard corner). `wave4/driver-emote.png`.
+- **Largest Gap:** still transform-level (no skinned animation clips);
+  legs/torso static; eyes don't blink.
+
+### UI-006 — Item HUD iconography
+
+- **Domain:** UI
+- **Status:** Integrated
+- **Evidence:** `wave4/item-icon.png` — held item renders colored glyph
+  + name (⚡/✹/◍/◯/✦/⇄), dimmed [space] hint.
+- **Largest Gap:** glyphs are unicode, not authored icons; no
+  incoming-hazard indicator.

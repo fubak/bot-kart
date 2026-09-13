@@ -116,3 +116,20 @@ traffic lock 7.8% unchanged.
   position-weighted rolls.
 - **Watch item:** BOT-B best lap 0:13.88 — likely a swap-teleport
   foreshortened lap (genre-consistent chaos; monitor).
+
+## Wave 4 — Round 4 Additions (options menu, track 2, emotes, icons)
+
+- **Options menu** — `O` overlay: master/music volume, reduced-motion,
+  minimap; auto-pauses racing. `wave4/options.png`.
+- **Track select** — `T` cycles PROVING GROUNDS / SWITCHBACK RIDGE on the
+  title; `wave4/track-select-title.png`, `wave4/track2-title.png`.
+- **Switchback Ridge race** — full 3-lap gauntlet: all 4 finishers
+  (BOT-C 69.23 / YOU 72.06 / BOT-A2 73.83 / BOT-B 76.81), correct
+  ranking, 75fps/152 draws, 0 console errors. `wave4/track2-racing.png`,
+  `wave4/track2-results.png`.
+- **Driver emotes** — arm pump/flail + head-into-turn via the seated
+  rigs' nodes. `wave4/driver-emote.png`.
+- **Item icons** — colored glyph + name on the held-item readout.
+  `wave4/item-icon.png`.
+- **Smoke regression** — identical baseline after the Track refactor:
+  3 skills × 3 laps, 0 wall hits, traffic 7.8%.
