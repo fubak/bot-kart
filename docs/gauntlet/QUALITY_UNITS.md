@@ -468,3 +468,14 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Largest Gap:** bot only brushes the apron apex — not a committed
   full-zone cut; approach-pull wedged on the wall face, so the pull only
   engages inside the zone.
+
+### AI-005 — Anti-wedge recovery
+
+- **Domain:** AI
+- **Status:** Integrated
+- **Evidence:** displacement sampling (0.5 s) detects pinned karts (both
+  nose-in-wall low-speed and wall-pressed high-speed); brake+steer-to-
+  tangent recovery freed a wedged bot in 251 ms. Spin-outs excluded via
+  new `kart.isSpinning`.
+- **Largest Gap:** recovery is reverse+steer only; no path-replanning if
+  the wedge point is re-entered.

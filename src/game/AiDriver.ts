@@ -23,6 +23,9 @@ export class AiDriver {
   private prevLateral = 0;
   private blockedTime = 0;
   private overtakeSide = 1;
+  private lastPos = new THREE.Vector3();
+  private posTimer = 0;
+  private stuckTime = 0;
 
   constructor(
     skill = 1.0,
@@ -49,6 +52,8 @@ export class AiDriver {
     this.recovering = false;
     this.prevLateral = 0;
     this.blockedTime = 0;
+    this.posTimer = 0;
+    this.stuckTime = 0;
   }
 
   update(kart: Kart, track: Track, dt: number, traffic?: Kart[]): ControlState {
@@ -85,6 +90,35 @@ export class AiDriver {
         // rotates the nose back toward the travel direction while backing up.
         return { ...idle, brake: 1, steer: clampSteer(err * AI.steerGain) };
       }
+    }
+
+    // --- wedge detection: pressing a wall face with speed but no
+    // displacement (verified: a bot pinned ~2 s at a shortcut wall end).
+    // Displacement sampled every 0.5 s; fast-but-frozen = wedged.
+    this.posTimer += dt;
+    if (this.posTimer > 0.5) {
+      this.posTimer = 0;
+      // Any wedge — nose-in-wall (low speed) or wall-pressed grind (high
+      // speed) — shows as ~zero displacement. Spin-outs excluded (they
+      // rotate in place legitimately for ~1 s).
+      if (!kart.isSpinning && kart.position.distanceTo(this.lastPos) < 0.5) {
+        this.stuckTime++;
+      } else {
+        this.stuckTime = 0;
+      }
+      this.lastPos.copy(kart.position);
+    }
+    if (this.stuckTime >= 2) {
+      // Back out steering the nose toward the travel direction (reverse
+      // flips steer inside Kart — same trick as the spin recovery).
+      const desired = Math.atan2(-tanNow.x, -tanNow.z);
+      const err = wrapAngle(desired - kart.heading);
+      if (kart.forwardSpeed < -1) {
+        // Reversed enough — drive off steering toward the line.
+        this.stuckTime = 0;
+        return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
+      }
+      return { ...idle, brake: 1, steer: clampSteer(err * AI.steerGain) };
     }
 
     // --- steering: pure pursuit to the centerline lookahead point ---

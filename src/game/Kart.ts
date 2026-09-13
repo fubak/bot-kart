@@ -41,6 +41,8 @@ export class Kart {
   inked = false;
   /** Set when this kart's racer finishes — driver celebrates. */
   celebrating = false;
+  /** True while a spin-out is in effect (item hits) — QA/AI read it. */
+  isSpinning = false;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
   private wallContact = false;
   private steerSmooth = 0;
@@ -246,8 +248,9 @@ export class Kart {
 
   update(dt: number, input: ControlState, track: Track, simTime: number): void {
     this.lastSimTime = simTime;
+    this.isSpinning = simTime < this.spinUntil;
     // Spin-out (item hits): yaw whips freely, controls dead, velocity decays.
-    if (simTime < this.spinUntil) {
+    if (this.isSpinning) {
       this.heading += 11 * dt;
       this.velocity.multiplyScalar(1 - Math.min(1, 3.2 * dt));
       this.driftDir = 0;
