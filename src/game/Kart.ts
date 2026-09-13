@@ -426,43 +426,42 @@ export class Kart {
     // --- walls: contact-episode model ---
     // Impact penalty fires once per wall ENTRY (scaled by impact speed), not
     // per step — sustained contact slides with a light scrub (critic tar-pit).
-    const before = this.position.clone();
     this.position.addScaledVector(this.velocity, dt);
     const c = track.constrain(this.position, this.trackIdx);
     this.trackIdx = c.index;
     if (c.clamped) {
-      // Push-back direction = inward wall normal.
-      const normal = before.sub(this.position);
-      const d = normal.length();
-      if (d > 1e-5) {
-        normal.divideScalar(d);
-        const out = this.velocity.dot(normal);
-        if (out < 0) {
-          // Remove outward velocity with restitution.
-          this.velocity.addScaledVector(normal, -out * (1 + KART.wallBounce));
-        }
-        if (!this.wallContact) {
-          // Contact episode start: penalty scales with how hard we hit.
-          const impact = Math.min(1, Math.abs(out) / KART.maxSpeed);
-          this.lastWallImpact = impact;
-          this.velocity.multiplyScalar(1 - KART.wallImpactLoss * (0.3 + 0.7 * impact));
-          // No backward ejection — the kart stops, it never bounces off
-          // facing the wall (critic: restitution ping-ponged it back in).
-          const fNow = this.velocity.dot(fwd);
-          if (fNow < 0) this.velocity.addScaledVector(fwd, -fNow);
-          this.lastWallHit = simTime;
-          this.wallHitCount++;
-          this.impactSquash = 0.4 + 0.6 * impact;
-          this.wallContact = true;
-        } else {
-          // Sustained grind: scrub friction + a hard cap — grinding is a
-          // real cost, not a free rail (critic: kart re-accelerated to full
-          // speed while in contact).
-          this.velocity.multiplyScalar(Math.exp(-KART.wallScrub * dt));
-          const grindCap = KART.maxSpeed * KART.wallGrindCap;
-          if (this.velocity.length() > grindCap) {
-            this.velocity.setLength(THREE.MathUtils.lerp(this.velocity.length(), grindCap, 1 - Math.exp(-8 * dt)));
-          }
+      // Inward wall normal from the TRACK FRAME — not the position delta.
+      // A kart parked exactly on the clamp produces before−after ≈ 0, so a
+      // delta-derived normal vanished and the whole response was skipped
+      // while throttle kept integrating: nose-in read top speed/FOV/revs,
+      // defeated the stuck hint, and stored a free launch (critic4 HIGH).
+      const normal = track.leftAt(c.index).clone().multiplyScalar(-Math.sign(c.lateral));
+      const out = this.velocity.dot(normal);
+      if (out < 0) {
+        // Remove outward velocity with restitution.
+        this.velocity.addScaledVector(normal, -out * (1 + KART.wallBounce));
+      }
+      if (!this.wallContact) {
+        // Contact episode start: penalty scales with how hard we hit.
+        const impact = Math.min(1, Math.abs(out) / KART.maxSpeed);
+        this.lastWallImpact = impact;
+        this.velocity.multiplyScalar(1 - KART.wallImpactLoss * (0.3 + 0.7 * impact));
+        // No backward ejection — the kart stops, it never bounces off
+        // facing the wall (critic: restitution ping-ponged it back in).
+        const fNow = this.velocity.dot(fwd);
+        if (fNow < 0) this.velocity.addScaledVector(fwd, -fNow);
+        this.lastWallHit = simTime;
+        this.wallHitCount++;
+        this.impactSquash = 0.4 + 0.6 * impact;
+        this.wallContact = true;
+      } else {
+        // Sustained grind: scrub friction + a hard cap — grinding is a
+        // real cost, not a free rail (critic: kart re-accelerated to full
+        // speed while in contact).
+        this.velocity.multiplyScalar(Math.exp(-KART.wallScrub * dt));
+        const grindCap = KART.maxSpeed * KART.wallGrindCap;
+        if (this.velocity.length() > grindCap) {
+          this.velocity.setLength(THREE.MathUtils.lerp(this.velocity.length(), grindCap, 1 - Math.exp(-8 * dt)));
         }
       }
     } else {
@@ -558,10 +557,8 @@ export class Kart {
       if (Math.random() < 90 * dt) this.vfx.boostFlame(rearC.clone().setY(0.55), this.velocity);
     }
     if (c.clamped && Math.random() < 30 * dt) {
-      const inward = this.position.clone().sub(before).setY(0);
-      if (inward.lengthSq() > 1e-6) {
-        this.vfx.wallChips(this.position.clone().setY(0.3), inward.normalize());
-      }
+      const inward = track.leftAt(c.index).clone().multiplyScalar(-Math.sign(c.lateral)).setY(0);
+      this.vfx.wallChips(this.position.clone().setY(0.3), inward);
     }
     this.vfx.update(dt);
 

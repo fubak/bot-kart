@@ -42,11 +42,20 @@ const DEFAULT_BINDINGS: Record<BindAction, string> = {
 export const bindings: Record<BindAction, string> = { ...DEFAULT_BINDINGS };
 
 const STORE = 'grok-kart-bindings';
+// Plausible KeyboardEvent.code grammar — a malformed-but-string stored
+// value ("BogusCode") would silently kill the action (critic4 LOW).
+const CODE_RE =
+  /^(Key[A-Z]|Digit\d|Numpad\w+|Arrow\w+|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right)|Space|Enter|Tab|CapsLock|Backquote|Backslash|Minus|Equal|BracketLeft|BracketRight|Semicolon|Quote|Comma|Period|Slash|IntlBackslash|IntlRo|IntlYen|F\d{1,2})$/;
 try {
   const saved = JSON.parse(localStorage.getItem(STORE) ?? '{}') as Partial<
     Record<BindAction, string>
   >;
-  for (const a of BIND_ACTIONS) if (typeof saved[a] === 'string') bindings[a] = saved[a];
+  for (const a of BIND_ACTIONS) {
+    const code = saved[a];
+    if (typeof code === 'string' && (code === '' || CODE_RE.test(code))) {
+      bindings[a] = code;
+    }
+  }
 } catch {
   /* corrupt/absent — defaults stand */
 }
@@ -92,6 +101,18 @@ export function keyName(code: string): string {
   if (code.startsWith('Numpad')) return 'NUM ' + code.slice(6);
   return code.toUpperCase();
 }
+
+// Hardcoded alternates polled alongside every binding — arrow keys for the
+// drive axes, Right Shift for drift. These are NOT valid bind targets:
+// assigning one to an action makes it fire two things (brake→ArrowUp still
+// throttles) — capture rejects them (Game.RESERVED_CODES covers them).
+export const UNIVERSAL_ALTERNATES: readonly string[] = [
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ShiftRight',
+];
 
 const keys = new Set<string>();
 

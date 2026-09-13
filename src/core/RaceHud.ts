@@ -1,6 +1,6 @@
 import type { Race } from '../game/Race';
 import type { Kart } from '../game/Kart';
-import { BIND_ACTIONS, BIND_LABELS, keyName } from './Input';
+import { BIND_ACTIONS, BIND_LABELS, bindings, keyName } from './Input';
 
 export interface OptionsState {
   open: boolean;
@@ -13,6 +13,8 @@ export interface OptionsState {
   // Key-rebind rows (Game.MENU_ROWS): current codes + armed capture.
   binds?: Record<string, string>;
   capture?: string | null;
+  // True briefly after a reserved key was pressed during capture.
+  denied?: boolean;
 }
 
 export interface GpState {
@@ -153,7 +155,11 @@ export class RaceHud {
         ...BIND_ACTIONS.map(
           (a) =>
             `${BIND_LABELS[a].padEnd(20)}${
-              opts.capture === a ? 'PRESS KEY…' : keyName(opts.binds?.[a] ?? '')
+              opts.capture === a
+                ? opts.denied
+                  ? 'NOT A DRIVE KEY'
+                  : 'PRESS KEY…'
+                : keyName(opts.binds?.[a] ?? '')
             }`,
         ),
         'RESET BINDINGS',
@@ -183,6 +189,17 @@ export class RaceHud {
         trackName
           ? `◂ ${trackName} ▸  [T]      ${gp?.mode ? `GRAND PRIX — leg ${Math.min(gp.leg + 1, gp.total)}/${gp.total}` : '1 RACE'}  [G]`
           : '';
+      // Controls hint (children[4]) follows the live bindings — a remapped
+      // drive key must not leave the title advertising WASD (critic4).
+      const hint =
+        `${keyName(bindings.throttle)}${keyName(bindings.left)}` +
+        `${keyName(bindings.brake)}${keyName(bindings.right)} / arrows — drive ` +
+        `&nbsp;·&nbsp; ${keyName(bindings.drift)} — drift &nbsp;·&nbsp; ` +
+        `${keyName(bindings.item)} — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; ` +
+        `R — restart &nbsp;·&nbsp; Q — quit &nbsp;·&nbsp; ⌫ — respawn<br>` +
+        `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track`;
+      const hintEl = this.titleEl.children[4] as HTMLElement;
+      if (hintEl.innerHTML !== hint) hintEl.innerHTML = hint;
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
       if (simTime - this.titlePulseAt > 0.06) {
         this.titlePulseAt = simTime;
@@ -199,7 +216,9 @@ export class RaceHud {
       this.pauseEl.style.display = 'none';
       return;
     }
-    this.pauseEl.style.display = paused ? 'block' : 'none';
+    // PAUSED hides under the options panel — both translucent overlays
+    // stacked read untidy (critic4).
+    this.pauseEl.style.display = paused && !opts?.open ? 'block' : 'none';
     const justFinished =
       race.phase === 'finished' && simTime - race.player.finishTime < 1.5;
     this.center.textContent =
@@ -229,6 +248,10 @@ export class RaceHud {
 
     this.warnEl.style.display =
       !paused && race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
+    // Hint text follows the live bindings — a remapped brake key must not
+    // leave the hint telling the player to hold S (critic4).
+    this.stuckEl.innerHTML =
+      `STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; ${keyName(bindings.brake)} reverse`;
     this.stuckEl.style.display =
       !paused && stuckHint && race.phase === 'racing' ? 'block' : 'none';
     // Held-item readout: colored glyph badge + name — readable at a glance.
@@ -244,7 +267,8 @@ export class RaceHud {
       const [glyph, color] = ITEM_GLYPHS[heldItem] ?? ['●', '#fff'];
       this.itemEl.innerHTML =
         `<span style="color:${color};font-size:26px">${glyph}</span> ` +
-        `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">[space]</span>`;
+        `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">` +
+        `[${keyName(bindings.item)}]</span>`;
     } else {
       this.itemEl.textContent = '';
     }

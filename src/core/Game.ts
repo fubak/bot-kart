@@ -7,6 +7,7 @@ import {
   bindKey,
   resetBindings,
   BIND_ACTIONS,
+  UNIVERSAL_ALTERNATES,
 } from './Input';
 import type { BindAction, ControlState } from './Input';
 import { DebugHud } from './DebugHud';
@@ -96,6 +97,11 @@ export class Game {
 
   // Options menu navigation shared by the title-phase and modal paths:
   // rows 0-4 adjust values; rows 5-10 arm the key-capture; row 11 resets.
+  private toggleMotion(): void {
+    this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
+    this.settings.reducedMotion = this.chaseCam.reducedMotion;
+  }
+
   private menuKey(code: string): void {
     const s = this.settings;
     if (code === 'ArrowUp') {
@@ -128,10 +134,15 @@ export class Game {
   // code (Escape cancels). Meta/game-command keys are reserved so a drive
   // bind can never shadow pause/quit/menu.
   private bindingCapture: BindAction | null = null;
+  private captureDeniedAt = -10; // simTime of last reserved-key denial
   private static readonly RESERVED_CODES = new Set([
     'Escape', 'KeyP', 'KeyO', 'KeyQ', 'KeyR', 'KeyN', 'KeyM', 'KeyT',
     'KeyG', 'Backquote', 'Backspace', 'Enter', 'Tab',
     'F5', 'F11', 'F12', 'MetaLeft', 'MetaRight', 'OSLeft', 'OSRight',
+    // Universal alternates (arrows drive, RShift drifts) — binding one
+    // would dual-fire with its hardcoded fallback (critic4: ↑ as brake
+    // still throttled).
+    ...UNIVERSAL_ALTERNATES,
   ]);
   // Options rows: 5 settings + 6 bind rows + RESET — keep in sync with
   // RaceHud's options render.
@@ -210,6 +221,10 @@ export class Game {
         } else if (!Game.RESERVED_CODES.has(e.code)) {
           bindKey(this.bindingCapture, e.code);
           this.bindingCapture = null;
+        } else {
+          // Reserved key — flash a denial so the wait doesn't read as a
+          // hang (critic4: rejection was silent).
+          this.captureDeniedAt = this.simTime;
         }
         return;
       }
@@ -230,7 +245,15 @@ export class Game {
           if (this.gpMode) this.buildWorld(0);
           return;
         }
-        if (e.code === 'KeyO') this.settings.open = !this.settings.open;
+        if (e.code === 'KeyO' || (e.code === 'Escape' && this.settings.open)) {
+          this.settings.open = !this.settings.open;
+        }
+        // M toggles reduced motion on the title too — the hint lists it
+        // (critic4: advertised but dead there).
+        if (e.code === 'KeyM' && !this.settings.open) {
+          this.toggleMotion();
+          return;
+        }
         if (this.settings.open) {
           this.menuKey(e.code);
           return;
@@ -267,10 +290,7 @@ export class Game {
       if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase !== 'title') {
         this.paused = !this.paused;
       }
-      if (e.code === 'KeyM') {
-        this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
-        this.settings.reducedMotion = this.chaseCam.reducedMotion;
-      }
+      if (e.code === 'KeyM') this.toggleMotion();
       if (e.code === bindings.item && !this.paused && this.race.phase === 'racing') {
         this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
       }
@@ -506,7 +526,12 @@ export class Game {
       this.simTime,
       this.items.held[0],
       this.paused,
-      { ...this.settings, binds: bindings, capture: this.bindingCapture },
+      {
+        ...this.settings,
+        binds: bindings,
+        capture: this.bindingCapture,
+        denied: this.simTime - this.captureDeniedAt < 1.2,
+      },
       this.track.name,
       {
         mode: this.gpMode,
