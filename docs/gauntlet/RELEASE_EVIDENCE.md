@@ -230,3 +230,14 @@ to `grok-kart-bindings`. Verified live: W→I rebind survives reload, a
 bound key starts the race from title and drives (28 m/s), duplicate
 binds displace to `—`, reserved keys (P) rejected without pausing,
 Esc cancels capture, RESET restores defaults (`options-rebind.png`).
+
+**Persisted lap records (this commit):** per-track best-lap records
+stored under `grok-kart-records` (`{trackIdx: seconds}`). Detected
+only on gate-validated player laps (post `race.update` lap-count
+delta). Verified live: seeded 999 s record → title shows
+`rec 16:39.00` → three autopilot laps rewrote it 19.87 → 19.36 →
+19.35, `★ NEW LAP RECORD!` toast flashed ~2.5 s on each record
+crossing, results row shows `best 0:19.35 ★REC`
+(`lap-records-results.png`). Slower laps do not overwrite (a ~140 s
+wall-pinned lap left the 105 s record intact). PG smoke re-run:
+18.12 s best, 0 wall hits — identical baseline.

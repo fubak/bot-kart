@@ -84,7 +84,10 @@ None.
   standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
 - Console audit: 0 errors / 0 warnings across the GP session.
 - Latest commits: `3aaabcd` NN geometry → `21fdfad` key remapping →
-  `bd09ab8` critic4 fix batch → `a23641e` leg animation.
+  `bd09ab8` critic4 fix batch → `a23641e` leg animation → `abab038`
+  gamepad → lap records (this commit): per-track best-lap persistence
+  (`grok-kart-records`), title `rec` line, `★ NEW LAP RECORD!` toast,
+  results `★REC` star — all verified live; slower laps don't overwrite.
 
 ---
 

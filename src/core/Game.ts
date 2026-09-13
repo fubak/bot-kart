@@ -137,6 +137,11 @@ export class Game {
   private bindingCapture: BindAction | null = null;
   private captureDeniedAt = -10; // simTime of last reserved-key denial
   private padPrev = new Set<string>(); // pad codes held last frame
+  // Per-track best-lap records (seconds) — persisted; a beaten record
+  // flashes mid-race and stars the results screen.
+  private readonly records: Record<number, number> = {};
+  private recordFlashAt = -10;
+  private recordSetThisRace = false;
   private static readonly RESERVED_CODES = new Set([
     'Escape', 'KeyP', 'KeyO', 'KeyQ', 'KeyR', 'KeyN', 'KeyM', 'KeyT',
     'KeyG', 'Backquote', 'Backspace', 'Enter', 'Tab',
@@ -204,6 +209,14 @@ export class Game {
       }
     } catch {
       /* corrupt/absent storage — defaults stand */
+    }
+    try {
+      Object.assign(
+        this.records,
+        JSON.parse(localStorage.getItem('grok-kart-records') ?? '{}'),
+      );
+    } catch {
+      /* corrupt/absent — no records yet */
     }
     this.buildWorld(this.trackIdx);
     this.applyDifficulty();
@@ -458,6 +471,7 @@ export class Game {
       positions.push(slot.position.clone());
     }
     this.race.restart(positions, this.simTime, phase);
+    this.recordSetThisRace = false;
   }
 
   start(): void {
@@ -521,6 +535,15 @@ export class Game {
       this.items.update(this.simTime, SIM.fixedDt, scores);
       const positions = [this.kart.position, ...this.aiKarts.map((k) => k.position)];
       this.race.update(positions, this.simTime, SIM.fixedDt);
+      // Lap record: the player's bestLapTime improves on lap completion —
+      // beating the stored record flashes a toast and stars the results.
+      const bt = this.race.bestLapTime;
+      if (bt > 0 && bt < (this.records[this.trackIdx] ?? Infinity)) {
+        this.records[this.trackIdx] = bt;
+        this.recordFlashAt = this.simTime;
+        this.recordSetThisRace = true;
+        localStorage.setItem('grok-kart-records', JSON.stringify(this.records));
+      }
       // Finish celebration: confetti fountain the moment each racer crosses.
       const karts = [this.kart, ...this.aiKarts];
       for (let i = 0; i < this.race.racers.length; i++) {
@@ -559,6 +582,11 @@ export class Game {
         done: this.gpDone,
       },
       this.stuckFor > 2,
+      {
+        time: this.records[this.trackIdx],
+        flash: this.simTime - this.recordFlashAt < 2.5,
+        setThisRace: this.recordSetThisRace,
+      },
     );
     this.minimap.update(
       [this.kart, ...this.aiKarts],

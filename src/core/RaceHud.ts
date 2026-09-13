@@ -25,6 +25,12 @@ export interface GpState {
   done: boolean;
 }
 
+export interface RecordInfo {
+  time?: number; // standing best-lap record for this track (s)
+  flash: boolean; // record was just beaten — show the toast
+  setThisRace: boolean; // record was set during this race — star results
+}
+
 // Player-facing race HUD: countdown numbers, lap counter, running/best lap
 // times, wrong-way warning, finish banner. DOM overlay (cheap, accessible).
 // Separate from DebugHud — this is part of the game UI, not dev tooling.
@@ -69,6 +75,11 @@ export class RaceHud {
       'bottom:96px;left:50%;transform:translateX(-50%);font-size:17px;' +
       'font-weight:800;color:#ffe28a;display:none;text-align:center',
     );
+    this.recordEl = mk(
+      'bottom:64px;left:50%;transform:translateX(-50%);font-size:24px;' +
+      'font-weight:900;color:#ffd454;display:none;text-align:center',
+    );
+    this.recordEl.textContent = '★ NEW LAP RECORD!';
     this.stuckEl.innerHTML =
       'STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; S reverse';
     this.itemEl = mk(
@@ -127,6 +138,7 @@ export class RaceHud {
   private readonly inkEl: HTMLDivElement;
   private readonly optionsEl: HTMLDivElement;
   private readonly stuckEl: HTMLDivElement;
+  private readonly recordEl: HTMLDivElement;
   private resultsRenderedAt = -1;
   private titlePulseAt = 0;
 
@@ -140,6 +152,7 @@ export class RaceHud {
     trackName?: string,
     gp?: GpState,
     stuckHint = false,
+    record?: RecordInfo,
   ): void {
     // Options overlay renders in every phase (openable from pause or title).
     if (opts?.open) {
@@ -184,10 +197,12 @@ export class RaceHud {
     }
     this.titleEl.style.display = race.phase === 'title' ? 'block' : 'none';
     if (race.phase === 'title') {
-      // Track + mode line under PRESS ENTER (children[3]).
+      // Track + mode line under PRESS ENTER (children[3]) — plus the
+      // standing lap record for the selected circuit.
       (this.titleEl.children[3] as HTMLElement).textContent =
         trackName
-          ? `◂ ${trackName} ▸  [T]      ${gp?.mode ? `GRAND PRIX — leg ${Math.min(gp.leg + 1, gp.total)}/${gp.total}` : '1 RACE'}  [G]`
+          ? `◂ ${trackName} ▸  [T]      ${gp?.mode ? `GRAND PRIX — leg ${Math.min(gp.leg + 1, gp.total)}/${gp.total}` : '1 RACE'}  [G]` +
+            (record?.time ? `    rec ${fmt(record.time)}` : '')
           : '';
       // Controls hint (children[4]) follows the live bindings — a remapped
       // drive key must not leave the title advertising WASD (critic4).
@@ -217,6 +232,7 @@ export class RaceHud {
       this.warnEl.style.display = 'none';
       this.resultsEl.style.display = 'none';
       this.pauseEl.style.display = 'none';
+      this.recordEl.style.display = 'none';
       return;
     }
     // PAUSED hides under the options panel — both translucent overlays
@@ -257,6 +273,8 @@ export class RaceHud {
       `STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; ${keyName(bindings.brake)} reverse`;
     this.stuckEl.style.display =
       !paused && stuckHint && race.phase === 'racing' ? 'block' : 'none';
+    this.recordEl.style.display =
+      !paused && record?.flash && race.phase !== 'countdown' ? 'block' : 'none';
     // Held-item readout: colored glyph badge + name — readable at a glance.
     const ITEM_GLYPHS: Record<string, [string, string]> = {
       boost: ['⚡', '#ffd454'],
@@ -300,7 +318,9 @@ export class RaceHud {
           .map((r, i) => {
             const rr = race.racers[r];
             const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
-            const best = fmt(rr.bestLapTime);
+            const best =
+              fmt(rr.bestLapTime) +
+              (r === 0 && record?.setThisRace ? ' ★REC' : '');
             const cls = r === 0 ? ' style="color:#7be8ff"' : '';
             let pts = '';
             if (gp?.mode) {
