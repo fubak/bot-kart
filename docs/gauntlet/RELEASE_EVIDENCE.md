@@ -100,3 +100,19 @@ traffic lock 7.8% unchanged.
 - **Gauntlet race (rubber-band build):** P1 BOT-B 1:01.10 · P2 BOT-C
   1:04.75 · P3 BOT-A2 1:08.68 · P4 YOU 1:23.13 — `wave4/results-rb.png`;
   75 fps, 160 draws, 34.5k tris, all celebrating.
+
+## Wave-4 round 3 (pacing proof + shortcut fix + wedge recovery)
+
+- **Rubber-band proof:** full race — all 4 finishers within 2.96 s
+  (BOT-C 0:58.26 / BOT-A2 0:59.22 / BOT-B 0:59.27 / YOU 1:01.22),
+  vs 7.6 s+ spreads before. `wave4/results-final.png`.
+- **Shortcut geometry fix:** corner measured +1.79 rad LEFT — zone-1 was
+  on the outside edge (detour); moved to the true inside cut.
+  `wave4/shortcut-inside.png`. Bot C (takesShortcuts) verified riding
+  the apron mid-apex (`surf=gravel` lat +6.0).
+- **Anti-wedge recovery:** displacement detector + reverse-out; freed a
+  pinned bot in 251 ms live.
+- **Item set:** 6 kinds — boost/missile/slick/shield/ink/swap +
+  position-weighted rolls.
+- **Watch item:** BOT-B best lap 0:13.88 — likely a swap-teleport
+  foreshortened lap (genre-consistent chaos; monitor).
