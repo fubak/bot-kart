@@ -17,8 +17,11 @@ rubber-band pacing (2.96 s pack spread verified), driver celebrations,
 anti-wedge AI recovery, Bot C AI shortcut-taker, confetti + positional
 audio, title-orbit framing fix. Options menu live (`O`): master/music
 volume bars, reduced-motion + minimap toggles — evidence `options.png`.
+Second track SWITCHBACK RIDGE selectable on title via `T` (buildWorld
+rebuild; AI laps verified; both gravel cuts probed to correct inside
+edges). Driver limb emotes via the seated bots' articulated rigs —
+victory arm-pump, spin flail, head-into-turn tracking.
 Release evidence at RELEASE_EVIDENCE.md.
-Next candidates: second track, skeletal bot animation.
 
 ---
 
@@ -44,8 +47,10 @@ AI depth, items, track character.
 
 1. ~~Settings menu~~ — DONE: O options overlay (volumes, reduced-motion,
    minimap) with arrow navigation.
-2. **Second track** — single circuit; a variant would multiply longevity.
-3. **Bot skeletal animation** — drivers bob/lean/celebrate; no limbs.
+2. ~~Second track~~ — DONE: Switchback Ridge, T to cycle on title.
+3. ~~Bot animation~~ — DONE: node-rig emotes (arm pump/flail, head look).
+4. **Item HUD iconography** — held item shows as text only; icons/pips
+   would polish readability.
 4. ~~Item variety~~ — DONE: 6 kinds + position-weighted rolls.
 5. ~~Track shortcut~~ — DONE: 2 inside gravel cuts, cap 15 m/s.
 

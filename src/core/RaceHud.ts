@@ -191,8 +191,23 @@ export class RaceHud {
 
     this.warnEl.style.display =
       !paused && race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
-    this.itemEl.textContent =
-      race.phase === 'racing' && heldItem ? `${heldItem.toUpperCase()} [space]` : '';
+    // Held-item readout: colored glyph badge + name — readable at a glance.
+    const ITEM_GLYPHS: Record<string, [string, string]> = {
+      boost: ['⚡', '#ffd454'],
+      missile: ['✹', '#ff5a3c'],
+      slick: ['◍', '#8a8f96'],
+      shield: ['◯', '#7be8ff'],
+      ink: ['✦', '#c070ff'],
+      swap: ['⇄', '#7dff8a'],
+    };
+    if (race.phase === 'racing' && heldItem) {
+      const [glyph, color] = ITEM_GLYPHS[heldItem] ?? ['●', '#fff'];
+      this.itemEl.innerHTML =
+        `<span style="color:${color};font-size:26px">${glyph}</span> ` +
+        `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">[space]</span>`;
+    } else {
+      this.itemEl.textContent = '';
+    }
 
     // Results table: re-renders at 2 Hz while finished so late finishers
     // update — the one-shot latch froze still-racing rivals as "DNF"
