@@ -71,3 +71,8 @@ export const TRACK = {
   samples: 1024, // centerline lookup resolution
   wallHeight: 0.55,
 } as const;
+
+export const RACE = {
+  laps: 3,
+  countdown: 3.0, // seconds of input-locked 3-2-1 before GO
+} as const;

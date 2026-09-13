@@ -5,6 +5,9 @@ import { DebugHud } from './DebugHud';
 import { Kart } from '../game/Kart';
 import { Track } from '../game/Track';
 import { ChaseCamera } from '../game/ChaseCamera';
+import { Race } from '../game/Race';
+import { RaceHud } from './RaceHud';
+import type { ControlState } from './Input';
 
 // Game root: renderer + scene + fixed-timestep sim loop (ADR-003).
 // Sim steps at SIM.fixedDt; render happens once per rAF.
@@ -16,6 +19,8 @@ export class Game {
   private readonly hud: DebugHud;
   private readonly track = new Track();
   private readonly kart = new Kart();
+  private readonly race: Race;
+  private readonly raceHud = new RaceHud();
   private accumulator = 0;
   private lastMs = 0;
   private simTime = 0;
@@ -34,10 +39,21 @@ export class Game {
     sun.position.set(60, 90, 40);
     this.scene.add(sun);
 
-    this.scene.add(this.track.group, this.kart.group);
+    this.scene.add(this.track.group, this.kart.group, this.kart.vfx.object);
 
     const spawn = this.track.spawn();
     this.kart.reset(spawn.position, spawn.heading);
+    this.race = new Race(this.track);
+    this.race.restart(spawn.position, 0);
+
+    // R = restart race (input-edge handled here, not in ControlState).
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyR' && !e.repeat) {
+        const s = this.track.spawn();
+        this.kart.reset(s.position, s.heading);
+        this.race.restart(s.position, this.simTime);
+      }
+    });
 
     this.chaseCam = new ChaseCamera(window.innerWidth / window.innerHeight);
     this.hud = new DebugHud(this.renderer);
@@ -56,6 +72,7 @@ export class Game {
       scene: this.scene,
       kart: this.kart,
       track: this.track,
+      race: this.race,
       camera: this.chaseCam.camera,
       sim: {
         fixedDt: SIM.fixedDt,
@@ -75,9 +92,13 @@ export class Game {
     this.lastMs = ms;
 
     const input = pollInput();
+    const driveInput: ControlState = this.race.allowsDrive
+      ? input
+      : { throttle: 0, brake: 0, steer: 0, drift: false };
     this.accumulator += frameDt;
     while (this.accumulator >= SIM.fixedDt) {
-      this.kart.update(SIM.fixedDt, input, this.track, this.simTime);
+      this.kart.update(SIM.fixedDt, driveInput, this.track, this.simTime);
+      this.race.update(this.kart.position, this.simTime, SIM.fixedDt);
       this.simTime += SIM.fixedDt;
       this.accumulator -= SIM.fixedDt;
     }
@@ -85,6 +106,7 @@ export class Game {
     this.chaseCam.update(frameDt, this.kart);
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
+    this.raceHud.update(this.race, this.kart, this.simTime);
     this.renderer.render(this.scene, this.chaseCam.camera);
   }
 }

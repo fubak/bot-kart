@@ -64,7 +64,7 @@ export class Track {
   }
 
   /** Nearest centerline sample index — linear scan, cheap at 1024 samples. */
-  private nearestIndex(pos: THREE.Vector3): number {
+  nearestIndex(pos: THREE.Vector3): number {
     let best = 0;
     let bestD = Infinity;
     for (let i = 0; i < this.samples.length; i++) {
@@ -109,6 +109,10 @@ export class Track {
     const s = this.samples[i];
     pos.copy(s.point).addScaledVector(s.left, Math.sign(lateral) * limit);
     return { lateral: Math.sign(lateral) * limit, clamped: true };
+  }
+
+  get sampleCount(): number {
+    return this.samples.length;
   }
 
   /** Spawn transform: on the grid just past the start line, facing tangent. */
@@ -223,5 +227,90 @@ export class Track {
     stripe.rotation.z = -Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
     stripe.position.copy(s0.point).setY(0.03); // above road, below wheels
     this.group.add(stripe);
+
+    // Centerline dashes — speed/racing-line readability (critic: flat
+    // featureless road gave no optical flow).
+    const dashGeo = new THREE.BoxGeometry(0.18, 0.02, 1.4);
+    const dashMat = new THREE.MeshStandardMaterial({ color: 0xd8dce4 });
+    const dashEvery = 6;
+    const dashes = new THREE.InstancedMesh(dashGeo, dashMat, Math.floor(n / dashEvery));
+    for (let c = 0; c < Math.floor(n / dashEvery); c++) {
+      const s = this.samples[(c * dashEvery) % n];
+      q.setFromAxisAngle(up, Math.atan2(s.tangent.x, s.tangent.z));
+      m.compose(
+        s.point.clone().setY(0.025),
+        q,
+        new THREE.Vector3(1, 1, 1),
+      );
+      dashes.setMatrixAt(c, m);
+    }
+    this.group.add(dashes);
+
+    // Start gantry — landmark over the stripe (two posts + beam + banner).
+    const postGeo = new THREE.BoxGeometry(0.4, 5.5, 0.4);
+    const beamMat = new THREE.MeshStandardMaterial({ color: 0x2a3140 });
+    for (const side of [1, -1]) {
+      const post = new THREE.Mesh(postGeo, beamMat);
+      post.position.copy(s0.point).addScaledVector(s0.left, side * (hw + 1.2)).setY(2.75);
+      this.group.add(post);
+    }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 2.8, 0.5, 0.5), beamMat);
+    beam.position.copy(s0.point).setY(5.5);
+    beam.rotation.y = Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
+    this.group.add(beam);
+    const banner = new THREE.Mesh(
+      new THREE.BoxGeometry(hw * 1.2, 1.0, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xffb340 }),
+    );
+    banner.position.copy(s0.point).setY(4.8);
+    banner.rotation.y = beam.rotation.y;
+    this.group.add(banner);
+
+    // Scenery: instanced trees + rocks scattered outside the walls. Pure
+    // optical-flow/parallax props — cheap, deterministic pseudo-random.
+    const rng = (seed: number) => {
+      let s = seed >>> 0;
+      return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff);
+    };
+    const rand = rng(1337);
+    const treeCount = 110;
+    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.3, 1.6, 6);
+    const canopyGeo = new THREE.ConeGeometry(1.5, 3.2, 7);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, flatShading: true });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2f7a3f, flatShading: true });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
+    const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, treeCount);
+    const rockGeo = new THREE.DodecahedronGeometry(0.9, 0);
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8f96, flatShading: true });
+    const rocks = new THREE.InstancedMesh(rockGeo, rockMat, 40);
+    let placed = 0;
+    let guard = 0;
+    while (placed < treeCount && guard++ < treeCount * 4) {
+      const s = this.samples[Math.floor(rand() * n)];
+      const side = rand() < 0.5 ? 1 : -1;
+      const dist = hw + 3 + rand() * 30;
+      const p = s.point.clone().addScaledVector(s.left, side * dist);
+      const sc = 0.8 + rand() * 0.9;
+      const rot = new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2);
+      m.compose(p.clone().setY(0.8 * sc), rot, new THREE.Vector3(sc, sc, sc));
+      trunks.setMatrixAt(placed, m);
+      m.compose(p.clone().setY((1.6 + 1.6) * sc), rot, new THREE.Vector3(sc, sc, sc));
+      canopies.setMatrixAt(placed, m);
+      placed++;
+    }
+    for (let c = 0; c < 40; c++) {
+      const s = this.samples[Math.floor(rand() * n)];
+      const side = rand() < 0.5 ? 1 : -1;
+      const dist = hw + 4 + rand() * 24;
+      const p = s.point.clone().addScaledVector(s.left, side * dist);
+      const sc = 0.5 + rand() * 1.1;
+      m.compose(
+        p.setY(0.4 * sc),
+        new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
+        new THREE.Vector3(sc, sc * 0.7, sc),
+      );
+      rocks.setMatrixAt(c, m);
+    }
+    this.group.add(trunks, canopies, rocks);
   }
 }

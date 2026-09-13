@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KART } from '../config/tuning';
 import type { ControlState } from '../core/Input';
 import type { Track } from './Track';
+import { KartVfx } from './KartVfx';
 import kartGlbUrl from '../../assets/exported/karts/kart-a.glb?url';
 
 // Arcade kart entity: velocity-based model with exp-grip lateral slip,
@@ -14,6 +15,7 @@ export type DriveState = 'grip' | 'drift' | 'boost';
 
 export class Kart {
   readonly group = new THREE.Group();
+  readonly vfx = new KartVfx();
 
   position = new THREE.Vector3();
   heading = 0; // rad; 0 faces -Z (ADR-002)
@@ -95,29 +97,36 @@ export class Kart {
     new GLTFLoader().load(
       kartGlbUrl,
       (gltf) => {
-        const model = gltf.scene;
-        // Normalize to KART footprint: GLB is 2.6 m long, target ~3.2 m.
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const scale = KART.length / size.z;
-        model.scale.setScalar(scale);
-        // Ground the model and center it on the kart origin.
-        box.setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center).setY(-box.min.y);
-        // GLB wheels (Cylinder.* spokes in the export) get spin like ours.
-        model.traverse((o) => {
-          if (o.name.startsWith('Cylinder')) this.glbWheels.push(o);
-        });
-        for (const o of this.proceduralBody) o.visible = false;
-        for (const w of this.wheels) w.visible = false;
-        this.body.add(model);
+        this.applyAsset(gltf.scene);
       },
       undefined,
-      () => {
-        // Load failed — procedural placeholder stays visible.
+      (err) => {
+        console.warn('[kart] GLB load failed, keeping placeholder:', err);
+        // One retry — covers the file being mid-rewrite during dev.
+        setTimeout(() => {
+          new GLTFLoader().load(kartGlbUrl, (g) => this.applyAsset(g.scene));
+        }, 1500);
       },
     );
+  }
+
+  private applyAsset(model: THREE.Group): void {
+    // Normalize to KART footprint: GLB is 2.6 m long, target ~3.2 m.
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const scale = KART.length / size.z;
+    model.scale.setScalar(scale);
+    // Ground the model and center it on the kart origin.
+    box.setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center).setY(-box.min.y);
+    // GLB wheels (Cylinder.* spokes in the export) get spin like ours.
+    model.traverse((o) => {
+      if (o.name.startsWith('Cylinder')) this.glbWheels.push(o);
+    });
+    for (const o of this.proceduralBody) o.visible = false;
+    for (const w of this.wheels) w.visible = false;
+    this.body.add(model);
   }
 
   get speed(): number {
@@ -196,7 +205,9 @@ export class Kart {
       // walls) but doesn't break the drift — brake-tap line-tightening stays.
       const canSustain = input.drift && fwdSpeed > KART.steerMinSpeed * 2;
       if (canSustain) {
-        if (input.brake === 0) this.driftCharge += dt;
+        if (input.brake === 0) {
+          this.driftCharge = Math.min(this.driftCharge + dt, KART.driftChargeTier[1] + 0.3);
+        }
       } else {
         // Release → mini-turbo if a tier was charged.
         const tier = this.driftCharge >= KART.driftChargeTier[1] ? 1 : this.driftCharge >= KART.driftChargeTier[0] ? 0 : -1;
@@ -277,6 +288,29 @@ export class Kart {
     const lat = this.velocity.clone().addScaledVector(this.forward(), -fAmt2);
     const latSigned = lat.dot(this.right());
     this.slipAngle = this.speed > 0.5 ? Math.atan2(latSigned, Math.abs(fAmt2)) : 0;
+
+    // --- VFX emission (world space) ---
+    const right2 = this.right();
+    const fwd3 = this.forward();
+    const rearC = this.position.clone().addScaledVector(fwd3, -(KART.length / 2 - 0.55)).setY(0.25);
+    if (this.driftDir !== 0) {
+      // Sparks at both rear wheels — tier color is the player's charge readout.
+      const wx = KART.width / 2 + 0.08;
+      if (Math.random() < 60 * dt) {
+        this.vfx.driftSparks(rearC.clone().addScaledVector(right2, -wx), this.velocity, this.driftCharge);
+        this.vfx.driftSparks(rearC.clone().addScaledVector(right2, wx), this.velocity, this.driftCharge);
+      }
+    }
+    if (this.boostTimer > 0) {
+      if (Math.random() < 90 * dt) this.vfx.boostFlame(rearC.clone().setY(0.55), this.velocity);
+    }
+    if (c.clamped && Math.random() < 30 * dt) {
+      const inward = this.position.clone().sub(before).setY(0);
+      if (inward.lengthSq() > 1e-6) {
+        this.vfx.wallChips(this.position.clone().setY(0.3), inward.normalize());
+      }
+    }
+    this.vfx.update(dt);
 
     this.syncVisual();
   }
