@@ -36,6 +36,7 @@ export class Kart {
   private impactSquash = 0; // 0..1 wall-hit squash, decays in syncVisual
   vy = 0; // vertical velocity — crests at speed give real airtime
   grounded = true;
+  airTime = 0; // seconds airborne — landing feedback scales with it
   slopePitch = 0; // road pitch under the kart — drives body tilt
   slopeRoll = 0;
 
@@ -371,9 +372,19 @@ export class Kart {
     if (this.position.y <= groundY) {
       this.position.y = groundY;
       this.vy = 0;
+      if (!this.grounded && this.airTime > 0.22) {
+        // Landing feedback: squash + dust + a camera/audio thump scaled by
+        // hang time (critic: 1-3 s crest flights landed silently).
+        this.impactSquash = Math.min(0.55, this.airTime * 0.45);
+        this.lastWallHit = simTime;
+        this.lastWallImpact = Math.min(1, this.airTime * 0.5);
+        this.vfx.wallChips(this.position.clone().setY(groundY + 0.15), new THREE.Vector3(0, 1, 0));
+      }
+      this.airTime = 0;
       this.grounded = true;
     } else {
       this.grounded = false;
+      this.airTime += dt;
     }
     // Slope gravity (grounded only): uphill bleeds speed, downhill adds it.
     const fwdE = this.forward();

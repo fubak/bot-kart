@@ -1,5 +1,6 @@
 import type { Kart } from '../game/Kart';
 import type { Race } from '../game/Race';
+import { Music } from './Music';
 
 // Procedural audio — Web Audio oscillators/noise, no samples. Engine pitch
 // tracks speed, drift band-noise tracks slip, boost is a filtered whoosh,
@@ -17,6 +18,7 @@ export class Audio {
   private lastWallT = -1;
   private lastLap = 1;
   private lastPhase = 'countdown';
+  private readonly music = new Music();
 
   /** Call once on a trusted user gesture (keydown/pointerdown). */
   unlock(): void {
@@ -67,6 +69,9 @@ export class Audio {
     bSrc.connect(bFilter).connect(bGain).connect(this.master);
     bSrc.start();
     this.boost = { src: bSrc, gain: bGain, filter: bFilter };
+
+    this.music.attach(ctx, this.master);
+    this.music.start();
   }
 
   private makeNoise(): AudioBuffer {
@@ -181,6 +186,16 @@ export class Audio {
       boost ? 2400 : 400,
       this.ctx.currentTime,
       0.12,
+    );
+
+    // Music intensity: sparse countdown → full race groove, hottest on the
+    // last lap, drops out after the flag.
+    this.music.setIntensity(
+      race.phase === 'racing'
+        ? 0.35 + 0.4 * (race.lap / race.totalLaps)
+        : race.phase === 'finished'
+          ? 0.2
+          : 0.1,
     );
     void simTime;
   }

@@ -48,7 +48,7 @@ export class DebugHud {
     const info = this.renderer.info;
     this.el.textContent =
       `fps ${this.fps.toFixed(0)}  ms ${this.frameMs.toFixed(1)} (worst ${this.worstMs.toFixed(1)})\n` +
-      `speed ${(kart.forwardSpeed * 3.6).toFixed(0)} km/h   state ${kart.state}\n` +
+      `speed ${Math.max(0, kart.forwardSpeed * 3.6).toFixed(0)} km/h   state ${kart.state}\n` +
       `drift ${kart.driftCharge.toFixed(2)}s   boost ${kart.boostTimer.toFixed(2)}s\n` +
       `draws ${info.render.calls}   tris ${info.render.triangles}\n` +
       `[WASD/arrows] drive   [shift] drift   [\`] hud`;

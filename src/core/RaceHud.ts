@@ -53,13 +53,16 @@ export class RaceHud {
 
   private readonly itemEl: HTMLDivElement;
   private readonly resultsEl: HTMLDivElement;
-  private resultsShown = false;
+  private resultsRenderedAt = -1;
 
   update(race: Race, kart: Kart, simTime: number, heldItem?: string | null): void {
-    if (race.phase !== 'finished') this.resultsShown = false;
+    const justFinished =
+      race.phase === 'finished' && simTime - race.player.finishTime < 1.5;
     this.center.textContent =
       race.phase === 'finished'
-        ? 'FINISH'
+        ? justFinished
+          ? 'FINISH'
+          : ''
         : race.countdownLabel;
     const pos = race.positionOf(0);
     this.lapEl.textContent =
@@ -83,29 +86,34 @@ export class RaceHud {
     this.itemEl.textContent =
       race.phase === 'racing' && heldItem ? `${heldItem.toUpperCase()} [space]` : '';
 
-    // Results table: ranks everyone — finishers by time, unfinished by score.
-    if (race.phase === 'finished' && !this.resultsShown) {
-      this.resultsShown = true;
-      const order = [...race.racers.keys()].sort(
-        (a, b) => race.positionOf(a) - race.positionOf(b),
-      );
-      const names = ['YOU', 'BOT-B', 'BOT-C', 'BOT-A2'];
-      const rows = order
-        .map((r, i) => {
-          const rr = race.racers[r];
-          const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : 'DNF';
-          const best = fmt(rr.bestLapTime);
-          const cls = r === 0 ? ' style="color:#7be8ff"' : '';
-          return `<div${cls}>P${i + 1}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}</div>`;
-        })
-        .join('');
-      this.resultsEl.innerHTML =
-        `<div style="font-size:30px;font-weight:900;margin-bottom:10px">RESULTS</div>` +
-        rows +
-        `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">[R] restart</div>`;
+    // Results table: re-renders at 2 Hz while finished so late finishers
+    // update — the one-shot latch froze still-racing rivals as "DNF"
+    // (critic: winning showed all rivals DNF forever).
+    if (race.phase === 'finished') {
       this.resultsEl.style.display = 'block';
+      if (simTime - this.resultsRenderedAt > 0.5) {
+        this.resultsRenderedAt = simTime;
+        const order = [...race.racers.keys()].sort(
+          (a, b) => race.positionOf(a) - race.positionOf(b),
+        );
+        const names = ['YOU', 'BOT-B', 'BOT-C', 'BOT-A2'];
+        const rows = order
+          .map((r, i) => {
+            const rr = race.racers[r];
+            const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
+            const best = fmt(rr.bestLapTime);
+            const cls = r === 0 ? ' style="color:#7be8ff"' : '';
+            return `<div${cls}>P${i + 1}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}</div>`;
+          })
+          .join('');
+        this.resultsEl.innerHTML =
+          `<div style="font-size:30px;font-weight:900;margin-bottom:10px">RESULTS</div>` +
+          rows +
+          `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">[R] restart</div>`;
+      }
+    } else {
+      this.resultsEl.style.display = 'none';
     }
-    if (race.phase !== 'finished') this.resultsEl.style.display = 'none';
     void kart;
   }
 }
