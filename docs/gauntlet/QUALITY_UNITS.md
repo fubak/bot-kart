@@ -38,11 +38,17 @@ them in the actual running game; the Coordinator sequences them into waves.
 | MOVE-007 | Drift/boost feedback VFX | Built | — |
 | RACE-001 | Checkpoints + lap counting | Built | — |
 | RACE-002 | Race flow (countdown/finish) | Built | — |
-| AI-001 | Opponent AI (racing line) | In Progress | — |
-| HUD-001 | Race HUD (lap/position/time) | Built | — |
+| AI-001 | Opponent AI (racing line) | Built → Fixed | 5/10→fixes |
+| AI-002 | AI traffic/overtake model | Built | — |
+| HUD-001 | Race HUD (lap/position/time/item) | Built | — |
+| HUD-002 | Results screen (finish table) | Built | — |
 | AUDIO-001 | Procedural SFX (engine/skid/boost/impact/UI) | Built | — |
 | ART-001 | Grok Bot A + Kart A (canonical assets) | Built | — |
+| ART-002 | Grok Bot B/C rival assets | Built | — |
 | TRACK-002 | Track readability pass 1 (scenery/dashes/gantry) | Built | — |
+| TRACK-003 | Elevation (crest + ridge, embankments, airtime) | Built | — |
+| TRACK-004 | Corner chevrons + boost pads (route decision) | Built | — |
+| ITEM-001 | Item boxes + boost + homing missile | Built | — |
 
 ---
 
@@ -289,3 +295,40 @@ readability, Track landmarks, Shortcuts, Characters, Karts, Character
 animation, Kart animation, VFX, Lighting, Materials, Environment art, Items,
 Item balancing, HUD, Menus, Transitions, Audio, Music, Input, Accessibility,
 Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
+
+### TRACK-003 — Elevation
+
+- **Domain:** Track
+- **Status:** Built
+- **Evidence:** `elevation-01.png`, `elevation-crest.png`; ai-smoke 3×3 laps
+  clean on elevated track; kart airtime via vy/gravity over crests.
+- **Largest Gap:** no jump ramps/landing dust; slope feel could be tuned.
+
+### ITEM-001 — Item boxes + boost + missile
+
+- **Domain:** Items
+- **Status:** Built
+- **Evidence:** live pickup→BOOST[space]→boost verified; missile hits
+  verified by critic (leader punished to 25% speed).
+- **Largest Gap:** only 2 item kinds; no drop-behind items (banana/oil).
+
+### AI-002 — Traffic/overtake model
+
+- **Domain:** AI racers
+- **Status:** Built
+- **Evidence:** pair-lock 91%→1% of samples under 2.75m post-fix.
+- **Largest Gap:** no defensive lines; no rubber-banding by design.
+
+### TRACK-004 — Chevrons + boost pads
+
+- **Domain:** Track
+- **Status:** Built
+- **Evidence:** `chevrons-crest.png`, `chevrons-hairpin.png`.
+- **Largest Gap:** chevron arrow is a tilted quad, not a real arrow shape.
+
+### HUD-002 — Results screen
+
+- **Domain:** HUD
+- **Status:** Built
+- **Evidence:** `results-screen.png` — finishers by time, DNFs, best laps.
+- **Largest Gap:** no podium ceremony/camera work; plain table.
