@@ -171,7 +171,9 @@
     "2026-09-13: wave4 critic3 PASS 8/10 — all HIGH/LOW defects fixed + committed (ee3770f)",
     "2026-09-13: NN wall-clip resolved — V-kink (R≈6/110°) softened to ~55° lean, AI braking horizon 1.3s/6 probes; 0 hits all tracks (3aaabcd)",
     "2026-09-13: final regression sweep — full GP autopilot (standings ★BOT-A2 24pts, clean title re-arm), 68.9fps p95 15.1ms, 0 console errors, build clean",
-    "2026-09-13: key remapping shipped (21fdfad) — 6 bind rows + RESET in options, persisted, conflict-safe; all documented feature gaps closed; critic4 playtest launched on the build"
+    "2026-09-13: key remapping shipped (21fdfad) — 6 bind rows + RESET in options, persisted, conflict-safe; all documented feature gaps closed; critic4 playtest launched on the build",
+    "2026-09-13: wave4 critic4 7.5/10 — HIGH nose-in wall velocity runaway fixed (frame-derived normal; parked kart read 28m/s → now 0.03, stuck hint fires), MED alternate-bind footgun + stale key hints fixed, LOW ×5 fixed (bd09ab8)",
+    "2026-09-13: leg animation shipped (a23641e) — pedal work + spin/celebration kicks; all documented quality gaps closed"
   ],
   "blockers": [],
   "milestones": [
@@ -211,16 +213,19 @@
   ],
   "agents": {},
   "latestCritic": {
-    "id": "wave4-critic3",
-    "score": 8.0,
+    "id": "wave4-critic4",
+    "score": 7.5,
     "verdict": "pass",
-    "report": "docs/gauntlet/evidence/wave4/CRITIC3_REPORT.md",
+    "report": "docs/gauntlet/evidence/wave4/CRITIC4_REPORT.md",
     "fixed": [
-      "gp-state-leak (HIGH, re-verified)",
-      "foldback-beaching (HIGH, re-verified)",
-      "n-through-pause",
-      "stuck-hint",
-      "leg-points-display"
+      "nose-in wall velocity runaway (HIGH — frame-derived contact normal)",
+      "universal-alternate bind footgun (MED — arrows/RShift capture-rejected)",
+      "stale key hints (MED — item/stuck/title render live bindings)",
+      "M dead on title",
+      "options renders over PAUSED",
+      "silent reserved-key denial (now NOT A DRIVE KEY flash)",
+      "malformed stored binding kills action (code-grammar validation)",
+      "Esc does not close options on title"
     ]
   },
   "wave3": {

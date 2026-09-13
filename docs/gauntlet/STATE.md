@@ -56,9 +56,11 @@ AI depth, items, track character.
 5. ~~Grand Prix~~ — DONE: 3-leg cup with standings.
 6. ~~Key remapping~~ — DONE: 6 bind rows + RESET in options, persisted,
    conflict-safe, reserved keys rejected (evidence `options-rebind.png`).
-7. **Bot leg animation** — legs static; arms/head/eyes done.
+7. ~~Bot leg animation~~ — DONE: pedal work (throttle/brake), spin kicks,
+   celebration kicks via leg_l/leg_r nodes.
 4. ~~Item variety~~ — DONE: 6 kinds + position-weighted rolls.
 5. ~~Track shortcut~~ — DONE: 2 inside gravel cuts, cap 15 m/s.
+8. **Remaining gaps:** none documented — all critic-identified items closed.
 
 ---
 
@@ -81,10 +83,8 @@ None.
 - Full GP autopilot pass verified: leg points accumulate, final
   standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
 - Console audit: 0 errors / 0 warnings across the GP session.
-- Latest commits: `ee3770f` critic3 fix batch → `3aaabcd` NN geometry +
-  AI braking horizon → `d630cf7` sweep evidence → `21fdfad` key remapping.
-- critic4 playtest running on the key-remap build (browser exclusive —
-  no source edits until it finishes).
+- Latest commits: `3aaabcd` NN geometry → `21fdfad` key remapping →
+  `bd09ab8` critic4 fix batch → `a23641e` leg animation.
 
 ---
 
@@ -122,6 +122,18 @@ None.
   softened + longer braking horizon — 0 hits all tracks); full GP on
   autopilot end-to-end (standings/champion/title re-arm correct);
   68.9 fps mid-race; 0 console errors; build clean.
+- Wave-4 critic4 (post key-remap playtest): 7.5/10 —
+  `evidence/wave4/CRITIC4_REPORT.md`. All prior fixes held; full
+  verified-working list incl. mid-race rebind hot-swap. Defects fixed
+  + verified (bd09ab8): HIGH nose-in wall velocity runaway (frame-
+  derived contact normal — parked kart read 28 m/s, defeated stuck
+  hint, stored a free launch; now 0.03 m/s + hint fires), MED universal-
+  alternate bind footgun (arrows/RShift rejected in capture), MED stale
+  key hints (item/stuck/title all render live bindings), LOW ×5 (M on
+  title, options-over-PAUSED, silent reserved denial → NOT A DRIVE KEY
+  flash, malformed binding validation, Esc closes options on title).
+- Leg animation shipped (a23641e): pedal work + spin/celebration kicks —
+  every documented quality gap now closed.
 
 ---
 
