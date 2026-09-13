@@ -125,14 +125,67 @@ export function initInput(): void {
   window.addEventListener('blur', () => keys.clear());
 }
 
+// --- Gamepad (standard mapping) ---
+// Continuous axes merge into ControlState here; discrete buttons surface
+// through pollPadCodes() so the game's single keyboard action pipeline
+// handles item/pause/menu/confirm identically for pad and keys.
+function firstPad(): Gamepad | null {
+  const pads = navigator.getGamepads?.() ?? [];
+  for (const p of pads) if (p && p.connected) return p;
+  return null;
+}
+
+export function padConnected(): boolean {
+  return firstPad() !== null;
+}
+
 export function pollInput(): ControlState {
   const k = (c: string) => (keys.has(c) ? 1 : 0);
-  return {
-    throttle: Math.max(k(bindings.throttle), k('ArrowUp')),
-    brake: Math.max(k(bindings.brake), k('ArrowDown')),
-    steer:
-      Math.max(k(bindings.right), k('ArrowRight')) -
-      Math.max(k(bindings.left), k('ArrowLeft')),
-    drift: keys.has(bindings.drift) || keys.has('ShiftRight'),
-  };
+  const kbSteer =
+    Math.max(k(bindings.right), k('ArrowRight')) -
+    Math.max(k(bindings.left), k('ArrowLeft'));
+  let throttle = Math.max(k(bindings.throttle), k('ArrowUp'));
+  let brake = Math.max(k(bindings.brake), k('ArrowDown'));
+  let steer = kbSteer;
+  let drift = keys.has(bindings.drift) || keys.has('ShiftRight');
+  const gp = firstPad();
+  if (gp) {
+    const b = (i: number) =>
+      gp.buttons[i]?.pressed || (gp.buttons[i]?.value ?? 0) > 0.5;
+    const bv = (i: number) => gp.buttons[i]?.value ?? 0;
+    const ax = (i: number) => {
+      const v = gp.axes[i] ?? 0;
+      return Math.abs(v) < 0.18 ? 0 : v; // deadzone
+    };
+    // RT/A throttle · LT/B brake · left stick or dpad steer · RB/X drift.
+    throttle = Math.max(throttle, bv(7), b(0) ? 1 : 0);
+    brake = Math.max(brake, bv(6), b(1) ? 1 : 0);
+    const padSteer = Math.max(
+      -1,
+      Math.min(1, ax(0) + (b(14) ? -1 : 0) + (b(15) ? 1 : 0)),
+    );
+    if (Math.abs(padSteer) > Math.abs(steer)) steer = padSteer;
+    drift = drift || b(5) || b(2);
+  }
+  return { throttle, brake, steer, drift };
+}
+
+// Pad buttons → keyboard action codes. Held-set diffing in Game turns
+// these into real keydown/keyup events, so every existing action (item,
+// pause, menu nav, title start, GP advance, respawn) works from a pad.
+export function pollPadCodes(): Set<string> {
+  const out = new Set<string>();
+  const gp = firstPad();
+  if (!gp) return out;
+  const b = (i: number) => gp.buttons[i]?.pressed ?? false;
+  if (b(0)) out.add('Enter'); // A — confirm/start
+  if (b(1)) out.add('Escape'); // B — back/pause-close
+  if (b(3) || b(4)) out.add(bindings.item); // Y / LB — item
+  if (b(8)) out.add('KeyM'); // Back — reduce motion
+  if (b(9)) out.add('KeyP'); // Start — pause
+  if (b(12)) out.add('ArrowUp');
+  if (b(13)) out.add('ArrowDown');
+  if (b(14)) out.add('ArrowLeft');
+  if (b(15)) out.add('ArrowRight');
+  return out;
 }

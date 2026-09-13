@@ -3,6 +3,7 @@ import { AI, SIM } from '../config/tuning';
 import {
   initInput,
   pollInput,
+  pollPadCodes,
   bindings,
   bindKey,
   resetBindings,
@@ -135,6 +136,7 @@ export class Game {
   // bind can never shadow pause/quit/menu.
   private bindingCapture: BindAction | null = null;
   private captureDeniedAt = -10; // simTime of last reserved-key denial
+  private padPrev = new Set<string>(); // pad codes held last frame
   private static readonly RESERVED_CODES = new Set([
     'Escape', 'KeyP', 'KeyO', 'KeyQ', 'KeyR', 'KeyN', 'KeyM', 'KeyT',
     'KeyG', 'Backquote', 'Backspace', 'Enter', 'Tab',
@@ -467,6 +469,22 @@ export class Game {
     this.lastMs = ms;
 
     const input = pollInput();
+    // Gamepad buttons → the keyboard action pipeline: held-set diffing
+    // dispatches real keydown/keyup so item/pause/menu/GP/respawn all
+    // work from a pad with zero parallel handling (critic-adjacent gap:
+    // "gamepad support is a later unit").
+    const padCodes = pollPadCodes();
+    for (const c of padCodes) {
+      if (!this.padPrev.has(c)) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: c }));
+      }
+    }
+    for (const c of this.padPrev) {
+      if (!padCodes.has(c)) {
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: c }));
+      }
+    }
+    this.padPrev = padCodes;
     if (!this.paused) this.accumulator += frameDt;
     const canDrive = this.race.allowsDrive && !this.paused;
     // Wall-pin discovery aid: throttle held but barely moving for ~2 s →

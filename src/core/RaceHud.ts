@@ -1,6 +1,6 @@
 import type { Race } from '../game/Race';
 import type { Kart } from '../game/Kart';
-import { BIND_ACTIONS, BIND_LABELS, bindings, keyName } from './Input';
+import { BIND_ACTIONS, BIND_LABELS, bindings, keyName, padConnected } from './Input';
 
 export interface OptionsState {
   open: boolean;
@@ -197,7 +197,10 @@ export class RaceHud {
         `&nbsp;·&nbsp; ${keyName(bindings.drift)} — drift &nbsp;·&nbsp; ` +
         `${keyName(bindings.item)} — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; ` +
         `R — restart &nbsp;·&nbsp; Q — quit &nbsp;·&nbsp; ⌫ — respawn<br>` +
-        `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track`;
+        `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track` +
+        (padConnected()
+          ? `<br>🎮 stick / RT·LT drive &nbsp;·&nbsp; A go &nbsp;·&nbsp; Y item &nbsp;·&nbsp; Start pause`
+          : '');
       const hintEl = this.titleEl.children[4] as HTMLElement;
       if (hintEl.innerHTML !== hint) hintEl.innerHTML = hint;
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
