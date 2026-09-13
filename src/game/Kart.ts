@@ -34,6 +34,12 @@ export class Kart {
   private wallContact = false;
   private steerSmooth = 0;
   private impactSquash = 0; // 0..1 wall-hit squash, decays in syncVisual
+  /** Spin-out state (item hits): yaw spins freely, controls dead, until this
+   *  sim-time. Set by Items on missile/slick hits. */
+  spinUntil = -1;
+  private lastSimTime = 0;
+  private readonly driver = new THREE.Group();
+  private readonly driverPhase = Math.random() * Math.PI * 2;
   vy = 0; // vertical velocity — crests at speed give real airtime
   grounded = true;
   airTime = 0; // seconds airborne — landing feedback scales with it
@@ -78,7 +84,8 @@ export class Kart {
     eyeL.position.set(-0.15, 1.0, -0.18);
     const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
     eyeR.position.set(0.15, 1.0, -0.18);
-    this.body.add(chassis, nose, engine, head, eyeL, eyeR);
+    this.driver.add(head, eyeL, eyeR);
+    this.body.add(chassis, nose, engine, this.driver);
     this.proceduralBody.push(chassis, nose, engine);
     this.placeholderDriver.push(head, eyeL, eyeR);
     this.group.add(this.body);
@@ -176,7 +183,7 @@ export class Kart {
         // Seat-base origin → place at cockpit floor, slightly behind center.
         bot.position.set(0, 0.62, 0.28);
         for (const o of this.placeholderDriver) o.visible = false;
-        this.body.add(bot);
+        this.driver.add(bot);
       },
       undefined,
       (err) => console.warn('[kart] driver GLB failed:', err),
@@ -217,6 +224,20 @@ export class Kart {
   }
 
   update(dt: number, input: ControlState, track: Track, simTime: number): void {
+    this.lastSimTime = simTime;
+    // Spin-out (item hits): yaw whips freely, controls dead, velocity decays.
+    if (simTime < this.spinUntil) {
+      this.heading += 11 * dt;
+      this.velocity.multiplyScalar(1 - Math.min(1, 3.2 * dt));
+      this.driftDir = 0;
+      this.driftCharge = 0;
+      this.position.addScaledVector(this.velocity, dt);
+      track.constrain(this.position);
+      const gy = track.heightAt(this.position);
+      if (this.position.y < gy) this.position.y = gy;
+      this.syncVisual();
+      return;
+    }
     const fwd = this.forward();
     const fwdSpeed = this.velocity.dot(fwd);
 
@@ -463,5 +484,13 @@ export class Kart {
     this.impactSquash = Math.max(0, this.impactSquash - this.lastDt * 6);
     const s = this.impactSquash;
     this.body.scale.set(1 + s * 0.1, 1 - s * 0.18, 1 + s * 0.1);
+
+    // Driver expressiveness: idle bob, lean with steering, eyes track the
+    // slide, flinch back on impacts — sells the bots as characters.
+    const t = this.lastSimTime + this.driverPhase;
+    this.driver.position.y = Math.sin(t * 2.3) * 0.022;
+    this.driver.rotation.z = -this.steerVisual * 0.16 - slip * 0.1;
+    this.driver.rotation.y = -slip * 0.5;
+    this.driver.rotation.x = -s * 0.3 + (this.grounded ? 0 : -0.12);
   }
 }

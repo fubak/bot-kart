@@ -10,6 +10,7 @@ import { RaceHud } from './RaceHud';
 import { Audio } from './Audio';
 import { AiDriver } from '../game/AiDriver';
 import { Items } from '../game/Items';
+import { Minimap } from './Minimap';
 import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
 import botCUrl from '../../assets/exported/characters/grokbot-c-seated.glb?url';
 import type { ControlState } from './Input';
@@ -32,6 +33,7 @@ export class Game {
   private readonly aiKarts: Kart[] = [];
   private readonly aiDrivers: AiDriver[] = [];
   private items!: Items;
+  private minimap!: Minimap;
   private readonly race: Race;
   private readonly raceHud = new RaceHud();
   private readonly audio = new Audio();
@@ -79,6 +81,7 @@ export class Game {
     this.race.restart(spawnPositions, 0, 'title');
     this.items = new Items(this.track, [this.kart, ...this.aiKarts]);
     this.scene.add(this.items.group);
+    this.minimap = new Minimap(this.track);
 
     // Input edges handled here (not in ControlState): title→start, pause,
     // item fire, restart.
@@ -174,6 +177,10 @@ export class Game {
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
     this.raceHud.update(this.race, this.kart, this.simTime, this.items.held[0], this.paused);
+    this.minimap.update(
+      [this.kart, ...this.aiKarts],
+      this.race.phase !== 'title',
+    );
     this.audio.update(this.kart, this.race, this.simTime);
     this.renderer.render(this.scene, this.chaseCam.camera);
   }

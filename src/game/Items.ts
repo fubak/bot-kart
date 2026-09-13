@@ -11,7 +11,7 @@ import { KART } from '../config/tuning';
 // Items (v1): BOOST — burst of speed; MISSILE — homes forward along the
 // centerline and spins out the first kart it tags.
 
-export type ItemKind = 'boost' | 'missile';
+export type ItemKind = 'boost' | 'missile' | 'slick';
 
 const BOX_RADIUS = 1.6; // pickup distance, m
 const RESPAWN_S = 7;
@@ -42,6 +42,14 @@ interface Missile {
   active: boolean;
 }
 
+interface Slick {
+  mesh: THREE.Mesh;
+  pos: THREE.Vector3;
+  owner: Kart;
+  spawnedAt: number; // owner-immune for the first beat
+  expiresAt: number;
+}
+
 const boxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
 const boxMat = new THREE.MeshStandardMaterial({
   color: 0x7be8ff,
@@ -54,6 +62,12 @@ const missileGeo = new THREE.ConeGeometry(0.32, 1.3, 8);
 const missileMat = new THREE.MeshStandardMaterial({
   color: 0xff5040,
   emissive: 0xa02010,
+  flatShading: true,
+});
+const slickGeo = new THREE.CylinderGeometry(0.7, 0.9, 0.22, 10);
+const slickMat = new THREE.MeshStandardMaterial({
+  color: 0xf7d020,
+  emissive: 0x7a5c00,
   flatShading: true,
 });
 const padGeo = new THREE.PlaneGeometry(2.2, 3.2);
@@ -72,6 +86,7 @@ export class Items {
 
   private readonly boxes: Box[] = [];
   private readonly missiles: Missile[] = [];
+  private readonly slicks: Slick[] = [];
   private readonly pads: Pad[] = [];
   private readonly karts: Kart[] = [];
 
@@ -121,9 +136,10 @@ export class Items {
     }
   }
 
-  /** Roll a random item — weighted toward boost. */
+  /** Roll a random item — boost most common, then missile, then slick. */
   private roll(): ItemKind {
-    return Math.random() < 0.55 ? 'boost' : 'missile';
+    const r = Math.random();
+    return r < 0.45 ? 'boost' : r < 0.75 ? 'missile' : 'slick';
   }
 
   /** Fire kart `k`'s held item. Returns the item used (or null). */
@@ -134,6 +150,24 @@ export class Items {
     const kart = this.karts[kartIdx];
     if (item === 'boost') {
       kart.boostTimer = Math.max(kart.boostTimer, KART.boostTime[1]);
+      return item;
+    }
+    if (item === 'slick') {
+      // Drop hazard behind the kart — persists ~18 s, spins whoever clips it.
+      const mesh = new THREE.Mesh(slickGeo, slickMat);
+      const pos = kart.position
+        .clone()
+        .addScaledVector(kart.forward(), -2.6);
+      pos.y = this.track.heightAt(pos) + 0.11;
+      mesh.position.copy(pos);
+      this.group.add(mesh);
+      this.slicks.push({
+        mesh,
+        pos,
+        owner: kart,
+        spawnedAt: simTime,
+        expiresAt: simTime + 18,
+      });
       return item;
     }
     // Missile: spawn at kart nose, travels the centerline forward.
@@ -207,6 +241,7 @@ export class Items {
           kart.velocity.multiplyScalar(MISSILE_SLOW);
           kart.lastWallHit = simTime;
           kart.lastWallImpact = 0.7;
+          kart.spinUntil = simTime + 0.9;
           hit = true;
           break;
         }
@@ -214,6 +249,30 @@ export class Items {
       if (hit || m.travelled > MISSILE_RANGE) {
         m.active = false;
         this.group.remove(m.mesh);
+      }
+    }
+    // Slicks: persistent hazards — spin out whoever clips one.
+    for (let i = this.slicks.length - 1; i >= 0; i--) {
+      const s = this.slicks[i];
+      if (simTime > s.expiresAt) {
+        this.group.remove(s.mesh);
+        this.slicks.splice(i, 1);
+        continue;
+      }
+      s.mesh.rotation.y += dt * 0.8;
+      for (const kart of this.karts) {
+        if (kart === s.owner && simTime < s.spawnedAt + 1.2) continue;
+        const dx = kart.position.x - s.pos.x;
+        const dz = kart.position.z - s.pos.z;
+        if (dx * dx + dz * dz < 1.2) {
+          kart.velocity.multiplyScalar(0.3);
+          kart.lastWallHit = simTime;
+          kart.lastWallImpact = 0.55;
+          kart.spinUntil = simTime + 1.1;
+          this.group.remove(s.mesh);
+          this.slicks.splice(i, 1);
+          break;
+        }
       }
     }
     // Compact dead missiles occasionally
