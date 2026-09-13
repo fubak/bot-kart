@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { AI, SIM } from '../config/tuning';
-import { initInput, pollInput } from './Input';
+import {
+  initInput,
+  pollInput,
+  bindings,
+  bindKey,
+  resetBindings,
+  BIND_ACTIONS,
+} from './Input';
+import type { BindAction, ControlState } from './Input';
 import { DebugHud } from './DebugHud';
 import { Kart } from '../game/Kart';
 import { Track } from '../game/Track';
@@ -16,7 +24,6 @@ import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
 import botCUrl from '../../assets/exported/characters/grokbot-c-seated.glb?url';
 import kartBUrl from '../../assets/exported/karts/kart-b.glb?url';
 import kartCUrl from '../../assets/exported/karts/kart-c.glb?url';
-import type { ControlState } from './Input';
 
 const IDLE: ControlState = { throttle: 0, brake: 0, steer: 0, drift: false };
 const AI_COUNT = 3; // rival bots on the grid
@@ -87,6 +94,28 @@ export class Game {
     this.saveSettings();
   }
 
+  // Options menu navigation shared by the title-phase and modal paths:
+  // rows 0-4 adjust values; rows 5-10 arm the key-capture; row 11 resets.
+  private menuKey(code: string): void {
+    const s = this.settings;
+    if (code === 'ArrowUp') {
+      s.sel = (s.sel + Game.MENU_ROWS - 1) % Game.MENU_ROWS;
+    } else if (code === 'ArrowDown') {
+      s.sel = (s.sel + 1) % Game.MENU_ROWS;
+    } else if (s.sel >= 5 && s.sel <= 10) {
+      if (code === 'ArrowRight' || code === 'Enter' || code === 'Space') {
+        this.bindingCapture = BIND_ACTIONS[s.sel - 5];
+      }
+    } else if (s.sel === 11) {
+      if (code === 'ArrowRight' || code === 'Enter' || code === 'Space') {
+        resetBindings();
+      }
+    } else {
+      const dir = code === 'ArrowLeft' ? -1 : code === 'ArrowRight' ? 1 : 0;
+      if (dir !== 0) this.adjustSetting(dir);
+    }
+  }
+
   private saveSettings(): void {
     localStorage.setItem(
       'grok-kart-settings',
@@ -95,6 +124,18 @@ export class Game {
   }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
   private stuckFor = 0; // seconds throttle-held below 1.5 m/s (D4 hint)
+  // Options key-rebind: while armed, the next keydown becomes the action's
+  // code (Escape cancels). Meta/game-command keys are reserved so a drive
+  // bind can never shadow pause/quit/menu.
+  private bindingCapture: BindAction | null = null;
+  private static readonly RESERVED_CODES = new Set([
+    'Escape', 'KeyP', 'KeyO', 'KeyQ', 'KeyR', 'KeyN', 'KeyM', 'KeyT',
+    'KeyG', 'Backquote', 'Backspace', 'Enter', 'Tab',
+    'F5', 'F11', 'F12', 'MetaLeft', 'MetaRight', 'OSLeft', 'OSRight',
+  ]);
+  // Options rows: 5 settings + 6 bind rows + RESET — keep in sync with
+  // RaceHud's options render.
+  private static readonly MENU_ROWS = 12;
   // Grand Prix cup: race all tracks in order for championship points.
   private gpMode = false;
   private gpLeg = 0;
@@ -158,6 +199,20 @@ export class Game {
     // item fire, restart.
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      // Key-bind capture: armed from an options key row, the next
+      // non-reserved keydown becomes the action's code; Escape cancels.
+      // Swallows every key while armed so the captured key can't also
+      // fire a game action.
+      if (this.bindingCapture) {
+        e.preventDefault();
+        if (e.code === 'Escape') {
+          this.bindingCapture = null;
+        } else if (!Game.RESERVED_CODES.has(e.code)) {
+          bindKey(this.bindingCapture, e.code);
+          this.bindingCapture = null;
+        }
+        return;
+      }
       if (this.race.phase === 'title' && e.code !== 'Backquote') {
         // Title-phase keys: T cycles the track (rebuilds the world), O
         // opens options — everything else starts the race.
@@ -177,17 +232,16 @@ export class Game {
         }
         if (e.code === 'KeyO') this.settings.open = !this.settings.open;
         if (this.settings.open) {
-          if (e.code === 'ArrowUp') this.settings.sel = (this.settings.sel + 4) % 5;
-          if (e.code === 'ArrowDown') this.settings.sel = (this.settings.sel + 1) % 5;
-          const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
-          if (dir !== 0) this.adjustSetting(dir);
+          this.menuKey(e.code);
           return;
         }
         // Only drive/start keys begin the race — Escape/O/T are handled
-        // above; a stray Space or Backquote shouldn't skip the title.
+        // above; a stray Backquote shouldn't skip the title. Bound drive
+        // keys count (a remapped throttle still starts the race).
         const START_KEYS = new Set([
-          'Enter', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD',
+          'Enter', 'Space',
           'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+          ...BIND_ACTIONS.map((a) => bindings[a]),
         ]);
         if (START_KEYS.has(e.code)) this.race.beginCountdown(this.simTime);
         return;
@@ -198,13 +252,8 @@ export class Game {
       if (this.settings.open) {
         if (e.code === 'KeyO' || e.code === 'Escape' || e.code === 'KeyP') {
           this.settings.open = false;
-        } else if (e.code === 'ArrowUp') {
-          this.settings.sel = (this.settings.sel + 4) % 5;
-        } else if (e.code === 'ArrowDown') {
-          this.settings.sel = (this.settings.sel + 1) % 5;
         } else {
-          const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
-          if (dir !== 0) this.adjustSetting(dir);
+          this.menuKey(e.code);
         }
         return;
       }
@@ -222,7 +271,7 @@ export class Game {
         this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
         this.settings.reducedMotion = this.chaseCam.reducedMotion;
       }
-      if (e.code === 'Space' && !this.paused && this.race.phase === 'racing') {
+      if (e.code === bindings.item && !this.paused && this.race.phase === 'racing') {
         this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
       }
       // Respawn (Backspace): lakitu-style reset onto the racing line at the
@@ -457,7 +506,7 @@ export class Game {
       this.simTime,
       this.items.held[0],
       this.paused,
-      this.settings,
+      { ...this.settings, binds: bindings, capture: this.bindingCapture },
       this.track.name,
       {
         mode: this.gpMode,

@@ -1,5 +1,6 @@
 import type { Race } from '../game/Race';
 import type { Kart } from '../game/Kart';
+import { BIND_ACTIONS, BIND_LABELS, keyName } from './Input';
 
 export interface OptionsState {
   open: boolean;
@@ -9,6 +10,9 @@ export interface OptionsState {
   difficulty: number;
   reducedMotion: boolean;
   minimap: boolean;
+  // Key-rebind rows (Game.MENU_ROWS): current codes + armed capture.
+  binds?: Record<string, string>;
+  capture?: string | null;
 }
 
 export interface GpState {
@@ -146,6 +150,13 @@ export class RaceHud {
         `DIFFICULTY            ${DIFFS[opts.difficulty] ?? 'NORMAL'}`,
         `REDUCED MOTION        ${opts.reducedMotion ? 'ON' : 'OFF'}`,
         `MINIMAP               ${opts.minimap ? 'ON' : 'OFF'}`,
+        ...BIND_ACTIONS.map(
+          (a) =>
+            `${BIND_LABELS[a].padEnd(20)}${
+              opts.capture === a ? 'PRESS KEY…' : keyName(opts.binds?.[a] ?? '')
+            }`,
+        ),
+        'RESET BINDINGS',
       ];
       this.optionsEl.innerHTML =
         `<div style="font-size:24px;font-weight:900;margin-bottom:8px">OPTIONS</div>` +
@@ -157,7 +168,10 @@ export class RaceHud {
           )
           .join('') +
         `<div style="margin-top:10px;font-size:13px;color:#9fb4d0">` +
-        `↑↓ select · ←→ adjust · O close</div>`;
+        (opts.capture
+          ? `press a key — Esc cancels`
+          : `↑↓ select · ←→ adjust · →/Enter rebind · O close`) +
+        `</div>`;
       this.optionsEl.style.display = 'block';
     } else {
       this.optionsEl.style.display = 'none';
