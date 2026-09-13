@@ -5,6 +5,7 @@ import type { ControlState } from '../core/Input';
 import type { Track } from './Track';
 import { KartVfx } from './KartVfx';
 import kartGlbUrl from '../../assets/exported/karts/kart-a.glb?url';
+import botGlbUrl from '../../assets/exported/characters/grokbot-a.glb?url';
 
 // Arcade kart entity: velocity-based model with exp-grip lateral slip,
 // hold-to-drift with mini-turbo charge, wall constraint via track lookup.
@@ -35,6 +36,7 @@ export class Kart {
   private readonly frontAxle = new THREE.Group();
   private readonly body: THREE.Group;
   private readonly proceduralBody: THREE.Object3D[] = [];
+  private readonly placeholderDriver: THREE.Object3D[] = [];
   private glbWheels: THREE.Object3D[] = [];
   private wheelSpin = 0;
   private steerVisual = 0;
@@ -64,8 +66,10 @@ export class Kart {
     eyeR.position.set(0.15, 1.0, -0.18);
     this.body.add(chassis, nose, engine, head, eyeL, eyeR);
     this.proceduralBody.push(chassis, nose, engine);
+    this.placeholderDriver.push(head, eyeL, eyeR);
     this.group.add(this.body);
     this.loadAsset();
+    this.loadDriver();
 
     // Wheels: 4 cylinders; fronts parented to a steerable axle group.
     const wheelGeo = new THREE.CylinderGeometry(KART.wheelRadius, KART.wheelRadius, 0.3, 12);
@@ -120,13 +124,35 @@ export class Kart {
     box.setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     model.position.sub(center).setY(-box.min.y);
-    // GLB wheels (Cylinder.* spokes in the export) get spin like ours.
+    // GLB wheels are named wheel_fl/fr/rl/rr (axle-local X spin).
     model.traverse((o) => {
-      if (o.name.startsWith('Cylinder')) this.glbWheels.push(o);
+      if (o.name.startsWith('wheel_')) this.glbWheels.push(o);
     });
     for (const o of this.proceduralBody) o.visible = false;
     for (const w of this.wheels) w.visible = false;
     this.body.add(model);
+  }
+
+  /** Grok Bot A GLB as the driver — authored seated, origin at seat base. */
+  private loadDriver(): void {
+    new GLTFLoader().load(
+      botGlbUrl,
+      (gltf) => {
+        const bot = gltf.scene;
+        const box = new THREE.Box3().setFromObject(bot);
+        const size = box.getSize(new THREE.Vector3());
+        // Slight downscale: 1.28 m bot in a 3.2 m kart reads proportionate.
+        bot.scale.setScalar(0.92);
+        box.setFromObject(bot);
+        void size;
+        // Seat-base origin → place at cockpit floor, slightly behind center.
+        bot.position.set(0, 0.62, 0.28);
+        for (const o of this.placeholderDriver) o.visible = false;
+        this.body.add(bot);
+      },
+      undefined,
+      (err) => console.warn('[kart] driver GLB failed:', err),
+    );
   }
 
   get speed(): number {

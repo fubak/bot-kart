@@ -7,6 +7,7 @@ import { Track } from '../game/Track';
 import { ChaseCamera } from '../game/ChaseCamera';
 import { Race } from '../game/Race';
 import { RaceHud } from './RaceHud';
+import { Audio } from './Audio';
 import type { ControlState } from './Input';
 
 // Game root: renderer + scene + fixed-timestep sim loop (ADR-003).
@@ -21,6 +22,7 @@ export class Game {
   private readonly kart = new Kart();
   private readonly race: Race;
   private readonly raceHud = new RaceHud();
+  private readonly audio = new Audio();
   private accumulator = 0;
   private lastMs = 0;
   private simTime = 0;
@@ -59,6 +61,10 @@ export class Game {
     this.hud = new DebugHud(this.renderer);
 
     initInput();
+    // AudioContext unlocks on first trusted gesture.
+    const unlock = () => this.audio.unlock();
+    window.addEventListener('keydown', unlock, { once: false });
+    window.addEventListener('pointerdown', unlock, { once: false });
     window.addEventListener('resize', () => {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.chaseCam.resize(window.innerWidth / window.innerHeight);
@@ -107,6 +113,7 @@ export class Game {
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
     this.raceHud.update(this.race, this.kart, this.simTime);
+    this.audio.update(this.kart, this.race, this.simTime);
     this.renderer.render(this.scene, this.chaseCam.camera);
   }
 }
