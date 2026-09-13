@@ -44,7 +44,9 @@ export class Track {
   // gravelWidth past the road on `side` (-1 = right, +1 = left). The hairpin
   // apex (frac ~0.62, right-hander) gets an inside cut — shorter, slower.
   private readonly gravelZones = [
-    { i0: 0.6, i1: 0.662, side: -1 },
+    // Hairpin at ~0.63 bends LEFT (+1.79 rad tangent delta) — inside is the
+    // left edge (+1). Cutting the apex across gravel is the shortcut.
+    { i0: 0.6, i1: 0.662, side: 1 },
     // Left-hander at ~0.36 (crest area): inside cut on the left edge —
     // a second, tighter route decision earlier in the lap.
     { i0: 0.352, i1: 0.382, side: 1 },
@@ -110,14 +112,36 @@ export class Track {
     return { lateral: rel.dot(s.left), tangent: s.tangent };
   }
 
-  /** Gravel zone containing a sample index, or null. */
-  private zoneAt(index: number): { i0: number; i1: number; side: number } | null {
+  /** Gravel zone containing a sample index, or null. `margin` shrinks the
+   *  zone on both ends (frac units) — used to release the AI's shortcut
+   *  pull before the wall resumes at the exit. */
+  private zoneAt(
+    index: number,
+    margin = 0,
+  ): { i0: number; i1: number; side: number } | null {
     const n = this.samples.length;
     const frac = index / n;
     for (const z of this.gravelZones) {
-      if (frac >= z.i0 && frac <= z.i1) return z;
+      if (frac >= z.i0 + margin && frac <= z.i1 - margin) return z;
     }
     return null;
+  }
+
+  /** Preferred racing-line lateral inside a gravel zone at this index
+   *  (mid-apron), or null — lets AI route through shortcuts. */
+  gravelBiasAt(index: number, margin = 0): number | null {
+    const z = this.zoneAt(index, margin);
+    if (!z) return null;
+    return z.side * (TRACK.roadHalfWidth + TRACK.gravelWidth * 0.35);
+  }
+
+  /** Kart-position shortcut test: mid-apron lateral only when the kart is
+   *  INSIDE a zone past the entry margin — approaching early steered bots
+   *  into the wall face just before the gap opens. */
+  gravelBiasInside(pos: THREE.Vector3, margin = 0.008): number | null {
+    const z = this.zoneAt(this.nearestIndex(pos), margin);
+    if (!z) return null;
+    return z.side * (TRACK.roadHalfWidth + TRACK.gravelWidth * 0.35);
   }
 
   /** Surface under a position: 'gravel' on shortcut aprons, else 'road'. */

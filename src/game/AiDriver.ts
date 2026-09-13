@@ -30,10 +30,16 @@ export class AiDriver {
      *  each bot its own racing line so the field spreads and side-by-side
      *  battles happen instead of single-file centerline trains. */
     lineOffset = 0,
+    /** Routes through gravel shortcut aprons when the zone offers one —
+     *  the cheeky shortcut-taker (slower surface, shorter path). */
+    takesShortcuts = false,
   ) {
     this.skill = THREE.MathUtils.clamp(skill, 0.8, 1.1);
     this.lineOffset = THREE.MathUtils.clamp(lineOffset, -3.5, 3.5);
+    this.takesShortcuts = takesShortcuts;
   }
+
+  readonly takesShortcuts: boolean;
 
   readonly lineOffset: number;
 
@@ -97,7 +103,21 @@ export class AiDriver {
     // Shift the pursuit point onto this bot's preferred line — plus a
     // temporary sidestep while executing an overtake (see traffic below).
     let lineBias = this.lineOffset;
-    if (this.blockedTime > AI.overtakeTime) lineBias += this.overtakeSide * AI.overtakeBias;
+    let onShortcut = false;
+    if (this.takesShortcuts) {
+      // Shortcut-taker: pull to mid-apron once the kart is inside the zone
+      // (past the wall's end — approach-pull wedged bots into the wall
+      // face). The inside cut doubles as an overtake line, so it takes
+      // precedence over the blocked-sidestep below.
+      const gb = track.gravelBiasInside(kart.position);
+      if (gb !== null) {
+        lineBias = gb;
+        onShortcut = true;
+      }
+    }
+    if (!onShortcut && this.blockedTime > AI.overtakeTime) {
+      lineBias += this.overtakeSide * AI.overtakeBias;
+    }
     target.addScaledVector(track.leftAt(track.nearestIndex(target)), lineBias);
     const toTarget = target.sub(kart.position).setY(0);
     if (toTarget.lengthSq() < 1e-6) return { ...idle, throttle: 1 };
@@ -211,6 +231,7 @@ export class AiDriver {
     } else {
       this.driftTime = 0;
       if (
+        !onShortcut && // gravel aprons: grip the cut, don't drift it
         radiusNow < AI.driftEnterRadius &&
         fwdSpeed > AI.driftMinSpeed &&
         steer !== 0

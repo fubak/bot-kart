@@ -77,7 +77,9 @@ export class Game {
       const aiKart = new Kart(tints[i], bots[i], karts[i]);
       aiKart.reset(slot.position, slot.heading);
       this.aiKarts.push(aiKart);
-      this.aiDrivers.push(new AiDriver(skills[i], lines[i]));
+      // Bot C (index 1, speed archetype) is the shortcut-taker — it dives
+      // onto the gravel aprons through the cut zones every lap.
+      this.aiDrivers.push(new AiDriver(skills[i], lines[i], i === 1));
       this.scene.add(aiKart.group, aiKart.vfx.object);
       spawnPositions.push(slot.position.clone());
     }
