@@ -329,6 +329,46 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 ### HUD-002 — Results screen
 
 - **Domain:** HUD
-- **Status:** Built
-- **Evidence:** `results-screen.png` — finishers by time, DNFs, best laps.
+- **Status:** Integrated
+- **Evidence:** `gauntlet-results.png` — live race, all 4 times correct order,
+  late finishers update live (DNF-freeze fixed).
 - **Largest Gap:** no podium ceremony/camera work; plain table.
+
+### FLOW-001 — Title / pause / menu flow
+
+- **Domain:** UX
+- **Status:** Integrated
+- **Evidence:** `title-screen.png`, `countdown.png` — title orbit holds until
+  keypress (also unlocks audio), P/Esc pause freezes sim cleanly, R restarts
+  into countdown.
+- **Largest Gap:** no settings menu; options are key toggles only.
+
+### HUD-003 — Minimap
+
+- **Domain:** HUD
+- **Status:** Integrated
+- **Evidence:** `gauntlet-results.png` — track outline + 4 racer dots live.
+- **Largest Gap:** no item/hazard icons; dots only.
+
+### ITEM-002 — Drop hazard (slick) + spin-out
+
+- **Domain:** Items
+- **Status:** Integrated
+- **Evidence:** live teleport test — slick consumed, spinUntil fired, kart
+  recovered. Missiles now spin too (was velocity cut only).
+- **Largest Gap:** 3 items total; genre standard is ~6 (shells, shield, etc).
+
+### CHAR-001 — Driver expressiveness
+
+- **Domain:** Characters
+- **Status:** Built
+- **Evidence:** code — idle bob, steer lean, eyes track slide, impact flinch.
+- **Largest Gap:** cosmetic-only (rotation/bob); no skeletal animation or
+  emotes. Bots don't celebrate/react to finish.
+
+### A11Y-001 — Reduced motion
+
+- **Domain:** Accessibility
+- **Status:** Built
+- **Evidence:** `M` key kills camera shake + speed-FOV kicks.
+- **Largest Gap:** no remapping, colorblind mode, or subtitle option yet.

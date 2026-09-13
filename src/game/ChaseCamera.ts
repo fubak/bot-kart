@@ -15,6 +15,8 @@ export class ChaseCamera {
   private shake = 0;
   private readonly shakeOffset = new THREE.Vector3();
   private introAngle = Math.PI * 0.5; // countdown orbit angle
+  /** Reduced motion: kills shake + speed FOV for motion-sensitive players. */
+  reducedMotion = false;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(CAMERA.fovBase, aspect, 0.1, 500);
@@ -64,7 +66,7 @@ export class ChaseCamera {
     // impact severity (a glancing tap shudders; a head-on thumps).
     if (kart.lastWallHit !== this.lastSeenHit) {
       this.lastSeenHit = kart.lastWallHit;
-      this.shake = 0.4 + 0.6 * kart.lastWallImpact;
+      this.shake = this.reducedMotion ? 0 : 0.4 + 0.6 * kart.lastWallImpact;
     }
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt / CAMERA.shakeTime);
@@ -77,8 +79,9 @@ export class ChaseCamera {
       this.camera.position.add(this.shakeOffset);
     }
 
-    const wantFov =
-      CAMERA.fovBase + CAMERA.fovSpeed * speedT + (kart.state === 'boost' ? CAMERA.fovBoost : 0);
+    const wantFov = this.reducedMotion
+      ? CAMERA.fovBase
+      : CAMERA.fovBase + CAMERA.fovSpeed * speedT + (kart.state === 'boost' ? CAMERA.fovBoost : 0);
     const fov = THREE.MathUtils.lerp(this.camera.fov, wantFov, kl);
     if (Math.abs(fov - this.camera.fov) > 0.01) {
       this.camera.fov = fov;

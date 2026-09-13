@@ -51,6 +51,6 @@ export class DebugHud {
       `speed ${Math.max(0, kart.forwardSpeed * 3.6).toFixed(0)} km/h   state ${kart.state}\n` +
       `drift ${kart.driftCharge.toFixed(2)}s   boost ${kart.boostTimer.toFixed(2)}s\n` +
       `draws ${info.render.calls}   tris ${info.render.triangles}\n` +
-      `[WASD/arrows] drive   [shift] drift   [\`] hud`;
+      `[WASD/arrows] drive   [shift] drift   [m] calm-cam   [\`] hud`;
   }
 }

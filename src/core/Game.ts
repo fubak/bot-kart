@@ -94,6 +94,9 @@ export class Game {
       if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase === 'racing') {
         this.paused = !this.paused;
       }
+      if (e.code === 'KeyM') {
+        this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
+      }
       if (e.code === 'Space') this.items.use(0, this.simTime);
       if (e.code === 'KeyR') {
         const s = this.track.spawn();

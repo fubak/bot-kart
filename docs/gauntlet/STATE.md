@@ -10,16 +10,16 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Critic #3 returned 7.5/10 — all three flagged defects fixed and verified
-live (results DNF-freeze, landing feedback, cosmetics). Now building Wave 3
-polish: title/press-to-start flow, pause, minimap, bot expressiveness,
-third item type, accessibility — then whole-game + release gauntlets.
+Wave 3 polish landed: title/press-to-start, pause, minimap, slick item +
+spin-outs, driver expressiveness, reduced-motion toggle. Full autopilot
+gauntlet race verified end-to-end (all 4 finish, correct results, 73fps).
+Next: final whole-game critic pass → release evidence package.
 
 ---
 
 ## Active Managed Devins
 
-None running.
+None running — release critic launching next.
 
 Prior agents: Critics #1 (4/10) and #2 (5/10 — both fixed), Grok Concept
 Builder (A canonical), Blender Asset Builders (kart-a, grokbot-a, bot-a,
@@ -37,12 +37,11 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. **Menu flow** — race auto-starts on load; needs press-to-start + pause.
-2. **Minimap** — kart-racing staple, absent.
-3. **Bot expressiveness** — drivers are static; need idle motion/reactions.
-4. **Item variety** — boost + missile only; genre wants 4-6 kinds.
-5. **Accessibility** — no reduced-motion/colorblind/remap options yet.
-6. Kart meshes still shared Kart A tinted — distinct kart geometry per rival.
+1. **Item variety** — 3 kinds (boost/missile/slick); genre wants ~6.
+2. **Kart meshes** — shared Kart A tinted; rivals deserve distinct chassis.
+3. **Bot skeletal animation** — drivers bob/lean but don't emote/celebrate.
+4. **Audio depth** — procedural SFX+music, no positional/racer audio.
+5. **Settings menu** — options exist as key toggles only (M, P, R).
 
 ---
 
