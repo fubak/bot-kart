@@ -11,6 +11,7 @@ import { Music } from './Music';
 export class Audio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private musicBus: GainNode | null = null;
   private engine: { osc: OscillatorNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private skid: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private boost: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
@@ -71,7 +72,11 @@ export class Audio {
     bSrc.start();
     this.boost = { src: bSrc, gain: bGain, filter: bFilter };
 
-    this.music.attach(ctx, this.master);
+    // Music gets its own bus so options can mix it vs SFX independently.
+    this.musicBus = ctx.createGain();
+    this.musicBus.gain.value = 0.8;
+    this.musicBus.connect(this.master);
+    this.music.attach(ctx, this.musicBus);
     this.music.start();
 
     // Rival engines: one quiet saw per AI kart, gain tracks distance so
@@ -86,6 +91,14 @@ export class Audio {
       o.start();
       this.rivalEngines.push({ osc: o, gain: g });
     }
+  }
+
+  /** Options sliders — 0..1. Master scales the 0.55 headroom ceiling. */
+  setMasterVolume(v: number): void {
+    if (this.master) this.master.gain.value = 0.55 * v;
+  }
+  setMusicVolume(v: number): void {
+    if (this.musicBus) this.musicBus.gain.value = v;
   }
 
   private makeNoise(): AudioBuffer {

@@ -1,6 +1,15 @@
 import type { Race } from '../game/Race';
 import type { Kart } from '../game/Kart';
 
+export interface OptionsState {
+  open: boolean;
+  sel: number;
+  masterVol: number;
+  musicVol: number;
+  reducedMotion: boolean;
+  minimap: boolean;
+}
+
 // Player-facing race HUD: countdown numbers, lap counter, running/best lap
 // times, wrong-way warning, finish banner. DOM overlay (cheap, accessible).
 // Separate from DebugHud — this is part of the game UI, not dev tooling.
@@ -63,13 +72,18 @@ export class RaceHud {
       `<div style="font-size:13px;color:#9fb4d0;margin-top:14px;line-height:1.8">` +
       `WASD / arrows — drive &nbsp;·&nbsp; SHIFT — drift &nbsp;·&nbsp; ` +
       `SPACE — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; R — restart &nbsp;·&nbsp; ` +
-      `M — reduce motion</div>`;
+      `M — reduce motion &nbsp;·&nbsp; O — options</div>`;
     this.pauseEl = mk(
       'top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;' +
       'font-weight:900;color:#fff;display:none;text-align:center',
     );
     this.pauseEl.innerHTML =
       'PAUSED<div style="font-size:15px;color:#9fb4d0;margin-top:8px">P / Esc to resume</div>';
+    this.optionsEl = mk(
+      'top:50%;left:50%;transform:translate(-50%,-50%);font-size:19px;' +
+      'font-weight:700;color:#fff;background:rgba(10,16,28,.85);padding:20px 30px;' +
+      'border-radius:10px;display:none;line-height:2.1;min-width:340px',
+    );
     // Ink splat: fullscreen blobs while the player is inked — vision denial
     // reads instantly without touching the renderer.
     this.inkEl = mk(
@@ -88,6 +102,7 @@ export class RaceHud {
   private readonly titleEl: HTMLDivElement;
   private readonly pauseEl: HTMLDivElement;
   private readonly inkEl: HTMLDivElement;
+  private readonly optionsEl: HTMLDivElement;
   private resultsRenderedAt = -1;
   private titlePulseAt = 0;
 
@@ -97,7 +112,33 @@ export class RaceHud {
     simTime: number,
     heldItem?: string | null,
     paused = false,
+    opts?: OptionsState,
   ): void {
+    // Options overlay renders in every phase (openable from pause or title).
+    if (opts?.open) {
+      const bar = (v: number) =>
+        '█'.repeat(Math.round(v * 10)).padEnd(10, '░');
+      const rows = [
+        `MASTER VOL  ${bar(opts.masterVol)} ${Math.round(opts.masterVol * 10)}`,
+        `MUSIC VOL   ${bar(opts.musicVol)} ${Math.round(opts.musicVol * 10)}`,
+        `REDUCED MOTION        ${opts.reducedMotion ? 'ON' : 'OFF'}`,
+        `MINIMAP               ${opts.minimap ? 'ON' : 'OFF'}`,
+      ];
+      this.optionsEl.innerHTML =
+        `<div style="font-size:24px;font-weight:900;margin-bottom:8px">OPTIONS</div>` +
+        rows
+          .map(
+            (r, i) =>
+              `<div style="${i === opts.sel ? 'color:#7be8ff' : 'color:#fff'}">` +
+              `${i === opts.sel ? '▸ ' : '&nbsp;&nbsp;'}${r}</div>`,
+          )
+          .join('') +
+        `<div style="margin-top:10px;font-size:13px;color:#9fb4d0">` +
+        `↑↓ select · ←→ adjust · O close</div>`;
+      this.optionsEl.style.display = 'block';
+    } else {
+      this.optionsEl.style.display = 'none';
+    }
     this.titleEl.style.display = race.phase === 'title' ? 'block' : 'none';
     if (race.phase === 'title') {
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.

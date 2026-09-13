@@ -43,6 +43,32 @@ export class Game {
   private lastMs = 0;
   private simTime = 0;
   private paused = false;
+  /** Options-menu state — O toggles; arrows navigate/adjust. */
+  private readonly settings = {
+    open: false,
+    sel: 0,
+    masterVol: 1,
+    musicVol: 0.8,
+    reducedMotion: false,
+    minimap: true,
+  };
+
+  private adjustSetting(dir: number): void {
+    const s = this.settings;
+    const clamp01 = (v: number) => THREE.MathUtils.clamp(v, 0, 1);
+    if (s.sel === 0) {
+      s.masterVol = clamp01(s.masterVol + dir * 0.1);
+      this.audio.setMasterVolume(s.masterVol);
+    } else if (s.sel === 1) {
+      s.musicVol = clamp01(s.musicVol + dir * 0.1);
+      this.audio.setMusicVolume(s.musicVol);
+    } else if (s.sel === 2) {
+      s.reducedMotion = !s.reducedMotion;
+      this.chaseCam.reducedMotion = s.reducedMotion;
+    } else {
+      s.minimap = !s.minimap;
+    }
+  }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
 
   constructor() {
@@ -104,6 +130,19 @@ export class Game {
       }
       if (e.code === 'KeyM') {
         this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
+        this.settings.reducedMotion = this.chaseCam.reducedMotion;
+      }
+      // Options menu: O opens/closes; arrows navigate/adjust while open.
+      // Opening mid-race pauses the sim (genre-standard pause submenu).
+      if (e.code === 'KeyO') {
+        this.settings.open = !this.settings.open;
+        if (this.settings.open && this.race.phase === 'racing') this.paused = true;
+      }
+      if (this.settings.open) {
+        if (e.code === 'ArrowUp') this.settings.sel = (this.settings.sel + 3) % 4;
+        if (e.code === 'ArrowDown') this.settings.sel = (this.settings.sel + 1) % 4;
+        const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
+        if (dir !== 0) this.adjustSetting(dir);
       }
       if (e.code === 'Space' && !this.paused) {
         this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
@@ -213,10 +252,17 @@ export class Game {
     this.chaseCam.update(frameDt, this.kart, this.race);
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
-    this.raceHud.update(this.race, this.kart, this.simTime, this.items.held[0], this.paused);
+    this.raceHud.update(
+      this.race,
+      this.kart,
+      this.simTime,
+      this.items.held[0],
+      this.paused,
+      this.settings,
+    );
     this.minimap.update(
       [this.kart, ...this.aiKarts],
-      this.race.phase !== 'title',
+      this.race.phase !== 'title' && this.settings.minimap,
     );
     this.audio.update(this.kart, this.race, this.simTime, this.aiKarts);
     this.renderer.render(this.scene, this.chaseCam.camera);
