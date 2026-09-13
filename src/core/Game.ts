@@ -53,9 +53,18 @@ export class Game {
     sel: 0,
     masterVol: 1,
     musicVol: 0.8,
+    difficulty: 1, // 0 easy / 1 normal / 2 hard
     reducedMotion: false,
     minimap: true,
   };
+  private readonly baseSkills = [0.95, 1.05, 1.0];
+
+  private applyDifficulty(): void {
+    const delta = [-0.13, 0, 0.05][this.settings.difficulty] ?? 0;
+    for (let i = 0; i < this.aiDrivers.length; i++) {
+      this.aiDrivers[i].setSkill(this.baseSkills[i] + delta);
+    }
+  }
 
   private adjustSetting(dir: number): void {
     const s = this.settings;
@@ -67,6 +76,9 @@ export class Game {
       s.musicVol = clamp01(s.musicVol + dir * 0.1);
       this.audio.setMusicVolume(s.musicVol);
     } else if (s.sel === 2) {
+      s.difficulty = THREE.MathUtils.clamp(s.difficulty + dir, 0, 2);
+      this.applyDifficulty();
+    } else if (s.sel === 3) {
       s.reducedMotion = !s.reducedMotion;
       this.chaseCam.reducedMotion = s.reducedMotion;
     } else {
@@ -110,14 +122,13 @@ export class Game {
     const tints = [0xff9040, 0xc070ff, 0xffd454]; // orange / violet / yellow rivals
     const bots = [botBUrl, botCUrl, undefined]; // Bot B heavy, Bot C speed, Bot A
     const karts = [kartBUrl, kartCUrl, undefined]; // matching chassis
-    const skills = [0.95, 1.05, 1.0];
     const lines = [-1.8, 0.8, 2.2]; // each bot takes its own line
     for (let i = 0; i < AI_COUNT; i++) {
       const aiKart = new Kart(tints[i], bots[i], karts[i]);
       this.aiKarts.push(aiKart);
       // Bot C (index 1, speed archetype) is the shortcut-taker — it dives
       // onto the gravel aprons through the cut zones every lap.
-      this.aiDrivers.push(new AiDriver(skills[i], lines[i], i === 1));
+      this.aiDrivers.push(new AiDriver(this.baseSkills[i], lines[i], i === 1));
       this.scene.add(aiKart.group, aiKart.vfx.object);
     }
     // Restore persisted settings + last-played track.
@@ -131,6 +142,7 @@ export class Game {
       /* corrupt/absent storage — defaults stand */
     }
     this.buildWorld(this.trackIdx);
+    this.applyDifficulty();
 
     // Input edges handled here (not in ControlState): title→start, pause,
     // item fire, restart.
@@ -155,8 +167,8 @@ export class Game {
         }
         if (e.code === 'KeyO') this.settings.open = !this.settings.open;
         if (this.settings.open) {
-          if (e.code === 'ArrowUp') this.settings.sel = (this.settings.sel + 3) % 4;
-          if (e.code === 'ArrowDown') this.settings.sel = (this.settings.sel + 1) % 4;
+          if (e.code === 'ArrowUp') this.settings.sel = (this.settings.sel + 4) % 5;
+          if (e.code === 'ArrowDown') this.settings.sel = (this.settings.sel + 1) % 5;
           const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
           if (dir !== 0) this.adjustSetting(dir);
           return;
@@ -177,9 +189,9 @@ export class Game {
         if (e.code === 'KeyO' || e.code === 'Escape' || e.code === 'KeyP') {
           this.settings.open = false;
         } else if (e.code === 'ArrowUp') {
-          this.settings.sel = (this.settings.sel + 3) % 4;
+          this.settings.sel = (this.settings.sel + 4) % 5;
         } else if (e.code === 'ArrowDown') {
-          this.settings.sel = (this.settings.sel + 1) % 4;
+          this.settings.sel = (this.settings.sel + 1) % 5;
         } else {
           const dir = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
           if (dir !== 0) this.adjustSetting(dir);

@@ -16,7 +16,11 @@ import type { Track } from './Track';
 
 export class AiDriver {
   /** 0.8 (cautious) … 1.0 (baseline) … 1.1 (hot). */
-  readonly skill: number;
+  private skill: number;
+  /** Difficulty select scales skill at runtime (options menu). */
+  setSkill(v: number): void {
+    this.skill = THREE.MathUtils.clamp(v, 0.8, 1.1);
+  }
 
   private driftTime = 0;
   private recovering = false;

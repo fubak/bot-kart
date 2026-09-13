@@ -6,6 +6,7 @@ export interface OptionsState {
   sel: number;
   masterVol: number;
   musicVol: number;
+  difficulty: number;
   reducedMotion: boolean;
   minimap: boolean;
 }
@@ -130,9 +131,11 @@ export class RaceHud {
     if (opts?.open) {
       const bar = (v: number) =>
         '█'.repeat(Math.round(v * 10)).padEnd(10, '░');
+      const DIFFS = ['EASY', 'NORMAL', 'HARD'];
       const rows = [
         `MASTER VOL  ${bar(opts.masterVol)} ${Math.round(opts.masterVol * 10)}`,
         `MUSIC VOL   ${bar(opts.musicVol)} ${Math.round(opts.musicVol * 10)}`,
+        `DIFFICULTY            ${DIFFS[opts.difficulty] ?? 'NORMAL'}`,
         `REDUCED MOTION        ${opts.reducedMotion ? 'ON' : 'OFF'}`,
         `MINIMAP               ${opts.minimap ? 'ON' : 'OFF'}`,
       ];
