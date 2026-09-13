@@ -57,12 +57,14 @@ export class Kart {
   private lastDt = 0;
   private readonly tint: THREE.Color | null;
   private readonly botUrl: string;
+  private readonly kartUrl: string;
 
   /** tint multiplies the GLB materials — cheap rival differentiation until
    *  distinct Bot B/C assets land. */
-  constructor(tint?: THREE.ColorRepresentation, botUrl?: string) {
+  constructor(tint?: THREE.ColorRepresentation, botUrl?: string, kartUrl?: string) {
     this.tint = tint === undefined ? null : new THREE.Color(tint);
     this.botUrl = botUrl ?? botGlbUrl;
+    this.kartUrl = kartUrl ?? kartGlbUrl;
     this.body = new THREE.Group();
 
     const mat = (c: number) =>
@@ -120,7 +122,7 @@ export class Kart {
    */
   private loadAsset(): void {
     new GLTFLoader().load(
-      kartGlbUrl,
+      this.kartUrl,
       (gltf) => {
         this.applyAsset(gltf.scene);
       },
@@ -129,7 +131,7 @@ export class Kart {
         console.warn('[kart] GLB load failed, keeping placeholder:', err);
         // One retry — covers the file being mid-rewrite during dev.
         setTimeout(() => {
-          new GLTFLoader().load(kartGlbUrl, (g) => this.applyAsset(g.scene));
+          new GLTFLoader().load(this.kartUrl, (g) => this.applyAsset(g.scene));
         }, 1500);
       },
     );
@@ -145,9 +147,11 @@ export class Kart {
     box.setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     model.position.sub(center).setY(-box.min.y);
-    // GLB wheels are named wheel_fl/fr/rl/rr (axle-local X spin).
+    // GLB wheels: exact axle nodes wheel_fl/fr/rl/rr (their _1/_2/_3 child
+    // parts are tread/hub pieces of the same wheel — matching the prefix
+    // would double-spin them).
     model.traverse((o) => {
-      if (o.name.startsWith('wheel_')) this.glbWheels.push(o);
+      if (/^wheel_(fl|fr|rl|rr)$/.test(o.name)) this.glbWheels.push(o);
     });
     for (const o of this.proceduralBody) o.visible = false;
     for (const w of this.wheels) w.visible = false;

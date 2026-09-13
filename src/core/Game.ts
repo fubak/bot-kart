@@ -13,6 +13,8 @@ import { Items } from '../game/Items';
 import { Minimap } from './Minimap';
 import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
 import botCUrl from '../../assets/exported/characters/grokbot-c-seated.glb?url';
+import kartBUrl from '../../assets/exported/karts/kart-b.glb?url';
+import kartCUrl from '../../assets/exported/karts/kart-c.glb?url';
 import type { ControlState } from './Input';
 
 const IDLE: ControlState = { throttle: 0, brake: 0, steer: 0, drift: false };
@@ -68,10 +70,11 @@ export class Game {
     const skills = [0.95, 1.05, 1.0];
     const tints = [0xff9040, 0xc070ff, 0xffd454]; // orange / violet / yellow rivals
     const bots = [botBUrl, botCUrl, undefined]; // Bot B heavy, Bot C speed, Bot A
+    const karts = [kartBUrl, kartCUrl, undefined]; // matching chassis
     const lines = [-1.8, 0.8, 2.2]; // each bot takes its own line
     for (let i = 0; i < AI_COUNT; i++) {
       const slot = this.track.gridSlot(10 + i * 7, i % 2 === 0 ? 2.2 : -2.2);
-      const aiKart = new Kart(tints[i], bots[i]);
+      const aiKart = new Kart(tints[i], bots[i], karts[i]);
       aiKart.reset(slot.position, slot.heading);
       this.aiKarts.push(aiKart);
       this.aiDrivers.push(new AiDriver(skills[i], lines[i]));

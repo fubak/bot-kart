@@ -61,7 +61,77 @@ Blender sources live under `assets/blender/<category>/`; runtime exports under
 - **Biggest Gap:** windshield alpha sorting unverified in-game; candy-stripe
   antenna is segmented cylinders rather than a smooth curve.
 
-### grokbot-a — Grok Bot A Driver (seated)
+### kart-b — Grok Bot B Heavy Kart
+
+- **Category:** karts
+- **Status:** Production
+- **Owner:** Blender Asset Builder subagent
+- **Critic:** pending (in-game critic review happens later)
+- **Quality Unit:** kart visuals (rival roster)
+- **Blender Source:** `assets/blender/karts/kart-b.blend`
+  (collection `kart_b`; build script `scripts/assets/build_kart_b.py`)
+- **Runtime Export:** `assets/exported/karts/kart-b.glb`
+- **Art-Direction Notes:** heavy/industrial box vocabulary matching
+  `grokbot-b.glb`: gunmetal slab hull + blunt nose, orange ram bar / flank
+  stripes / X-brace / wheel hubs, navy pods/dash/seat/rear deck, amber-glow
+  headlights / dash strip / tail lights / exhaust-tip rings. Signature
+  silhouette: full roll cage (two hoops + roof rails + orange rear
+  X-brace), twin vertical exhaust stacks, hood scoop, whip antenna,
+  squared fenders over chunky r=0.26 tires — wide, tall, heavy read vs
+  kart-a's bubble pod and kart-c's wedge.
+- **Triangles:** 6,004 | **Materials:** 5 (gunmetal, navy, orange,
+  amber_glow, tire) | **Textures:** 0 (flat-color materials)
+- **Animation:** none — wheels are separate named nodes `wheel_fl`,
+  `wheel_fr`, `wheel_rl`, `wheel_rr` (pivots at axle centers, local X =
+  axle) for runtime spin/steer | **Collision:** box clamp via track
+  constraint | **LOD:** none
+- **Performance Notes:** 56 nodes, 94.9 KB; same optimize pass as kart-a
+  (`gltf-transform optimize --compress quantize --flatten false --join false
+  --palette false --instance false` → `KHR_mesh_quantization` only, no
+  decoder needed). Dims: 1.71 m wide × 2.67 m long × 1.46 m tall (cage
+  top); nose at -Z; origin at ground center; wheels r=0.26 at axles
+  ±0.88 m. Cockpit seat area clear at glTF ~(0, 0.6, 0.3) for the seated
+  driver. Preview: `docs/gauntlet/evidence/wave3/kart-b_preview.png`.
+- **Critic Result:** not yet reviewed in-game
+- **Biggest Gap:** cage roof rails sit at driver chin height (head clears
+  above, kart-a wing-style) — verify in-game that the seated B head/beacon
+  doesn't clip the front rail; ~0.06 m wider and ~0.07 m longer than
+  kart-a (intentional wide-stance heavy read).
+
+### kart-c — Grok Bot C Speed Kart
+
+- **Category:** karts
+- **Status:** Production
+- **Owner:** Blender Asset Builder subagent
+- **Critic:** pending (in-game critic review happens later)
+- **Quality Unit:** kart visuals (rival roster)
+- **Blender Source:** `assets/blender/karts/kart-c.blend`
+  (collection `kart_c`; build script `scripts/assets/build_kart_c.py`)
+- **Runtime Export:** `assets/exported/karts/kart-c.glb`
+- **Art-Direction Notes:** low wedge/blade vocabulary matching
+  `grokbot-c.glb`: pearl monocoque — pointed nose loft + tapered tail,
+  violet aero (front wing + endplates, rear wing on graphite stalks,
+  swept dorsal shark fin, side winglets, pod blades, tub rims, seat
+  shell), graphite floor/tub/steering, magenta-glow flank + pod strips /
+  nose sliver / tail strip, dark wind deflector. Signature silhouette:
+  ground-hugging open-wheel speed wedge vs kart-b's tall box.
+- **Triangles:** 4,676 | **Materials:** 6 (pearl, violet, graphite,
+  magenta_glow, visor_dark, tire) | **Textures:** 0 (flat-color materials)
+- **Animation:** none — wheels are separate named nodes `wheel_fl`,
+  `wheel_fr`, `wheel_rl`, `wheel_rr` (pivots at axle centers, local X =
+  axle) for runtime spin/steer | **Collision:** box clamp via track
+  constraint | **LOD:** none
+- **Performance Notes:** 43 nodes, 82.8 KB; same optimize pass as kart-a
+  (`KHR_mesh_quantization` only, no decoder needed). Dims: 1.55 m wide ×
+  2.64 m long × 1.04 m tall (dorsal-fin tip); nose at -Z; origin at
+  ground center; low-profile wheels r=0.22 at axles ±0.90 m. Cockpit seat
+  area clear at glTF ~(0, 0.6, 0.3). Preview:
+  `docs/gauntlet/evidence/wave3/kart-c_preview.png`.
+- **Critic Result:** not yet reviewed in-game
+- **Biggest Gap:** magenta flank strips sit flush on the lofted hull —
+  check for z-fighting at grazing angles in-game; open wheels have no
+  fenders so full tire tread is visible during spin (needs hub motion
+  blur or tread texture if it reads static).
 
 - **Category:** characters
 - **Status:** Production
