@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Kart } from './Kart';
 import type { Track } from './Track';
-import { KART } from '../config/tuning';
+import { AI, KART } from '../config/tuning';
 
 // Item system: floating pickup boxes on the racing line + usable items.
 // Wave-2 unit ITEM-001. Boxes respawn after collection; a kart holds one
@@ -11,7 +11,7 @@ import { KART } from '../config/tuning';
 // Items (v1): BOOST — burst of speed; MISSILE — homes forward along the
 // centerline and spins out the first kart it tags.
 
-export type ItemKind = 'boost' | 'missile' | 'slick' | 'shield';
+export type ItemKind = 'boost' | 'missile' | 'slick' | 'shield' | 'ink';
 
 const BOX_RADIUS = 1.6; // pickup distance, m
 const RESPAWN_S = 7;
@@ -154,18 +154,40 @@ export class Items {
     }
   }
 
-  /** Roll a random item — boost most common, then missile, then slick. */
+  /** Roll a random item — boost most common; ink is the rarest. */
   private roll(): ItemKind {
     const r = Math.random();
-    return r < 0.38 ? 'boost' : r < 0.68 ? 'missile' : r < 0.86 ? 'slick' : 'shield';
+    return r < 0.32
+      ? 'boost'
+      : r < 0.56
+        ? 'missile'
+        : r < 0.72
+          ? 'slick'
+          : r < 0.86
+            ? 'shield'
+            : 'ink';
   }
 
-  /** Fire kart `k`'s held item. Returns the item used (or null). */
-  use(kartIdx: number, simTime: number): ItemKind | null {
+  /** Fire kart `k`'s held item. `scores` = race scores for ink targeting.
+   *  Returns the item used (or null). */
+  use(kartIdx: number, simTime: number, scores?: number[]): ItemKind | null {
     const item = this.held[kartIdx];
     if (!item) return null;
     this.held[kartIdx] = null;
     const kart = this.karts[kartIdx];
+    if (item === 'ink') {
+      // Blooper: splats every racer ahead on score. Leading = wasted toss.
+      if (!scores) return item;
+      for (let k = 0; k < this.karts.length; k++) {
+        if (k === kartIdx || scores[k] <= scores[kartIdx]) continue;
+        if (simTime < this.shieldUntil[k]) {
+          this.shieldUntil[k] = 0; // shield absorbs it, consumed
+        } else {
+          this.karts[k].inkedUntil = simTime + AI.inkDuration;
+        }
+      }
+      return item;
+    }
     if (item === 'boost') {
       kart.boostTimer = Math.max(kart.boostTimer, KART.boostTime[1]);
       return item;
@@ -308,8 +330,9 @@ export class Items {
         }
       }
     }
-    // Shield bubbles follow their kart while active.
+    // Shield bubbles follow their kart while active; ink flags tick too.
     for (let k = 0; k < this.karts.length; k++) {
+      this.karts[k].inked = simTime < this.karts[k].inkedUntil;
       const active = simTime < this.shieldUntil[k];
       const b = this.shieldMeshes[k];
       b.visible = active;

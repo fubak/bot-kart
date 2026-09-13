@@ -70,12 +70,24 @@ export class RaceHud {
     );
     this.pauseEl.innerHTML =
       'PAUSED<div style="font-size:15px;color:#9fb4d0;margin-top:8px">P / Esc to resume</div>';
+    // Ink splat: fullscreen blobs while the player is inked — vision denial
+    // reads instantly without touching the renderer.
+    this.inkEl = mk(
+      'inset:0;display:none;background:' +
+        'radial-gradient(circle at 24% 30%, rgba(12,10,20,.88) 0 9%, transparent 12%),' +
+        'radial-gradient(circle at 68% 22%, rgba(12,10,20,.85) 0 12%, transparent 15%),' +
+        'radial-gradient(circle at 48% 62%, rgba(12,10,20,.9) 0 14%, transparent 17%),' +
+        'radial-gradient(circle at 82% 66%, rgba(12,10,20,.8) 0 8%, transparent 11%),' +
+        'radial-gradient(circle at 14% 74%, rgba(12,10,20,.82) 0 10%, transparent 13%);' +
+        'transition:opacity .3s',
+    );
   }
 
   private readonly itemEl: HTMLDivElement;
   private readonly resultsEl: HTMLDivElement;
   private readonly titleEl: HTMLDivElement;
   private readonly pauseEl: HTMLDivElement;
+  private readonly inkEl: HTMLDivElement;
   private resultsRenderedAt = -1;
   private titlePulseAt = 0;
 
@@ -164,6 +176,7 @@ export class RaceHud {
     } else {
       this.resultsEl.style.display = 'none';
     }
-    void kart;
+    this.inkEl.style.display =
+      kart.inked && race.phase === 'racing' && !paused ? 'block' : 'none';
   }
 }

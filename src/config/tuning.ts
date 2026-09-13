@@ -169,4 +169,14 @@ export const AI = {
   blockThrottle: 0.55,
   overtakeTime: 0.8,
   overtakeBias: 2.8,
+
+  // Rubber-band: AI pace assist vs the player's race score — trailing bots
+  // get a real top-speed edge, runaway leaders ease off. Compresses the
+  // pack so positions actually swap (critic: field read as processional).
+  rubberBandGain: 0.004, // assist per score-point of gap (≈ per ~3 m)
+  rubberBandUp: 0.08, // trailing: up to +8% top speed
+  rubberBandDown: 0.05, // leading: up to -5%
+
+  // Ink item: splat duration — victim's vision is degraded this long.
+  inkDuration: 4,
 } as const;

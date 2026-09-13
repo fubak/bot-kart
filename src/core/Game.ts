@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SIM } from '../config/tuning';
+import { AI, SIM } from '../config/tuning';
 import { initInput, pollInput } from './Input';
 import { DebugHud } from './DebugHud';
 import { Kart } from '../game/Kart';
@@ -103,7 +103,9 @@ export class Game {
       if (e.code === 'KeyM') {
         this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
       }
-      if (e.code === 'Space' && !this.paused) this.items.use(0, this.simTime);
+      if (e.code === 'Space' && !this.paused) {
+        this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
+      }
       if (e.code === 'KeyR') {
         this.celebrated.length = 0;
         this.paused = false; // restart always unfreezes (kills P→R soft-lock)
@@ -168,12 +170,23 @@ export class Game {
     while (!this.paused && this.accumulator >= SIM.fixedDt) {
       this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime);
       const allKarts = [this.kart, ...this.aiKarts];
+      const scores = this.race.racers.map((r) => r.score);
+      const racing = this.race.phase === 'racing';
       for (let i = 0; i < this.aiKarts.length; i++) {
+        // Rubber-band: trailing AI get a small real pace edge vs the player,
+        // runaway leaders ease off — keeps the pack close (critic:
+        // processional field, positions rarely swapped).
+        const gap = racing ? scores[0] - scores[i + 1] : 0;
+        this.aiKarts[i].paceAssist = THREE.MathUtils.clamp(
+          gap * AI.rubberBandGain,
+          -AI.rubberBandDown,
+          AI.rubberBandUp,
+        );
         const cs = canDrive ? this.aiDrivers[i].update(this.aiKarts[i], this.track, SIM.fixedDt, allKarts) : IDLE;
         this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime);
         // AI uses held items on straights at speed — keeps the field lively.
         if (this.items.held[i + 1] && this.aiKarts[i].speed > 18 && Math.random() < 0.4 * SIM.fixedDt) {
-          this.items.use(i + 1, this.simTime);
+          this.items.use(i + 1, this.simTime, scores);
         }
       }
       this.collideKarts();

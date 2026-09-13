@@ -90,6 +90,8 @@ export class AiDriver {
     look = Math.min(look, AI.lookaheadMax);
     // Far off-line → shorten lookahead to rejoin instead of cutting across.
     if (Math.abs(lateral) > AI.rejoinLateral) look *= AI.rejoinLookMul;
+    // Inked: vision denied — short sight + steering wander (see below).
+    if (kart.inked) look *= 0.55;
 
     const target = track.lookaheadPoint(kart.position, look);
     // Shift the pursuit point onto this bot's preferred line — plus a
@@ -222,6 +224,9 @@ export class AiDriver {
       const dir = drifting ? kart.driftDir : Math.sign(steer);
       steer = clampSteer(steer * AI.driftPursuitMul + dir * AI.driftSteerBias);
     }
+
+    // Inked: squinting through the splat — wander on top of the pursuit.
+    if (kart.inked) steer = clampSteer(steer + (Math.random() - 0.5) * 1.1);
 
     return { throttle, brake, steer, drift };
   }

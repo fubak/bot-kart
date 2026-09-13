@@ -33,6 +33,12 @@ export class Kart {
   /** True wall impacts only — the QA metric (lastWallHit also fires on
    *  landings and item hits, which legitimately shake/thump). */
   wallHitCount = 0;
+  /** Rubber-band pace assist (-1..+1 fraction of maxSpeed) — Game sets it
+   *  from each AI kart's score gap vs the player; 0 = no assist. */
+  paceAssist = 0;
+  /** Ink item: vision-denied until this sim-time (`inked` flag mirrors it). */
+  inkedUntil = 0;
+  inked = false;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
   private wallContact = false;
   private steerSmooth = 0;
@@ -229,6 +235,9 @@ export class Kart {
     this.impactSquash = 0;
     this.slipAngle = 0;
     this.wallHitCount = 0;
+    this.paceAssist = 0;
+    this.inkedUntil = 0;
+    this.inked = false;
     this.syncVisual();
   }
 
@@ -252,12 +261,16 @@ export class Kart {
 
     // --- throttle / brake ---
     const boosting = this.boostTimer > 0;
-    const topSpeed = KART.maxSpeed + (boosting ? KART.boostSpeed : 0);
+    const topSpeed =
+      KART.maxSpeed * (1 + this.paceAssist) + (boosting ? KART.boostSpeed : 0);
     if (input.throttle > 0) {
       // Launch surge: extra kick off the line, tapering out by launchSpeed.
       const surge =
         fwdSpeed < KART.launchSpeed ? THREE.MathUtils.lerp(KART.launchMul, 1, fwdSpeed / KART.launchSpeed) : 1;
-      const a = (boosting ? KART.boostAccel : KART.accel) * surge;
+      const a =
+        (boosting ? KART.boostAccel : KART.accel) *
+        surge *
+        (1 + this.paceAssist * 0.5);
       this.velocity.addScaledVector(fwd, a * input.throttle * dt);
     }
     if (input.brake > 0) {
