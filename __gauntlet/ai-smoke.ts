@@ -104,9 +104,47 @@ function runOne(skill: number, simSeconds: number): RunResult {
   };
 }
 
+/** Traffic regression: 3 karts, mixed skills, count time welded <2.75 m
+ *  (the pair-lock defect the critic found — should be rare, not ~90%). */
+function runTraffic(simSeconds: number) {
+  const track = new Track();
+  const karts = [new Kart(), new Kart(), new Kart()];
+  const drivers = [new AiDriver(0.95), new AiDriver(1.0), new AiDriver(1.05)];
+  const spawn = track.spawn();
+  karts.forEach((k, i) => {
+    const slot = track.gridSlot(i * 8, (i % 2) * 4 - 2);
+    k.reset(i === 0 ? spawn.position : slot.position, slot.heading);
+  });
+  const dt = SIM.fixedDt;
+  const steps = Math.round(simSeconds / dt);
+  let simTime = 3.5; // pretend countdown already ran
+  let locked = 0;
+  let pairs = 0;
+  for (let i = 0; i < steps; i++) {
+    for (let k = 0; k < 3; k++) {
+      const cs = drivers[k].update(karts[k], track, dt, karts);
+      karts[k].update(dt, cs, track, simTime);
+    }
+    for (let a = 0; a < 3; a++) {
+      for (let b = a + 1; b < 3; b++) {
+        pairs++;
+        if (karts[a].position.distanceTo(karts[b].position) < 2.75) locked++;
+      }
+    }
+    simTime += dt;
+  }
+  return {
+    locked,
+    pairs,
+    lockedPct: Math.round((locked / pairs) * 1000) / 10,
+    topSpeeds: karts.map((k) => Math.round(k.speed * 10) / 10),
+  };
+}
+
 try {
   const results = [0.85, 1.0, 1.1].map((s) => runOne(s, 90));
-  const json = JSON.stringify(results, null, 2);
+  const traffic = runTraffic(60);
+  const json = JSON.stringify({ solo: results, traffic }, null, 2);
   const el = document.getElementById('out');
   if (el) el.textContent = json;
   console.log('[ai-smoke]', json);
