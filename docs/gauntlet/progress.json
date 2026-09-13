@@ -5,7 +5,7 @@
     "status": "executing",
     "currentWave": 3,
     "overallQualityScore": 8.0,
-    "lastUpdated": "2026-09-13T17:45:00Z"
+    "lastUpdated": "2026-09-13T18:30:00Z"
   },
   "coordinator": {
     "session": "devin-desktop-primary",
@@ -189,5 +189,14 @@
     ],
     "gauntlet": "4-racer live race completed: BOT-B 1:00.59 P1, player P4 1:09.31, all finished, minimap+results verified, 73fps"
   },
-  "releaseEvidence": "docs/gauntlet/RELEASE_EVIDENCE.md"
+  "releaseEvidence": "docs/gauntlet/RELEASE_EVIDENCE.md",
+  "wave4": {
+    "units": [
+      "ITEM-003 shield",
+      "KART-B/C chassis",
+      "confetti",
+      "rival audio"
+    ],
+    "status": "integrated"
+  }
 }

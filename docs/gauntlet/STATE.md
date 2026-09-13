@@ -10,10 +10,10 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Release critic returned 8/10 — all wave-3 features verified live, three
-races completed cleanly (player legitimately won race 3). Its three pause
-edge-case defects are fixed and verified. Game is in release-candidate
-shape: release evidence index at docs/gauntlet/RELEASE_EVIDENCE.md.
+Post-release depth pass continues: 4th item (shield — verified absorb/
+consume live), distinct rival kart chassis (Blender kart-b heavy +
+kart-c wedge integrated), finish confetti per racer, positional rival
+engine audio. Release evidence index at docs/gauntlet/RELEASE_EVIDENCE.md.
 
 ---
 
@@ -37,11 +37,11 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. **Item variety** — 3 kinds (boost/missile/slick); genre wants ~6.
-2. **Kart meshes** — shared Kart A tinted; rivals deserve distinct chassis.
-3. **Bot skeletal animation** — drivers bob/lean but don't emote/celebrate.
-4. **Audio depth** — procedural SFX+music, no positional/racer audio.
-5. **Settings menu** — options exist as key toggles only (M, P, R).
+1. **Item variety** — 4 kinds (boost/missile/slick/shield); genre wants ~6.
+2. **Bot skeletal animation** — drivers bob/lean but don't emote/celebrate.
+3. **Settings menu** — options exist as key toggles only (M, P, R).
+4. **Second track** — single circuit; a variant would multiply longevity.
+5. **Track shortcut** — boost pads exist but no true alternate route.
 
 ---
 
