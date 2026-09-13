@@ -233,7 +233,8 @@ export class RaceHud {
         this.resultsEl.innerHTML =
           `<div style="font-size:30px;font-weight:900;margin-bottom:10px">RESULTS</div>` +
           rows +
-          `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">[R] restart</div>`;
+          `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">` +
+          `[R] restart &nbsp;·&nbsp; [Q] title</div>`;
       }
     } else {
       this.resultsEl.style.display = 'none';

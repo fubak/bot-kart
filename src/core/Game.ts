@@ -163,7 +163,7 @@ export class Game {
         this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
         this.settings.reducedMotion = this.chaseCam.reducedMotion;
       }
-      if (e.code === 'Space' && !this.paused) {
+      if (e.code === 'Space' && !this.paused && this.race.phase === 'racing') {
         this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
       }
       // Respawn (Backspace): lakitu-style reset onto the racing line at the

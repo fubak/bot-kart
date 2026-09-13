@@ -86,7 +86,12 @@ None.
 - Release critic: PASS 8/10 — every wave-3 feature verified live across
   3 full races (player won one legitimately). Fixed post-report: P→R
   soft-lock, Space items while paused, pause coverage countdown/finished.
-  Score arc: 4/10 → 5/10 → 7.5/10 → 8/10.
+- Wave-4 critic2: 7.5/10 — all new features verified working on both
+  tracks (options gains plumbed, T-swap world rebuild, emotes, glyphs,
+  75 fps both, 0 console errors). Defects fixed post-report: options
+  menu now modal (pause-all-phases + key capture), Items.reset() on
+  restart, Q quit-to-title, Backspace respawn, DebugHud hidden,
+  title-start key whitelist. Score arc: 4→5→7.5→8→7.5(fixes in).
 
 ---
 
