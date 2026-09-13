@@ -103,12 +103,45 @@ export class Track {
   /** Push a position back inside the road if it exceeds the drivable edge. */
   constrain(pos: THREE.Vector3): { lateral: number; clamped: boolean } {
     const { lateral } = this.query(pos);
-    const limit = TRACK.roadHalfWidth - 0.9; // kart half-width + margin
+    const limit = TRACK.roadHalfWidth - 0.75; // kart half-width → edge at wall face
     if (Math.abs(lateral) <= limit) return { lateral, clamped: false };
     const i = this.nearestIndex(pos);
     const s = this.samples[i];
     pos.copy(s.point).addScaledVector(s.left, Math.sign(lateral) * limit);
     return { lateral: Math.sign(lateral) * limit, clamped: true };
+  }
+
+  /**
+   * Point on the centerline `aheadMeters` past the nearest sample to `pos`.
+   * Walks the samples by arc length and interpolates the final segment so the
+   * target moves smoothly — used as the AI pure-pursuit lookahead.
+   */
+  lookaheadPoint(pos: THREE.Vector3, aheadMeters: number): THREE.Vector3 {
+    const n = this.samples.length;
+    const start = this.nearestIndex(pos);
+    let i = start;
+    let acc = 0;
+    while (acc < aheadMeters) {
+      const j = (i + 1) % n;
+      acc += this.samples[i].point.distanceTo(this.samples[j].point);
+      i = j;
+      if (i === start) break; // wrapped the whole lap — absurd distance
+    }
+    // Interpolate back into the final segment for a smooth target point.
+    const prev = this.samples[(i - 1 + n) % n].point;
+    const cur = this.samples[i].point;
+    const segLen = prev.distanceTo(cur);
+    const t =
+      segLen > 1e-6
+        ? THREE.MathUtils.clamp(1 - (acc - aheadMeters) / segLen, 0, 1)
+        : 1;
+    return prev.clone().lerp(cur, t);
+  }
+
+  /** Unit tangent of the travel direction at a centerline sample index. */
+  tangentAt(index: number): THREE.Vector3 {
+    const n = this.samples.length;
+    return this.samples[((index % n) + n) % n].tangent;
   }
 
   get sampleCount(): number {
@@ -176,7 +209,7 @@ export class Track {
         [curbsR, -1],
       ] as const) {
         m.compose(
-          s.point.clone().addScaledVector(s.left, side * (hw + 0.2)).setY(0.06),
+          s.point.clone().addScaledVector(s.left, side * (hw - 0.15)).setY(0.06),
           q,
           new THREE.Vector3(1, 1, 1),
         );
@@ -196,7 +229,8 @@ export class Track {
     for (const side of [1, -1]) {
       const wallPos: number[] = [];
       const wallIdx: number[] = [];
-      const off = hw + 0.35;
+      // Wall face sits just past the clamp edge so contact visually touches.
+      const off = hw + 0.05;
       const h = TRACK.wallHeight;
       for (let i = 0; i <= n; i++) {
         const s = this.samples[i % n];

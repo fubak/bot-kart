@@ -24,7 +24,11 @@ export class ChaseCamera {
     const fwd = kart.forward();
     const speedT = THREE.MathUtils.clamp(kart.speed / KART.maxSpeed, 0, 1);
     const dist = CAMERA.distance - CAMERA.distanceSpeedTrim * speedT;
-    let targetPos = kart.position
+    // Velocity lead compensates posDamp lag — without it the follow point
+    // trails ~v/posDamp behind and the kart shrinks at speed (critic: 9.9 m
+    // effective stand-off at 28 m/s despite the trim).
+    const lead = kart.position.clone().addScaledVector(kart.velocity, CAMERA.speedLead);
+    let targetPos = lead
       .clone()
       .addScaledVector(fwd, -dist)
       .add(new THREE.Vector3(0, CAMERA.height, 0));
@@ -56,10 +60,11 @@ export class ChaseCamera {
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
 
-    // Wall-impact shake: fresh lastWallHit starts a decaying jitter burst.
+    // Wall-impact shake: fresh lastWallHit starts a jitter burst scaled by
+    // impact severity (a glancing tap shudders; a head-on thumps).
     if (kart.lastWallHit !== this.lastSeenHit) {
       this.lastSeenHit = kart.lastWallHit;
-      this.shake = 1;
+      this.shake = 0.4 + 0.6 * kart.lastWallImpact;
     }
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt / CAMERA.shakeTime);

@@ -14,6 +14,8 @@ import botGlbUrl from '../../assets/exported/characters/grokbot-a.glb?url';
 
 export type DriveState = 'grip' | 'drift' | 'boost';
 
+const UP = new THREE.Vector3(0, 1, 0);
+
 export class Kart {
   readonly group = new THREE.Group();
   readonly vfx = new KartVfx();
@@ -27,6 +29,7 @@ export class Kart {
   boostTimer = 0;
   state: DriveState = 'grip';
   lastWallHit = -1; // sim-time of last wall impact (feedback hooks consume)
+  lastWallImpact = 0; // 0..1 severity of the last impact (camera/audio scale)
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
   private wallContact = false;
   private steerSmooth = 0;
@@ -196,7 +199,10 @@ export class Kart {
     const boosting = this.boostTimer > 0;
     const topSpeed = KART.maxSpeed + (boosting ? KART.boostSpeed : 0);
     if (input.throttle > 0) {
-      const a = boosting ? KART.boostAccel : KART.accel;
+      // Launch surge: extra kick off the line, tapering out by launchSpeed.
+      const surge =
+        fwdSpeed < KART.launchSpeed ? THREE.MathUtils.lerp(KART.launchMul, 1, fwdSpeed / KART.launchSpeed) : 1;
+      const a = (boosting ? KART.boostAccel : KART.accel) * surge;
       this.velocity.addScaledVector(fwd, a * input.throttle * dt);
     }
     if (input.brake > 0) {
@@ -222,16 +228,16 @@ export class Kart {
 
     // --- drift state machine ---
     const drifting = this.driftDir !== 0;
-    if (!drifting && input.drift && input.steer !== 0 && fwdSpeed > KART.steerMinSpeed * 4) {
+    if (!drifting && input.drift && input.steer !== 0 && fwdSpeed > KART.driftEnterSpeed) {
       this.driftDir = Math.sign(input.steer);
       this.driftCharge = 0;
     }
     if (drifting) {
-      // Brake pauses charge gain (critic: charge accrued while braking into
-      // walls) but doesn't break the drift — brake-tap line-tightening stays.
-      const canSustain = input.drift && fwdSpeed > KART.steerMinSpeed * 2;
+      // Sustain needs real forward speed (kills parking-lot donuts) and the
+      // drift button. Charge only accrues while genuinely moving + sliding.
+      const canSustain = input.drift && fwdSpeed > KART.driftSustainSpeed;
       if (canSustain) {
-        if (input.brake === 0) {
+        if (input.brake === 0 && fwdSpeed > KART.driftChargeSpeed && Math.abs(this.slipAngle) > 0.1) {
           this.driftCharge = Math.min(this.driftCharge + dt, KART.driftChargeTier[1] + 0.3);
         }
       } else {
@@ -247,10 +253,13 @@ export class Kart {
     this.state = this.boostTimer > 0 ? 'boost' : this.driftDir !== 0 ? 'drift' : 'grip';
 
     // --- steering ---
-    // Virtual wheel slews toward the stick target — kills binary dart-twitch
-    // (critic: instant full lock). Drift still gets fast lock-in.
-    const slewTarget = drifting ? this.driftDir * 0.8 + input.steer * 0.45 : input.steer;
-    const slewRate = drifting ? KART.steerSlew * 1.6 : KART.steerSlew;
+    // Virtual wheel slews toward the stick target — asymmetric: fast attack
+    // (corrections land sooner), softer release (taps stay gentle). Drift
+    // biases the wheel into the drift direction but leaves counter-steer
+    // authority — that's the skill input.
+    const slewTarget = drifting ? this.driftDir * 0.55 + input.steer * 0.5 : input.steer;
+    const attacking = Math.abs(slewTarget) > Math.abs(this.steerSmooth);
+    const slewRate = (attacking ? KART.steerAttack : KART.steerRelease) * (drifting ? 1.6 : 1);
     this.steerSmooth += THREE.MathUtils.clamp(
       slewTarget - this.steerSmooth, -slewRate * dt, slewRate * dt,
     );
@@ -262,7 +271,16 @@ export class Kart {
     const steerMul = drifting ? KART.driftSteerMul : 1;
     // Reverse steering when going backward.
     const dirSign = fwdSpeed >= 0 ? 1 : -1;
-    this.heading -= this.steerSmooth * KART.steerRate * steerMul * speedFactor * dirSign * dt;
+    const yawDelta = -this.steerSmooth * KART.steerRate * steerMul * speedFactor * dirSign * dt;
+    this.heading += yawDelta;
+    // Drift arc model: the velocity vector follows a fraction of the yaw —
+    // the kart carves a widening arc instead of spinning through its own
+    // velocity (critic: held drift → slip 62–80°, speed collapse, spin-out).
+    if (drifting) {
+      this.velocity.applyAxisAngle(UP, yawDelta * KART.driftVelFollow);
+      // Mild scrub — holds ~83% of entry speed through a 1.2 s drift.
+      this.velocity.multiplyScalar(Math.exp(-KART.driftScrub * dt));
+    }
     this.steerVisual = this.steerSmooth;
     this.lastDt = dt;
 
@@ -296,13 +314,24 @@ export class Kart {
         if (!this.wallContact) {
           // Contact episode start: penalty scales with how hard we hit.
           const impact = Math.min(1, Math.abs(out) / KART.maxSpeed);
-          this.velocity.multiplyScalar(1 - KART.wallImpactLoss * (0.4 + 0.6 * impact));
+          this.lastWallImpact = impact;
+          this.velocity.multiplyScalar(1 - KART.wallImpactLoss * (0.3 + 0.7 * impact));
+          // No backward ejection — the kart stops, it never bounces off
+          // facing the wall (critic: restitution ping-ponged it back in).
+          const fNow = this.velocity.dot(fwd);
+          if (fNow < 0) this.velocity.addScaledVector(fwd, -fNow);
           this.lastWallHit = simTime;
           this.impactSquash = 0.4 + 0.6 * impact;
           this.wallContact = true;
         } else {
-          // Sustained grind: light scrub friction only.
-          this.velocity.multiplyScalar(1 - KART.wallScrub * dt);
+          // Sustained grind: scrub friction + a hard cap — grinding is a
+          // real cost, not a free rail (critic: kart re-accelerated to full
+          // speed while in contact).
+          this.velocity.multiplyScalar(Math.exp(-KART.wallScrub * dt));
+          const grindCap = KART.maxSpeed * KART.wallGrindCap;
+          if (this.velocity.length() > grindCap) {
+            this.velocity.setLength(THREE.MathUtils.lerp(this.velocity.length(), grindCap, 1 - Math.exp(-8 * dt)));
+          }
         }
       }
     } else {
@@ -314,6 +343,18 @@ export class Kart {
     const lat = this.velocity.clone().addScaledVector(this.forward(), -fAmt2);
     const latSigned = lat.dot(this.right());
     this.slipAngle = this.speed > 0.5 ? Math.atan2(latSigned, Math.abs(fAmt2)) : 0;
+    // Held-slip ceiling: while drifting, heading may lead velocity by at most
+    // driftMaxSlip — settles into a held ~30° slide instead of a spin-out.
+    if (drifting && Math.abs(this.slipAngle) > KART.driftMaxSlip) {
+      const velHeading = Math.atan2(-this.velocity.x, -this.velocity.z);
+      const s = Math.sign(this.slipAngle);
+      this.heading = velHeading + s * KART.driftMaxSlip;
+      this.slipAngle = s * KART.driftMaxSlip;
+    }
+    // Keep heading bounded.
+    if (this.heading > Math.PI * 4 || this.heading < -Math.PI * 4) {
+      this.heading = THREE.MathUtils.euclideanModulo(this.heading + Math.PI, Math.PI * 2) - Math.PI;
+    }
 
     // --- VFX emission (world space) ---
     const right2 = this.right();

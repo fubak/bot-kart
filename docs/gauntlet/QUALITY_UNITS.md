@@ -113,11 +113,13 @@ them in the actual running game; the Coordinator sequences them into waves.
 - **Builder:** Coordinator
 - **Dependencies:** MOVE-002
 - **Wave:** 1
-- **Spec:** Hold Shift+steer at speed → locked-direction drift with slip angle
-  (low lateral grip) and yawed-out body; charge tiers at 0.9s/1.9s; release →
-  0.7s/1.4s mini-turbo boost. Boost expiry bleeds speed (no snap clamp).
-  Brake interrupts drift. Verified: charge 1.19s → release → boost state
-  0.5s → 28 m/s.
+- **Spec:** Hold Shift+steer at speed → drift arcs through the corner:
+  velocity follows 62% of yaw (driftVelFollow) so slip settles at a held
+  ~28-31° (driftMaxSlip cap) instead of spinning out; drift scrub keeps
+  ~83% of entry speed; charge accrues only while genuinely sliding at
+  >12 m/s (donut exploit dead); enter/sustain floors 12/10 m/s. Release →
+  0.7s/1.4s mini-turbo. Verified live: held drift slip −0.5, speed
+  12.8→22.6 climbing, charge 0→1.18.
 - **Evidence:** eval trace `["release+0.2",7.4,"boost",0.5]`; `slice-drift.png`
 - **Critic Result:** FAIL flagged — boost hard-clamped 37→28 on expiry;
   body-yaw/slip not proportional; charge invisible to players.
@@ -132,12 +134,12 @@ them in the actual running game; the Coordinator sequences them into waves.
 - **Builder:** Coordinator
 - **Dependencies:** MOVE-001, TRACK-001
 - **Wave:** 1
-- **Spec:** Kart clamps to road edge (no wall penetration). Contact is an
-  episode: outward velocity reflected with restitution + one-time speed
-  retention penalty ON IMPACT only; sustained contact slides along the wall
-  and re-accelerates. Barrier walls + curbs make the boundary VISIBLE.
-  Verified live: `intoWall 15.5 → grind+1.5s 24.3 → released 28` m/s;
-  `wall-check.png` shows kart at lateral clamp 5.1 inside wall at 101 km/h.
+- **Spec:** Kart clamps to road edge at the wall face (limit = halfWidth −
+  kart half-width → kart edge visually touches the barrier). Contact is an
+  episode: one-time impact penalty scaled by hit severity, NO backward
+  rebound (kart stops, never ejects facing the wall); sustained grind has
+  heavy scrub + a 70%-top-speed cap — grinding costs real pace.
+  Verified live: approach impact 28.4→9.6 no rebound; grind bleeds speed.
 - **Evidence:** `docs/gauntlet/evidence/wave1/wall-check.png`,
   `walls.png`, `spawn-check3.png`; eval traces
 - **Critic Result:** FAIL flagged — invisible boundary + wall penalty
@@ -152,13 +154,14 @@ them in the actual running game; the Coordinator sequences them into waves.
 - **Builder:** Coordinator
 - **Dependencies:** CORE-001
 - **Wave:** 1
-- **Spec:** Exp-damped follow behind kart; look-ahead along heading; FOV
-  60→74° with speed, +8° on boost. Consumes `kart.lastWallHit` as a decaying
-  shake impulse on impact. Frame-rate independent.
-- **Evidence:** `slice-*.png`, `wall-check.png` — consistent chase framing
-- **Critic Result:** FAIL flagged — zero impact feedback. Fixed: wall-hit
-  shake wired in.
-- **Largest Gap:** shake amplitude is untuned (judged from traces, not feel).
+- **Spec:** Exp-damped follow behind kart; velocity-lead on the follow
+  target (speedLead 0.13) so the kart doesn't shrink at speed; look-ahead
+  along heading; FOV 60→74° +8° boost; impact shake scaled by severity;
+  countdown intro orbit. Frame-rate independent.
+- **Evidence:** `intro-cam.png` — orbit countdown; `wall-check.png` chase.
+- **Critic Result:** FAIL flagged — zero impact feedback + distance trim
+  defeated by damping lag. Fixed: velocity lead + severity-scaled shake.
+- **Largest Gap:** shake feel still coarse; no FOV landmark landmark.
 
 ### TRACK-001 — Test track (Proving Grounds)
 
