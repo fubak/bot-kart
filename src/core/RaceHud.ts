@@ -44,11 +44,19 @@ export class RaceHud {
     this.itemEl = mk(
       'bottom:24px;right:18px;font-size:22px;font-weight:800;color:#7be8ff',
     );
+    this.resultsEl = mk(
+      'top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;' +
+      'font-weight:700;color:#fff;background:rgba(10,16,28,.82);padding:22px 34px;' +
+      'border-radius:10px;display:none;text-align:left;line-height:1.9;min-width:320px',
+    );
   }
 
   private readonly itemEl: HTMLDivElement;
+  private readonly resultsEl: HTMLDivElement;
+  private resultsShown = false;
 
   update(race: Race, kart: Kart, simTime: number, heldItem?: string | null): void {
+    if (race.phase !== 'finished') this.resultsShown = false;
     this.center.textContent =
       race.phase === 'finished'
         ? 'FINISH'
@@ -69,12 +77,35 @@ export class RaceHud {
       `TIME ${fmt(race.raceTime)}<br>` +
       `LAP&nbsp;&nbsp;${fmt(cur)}<br>` +
       `LAST&nbsp;${fmt(race.lastLapTime)}<br>` +
-      `BEST&nbsp;${fmt(race.bestLapTime)}` +
-      (race.phase === 'finished' ? '<br>[R] restart' : '');
+      `BEST&nbsp;${fmt(race.bestLapTime)}`;
 
     this.warnEl.style.display = race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
     this.itemEl.textContent =
       race.phase === 'racing' && heldItem ? `${heldItem.toUpperCase()} [space]` : '';
+
+    // Results table: ranks everyone — finishers by time, unfinished by score.
+    if (race.phase === 'finished' && !this.resultsShown) {
+      this.resultsShown = true;
+      const order = [...race.racers.keys()].sort(
+        (a, b) => race.positionOf(a) - race.positionOf(b),
+      );
+      const names = ['YOU', 'BOT-B', 'BOT-C', 'BOT-A2'];
+      const rows = order
+        .map((r, i) => {
+          const rr = race.racers[r];
+          const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : 'DNF';
+          const best = fmt(rr.bestLapTime);
+          const cls = r === 0 ? ' style="color:#7be8ff"' : '';
+          return `<div${cls}>P${i + 1}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}</div>`;
+        })
+        .join('');
+      this.resultsEl.innerHTML =
+        `<div style="font-size:30px;font-weight:900;margin-bottom:10px">RESULTS</div>` +
+        rows +
+        `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">[R] restart</div>`;
+      this.resultsEl.style.display = 'block';
+    }
+    if (race.phase !== 'finished') this.resultsEl.style.display = 'none';
     void kart;
   }
 }
