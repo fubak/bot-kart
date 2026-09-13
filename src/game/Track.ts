@@ -144,6 +144,32 @@ export class Track {
     return this.samples[((index % n) + n) % n].tangent;
   }
 
+  /** Centerline point at a sample index (wrapped). */
+  pointAt(index: number): THREE.Vector3 {
+    const n = this.samples.length;
+    return this.samples[((index % n) + n) % n].point.clone();
+  }
+
+  /** Road-left unit vector at a sample index (wrapped). */
+  leftAt(index: number): THREE.Vector3 {
+    const n = this.samples.length;
+    return this.samples[((index % n) + n) % n].left;
+  }
+
+  /** Average metres between centerline samples (for arc-length math). */
+  get sampleSpacing(): number {
+    if (this._spacing < 0) {
+      let acc = 0;
+      const n = this.samples.length;
+      for (let i = 0; i < n; i++) {
+        acc += this.samples[i].point.distanceTo(this.samples[(i + 1) % n].point);
+      }
+      this._spacing = acc / n;
+    }
+    return this._spacing;
+  }
+  private _spacing = -1;
+
   get sampleCount(): number {
     return this.samples.length;
   }

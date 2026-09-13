@@ -2,7 +2,7 @@
 
 Last Updated: 2026-09-13
 Coordinator: Devin Desktop (primary session)
-Current Wave: 1
+Current Wave: 1→2 transition
 Project Phase: Execution
 Overall Status: EXECUTING
 
@@ -10,36 +10,42 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Wave 1 — Technical Spine: runtime architecture, game loop, kart controller,
-test track, chase camera, instrumentation. Goal: smallest playable driving
-slice that proves the driving experience can become excellent.
+Wave 1 spine is shipped and stable. Now deepening the game: AI opponents are
+integrated and racing; next gaps are rival-asset distinctness, track
+identity, items, and the live-race critique currently in flight.
 
 ---
 
 ## Active Managed Devins
 
-None right now. Prior agents this wave: Gameplay Critic (slice FAIL 4/10,
-static audit — explore profile cannot exec), Grok Concept Builder (done),
-Blender Asset Builder (exhausted context — only `_axis_probe.glb` produced;
-relaunch pending). Lesson: gameplay critics need the `subagent_general`
-profile so they can run the game.
+- Gameplay Critic (background, subagent_general): live 4-kart race critique —
+  pacing, collision feel, grid start, race integrity, stuck-AI detection.
+
+Prior agents this wave: Gameplay Critic #1 (slice FAIL 4/10, static audit),
+Critic #2 (live drive FAIL 5/10 — drift model rebuilt), Grok Concept Builder
+(3 bot candidates; A canonical), Blender Asset Builder (kart-a.glb +
+grokbot-a.glb + bot-a.glb delivered), AI Builder (AiDriver.ts + smoke harness).
 
 ---
 
 ## Current Integration Wave
 
-Wave 1 — Technical Spine (fix pass applied; awaiting fresh live critic)
+Wave 1 — Technical Spine: COMPLETE (drive, drift/boost, VFX, audio, race
+flow, HUD, AI field all live-verified). Operating in Wave 2 territory:
+AI depth, items, track character.
 
 ---
 
 ## Highest Priority Quality Gaps
 
-1. **Player-facing feedback** — drift charge is debug-HUD only; no VFX or
-   audio anywhere; impact feedback is camera-shake only.
-2. **Track readability/speed perception** — flat single-color road, no
-   scenery, landmarks, or optical-flow cues.
-3. **Race structure** — no laps/checkpoints/AI/race flow (Wave 2 units).
-4. Wall wedge recovery; boost feel tuning.
+1. **Rival distinctness** — AI karts differ only by tint; need Bot B/C
+   geometry + personality (heavy/power, speed archetypes).
+2. **Track identity** — flat circuit; needs signature corner, elevation,
+   curb alternation, corner signage. AI grazes walls at idx 380/430/701.
+3. **Items/pickups** — none exist; needed for kart-genre depth.
+4. **AI-vs-player interplay** — collision works; no AI avoidance of each
+   other yet (they share the centerline).
+5. Finish = banner only; no results screen.
 
 ---
 
@@ -49,70 +55,33 @@ None.
 
 ---
 
-## Preflight Result (2026-09-13)
+## Build State
 
-PASSED. All core conditions verified:
-
-- Game Director spec complete (no placeholder)
-- progress.json valid; STATE/TOOLCHAIN/registries consistent
-- 6/6 Skills present and match real environment
-- `npm run check:toolchain`: 15/15 pass
-- `npm run typecheck` + `npm run build`: pass (vite build 786ms)
-- Dev server :5173 renders WebGL scene, console clean
-- `/__gauntlet` dashboard serves live progress.json
-- Blender MCP repaired (addon conflict on port 9876 — see TOOLCHAIN.md)
-- Chrome DevTools MCP, Context7 enumerated live; playwright-cli live-tested
-- Grok CLI 1.0.30 authed (Imagine live-tested at init)
-- Zero-cost policy: all tools free/local/provisioned
-
-Repairs: `__gauntlet` favicon 404 fixed; Blender MCP addon conflict fixed
-(`scripts/assets/fix_blender_mcp_addon.py`).
-
-Degradations (optional, non-blocking): no standalone basisu (toktx covers),
-no Audacity/LMMS (audio pipeline TBD), blender-mcp hyper3d/hunyuan3d
-unverified, no linter or test runner configured yet (Wave 1 TODO).
-
-Baseline: Vite+TS+Three 0.185.1 shell only — spinning icosahedron bot on a
-box kart over a fog disc. No gameplay, assets, tests, or instrumentation yet.
+- `tsc --noEmit`: clean; `vite build`: clean.
+- Live: 4 racers on grid, AI laps at ~21 s, collision verified, position HUD
+  live (P n/N). Draws ~368 / tris ~57k @ 75 fps with 3 AI karts loaded.
+- Latest commit: kart-vs-kart collision + tinted rivals + per-racer Race.
 
 ---
 
-## Next Actions
+## Latest Critic Results
 
-1. Fresh gameplay critic (subagent_general) on the fixed slice — live drive.
-2. Relaunch Blender asset builder: canonical Bot A body + kart (ADR-002).
-3. MOVE-007 drift/boost VFX + player-facing charge indicator.
-4. Track readability pass: scenery, landmarks, surface detail.
-5. Wave 2: RACE-001 checkpoints/laps → RACE-002 race flow → AI-001.
-
----
-
-## Latest Whole-Game Critic Result
-
-Slice critic (static audit): **FAIL 4/10**. Verified defects fixed:
-wall tar-pit (contact-episode model), invisible walls (barrier meshes),
-drag under throttle, boost snap-clamp, binary steering, left/right basis,
-unused lastWallHit. Live-verified: wall slide 15.5→24.3→28 m/s, road
-renders correctly after winding fix. Fresh live critic pending.
+- Slice critic (static audit): FAIL 4/10 — all findings fixed.
+- Live critic #2: FAIL 5/10 — drift yaw runaway (62–80° slip) rebuilt and
+  re-verified (stable ~28° slip, tier-1 charge); wall rebound + camera lag
+  fixed. Live race critic: RUNNING.
 
 ---
 
 ## Persistent Context
 
 `DEVIN_GAME_DIRECTOR.md` is the project constitution.
-
 `STATE.md` is current operational memory.
-
 `progress.json` is machine-readable execution state.
-
 `QUALITY_UNITS.md` is the quality-work registry.
-
 `ASSET_REGISTRY.md` tracks authored 3D assets.
-
 `MEDIA_REGISTRY.md` tracks generated media.
-
 `DECISIONS.md` records important long-lived decisions.
-
 `TOOLCHAIN.md` describes confirmed available tools and invocation.
 
 The Skills under `.agents/skills/` contain reusable execution procedures.

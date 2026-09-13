@@ -24,9 +24,15 @@ export class RacerProgress {
   finished = false;
   finishTime = 0;
 
-  private nextGate = 0;
   private lastIdx = -1;
   private backwardAccum = 0;
+  // Per-gate crossing model: gates[k] must be crossed in order around the
+  // lap. mask marks mid-lap gates (0..6) passed; gate 7 is the start/finish
+  // line and only counts a lap when the mask is full — so a kart gridded
+  // behind the line doesn't get a free lap for crossing it.
+  private nextCross: number[] = [];
+  private mask = 0;
+  private spawnOffset = 0;
 
   constructor(
     private readonly track: Track,
@@ -42,10 +48,13 @@ export class RacerProgress {
     this.wrongWay = false;
     this.finished = false;
     this.finishTime = 0;
-    this.nextGate = 0;
     this.backwardAccum = 0;
     this.lastIdx = this.track.nearestIndex(spawnPos);
     this.progressIdx = this.lastIdx;
+    this.spawnOffset = this.lastIdx;
+    const n = this.track.sampleCount;
+    this.mask = 0;
+    this.nextCross = this.gates.map((g) => (g > this.lastIdx ? g : g + n));
     this.lapStart = simTime;
   }
 
@@ -69,10 +78,19 @@ export class RacerProgress {
     }
     this.wrongWay = this.backwardAccum > n * 0.01;
 
+    const lineGate = this.gates.length - 1;
+    const fullMask = (1 << lineGate) - 1;
     let lapped = false;
-    while (this.nextGate < this.gates.length && this.progressIdx >= this.gates[this.nextGate]) {
-      if (this.nextGate === this.gates.length - 1) lapped = true;
-      this.nextGate++;
+    for (let k = 0; k < this.gates.length; k++) {
+      if (this.progressIdx >= this.nextCross[k]) {
+        if (k === lineGate) {
+          if (this.mask === fullMask) lapped = true;
+          this.mask = 0;
+        } else {
+          this.mask |= 1 << k;
+        }
+        this.nextCross[k] += n;
+      }
     }
     if (lapped) {
       const t = simTime - this.lapStart;
@@ -86,16 +104,15 @@ export class RacerProgress {
         return true;
       }
       this.lap++;
-      this.progressIdx -= n;
-      this.nextGate = 0;
       return true;
     }
     return false;
   }
 
-  /** Sortable race distance — higher = further along. */
+  /** Sortable race distance — higher = further along. Spawn-offset so a
+   *  kart gridded behind the line doesn't rank ahead for free. */
   get score(): number {
-    return this.lap * this.track.sampleCount + this.progressIdx;
+    return this.lap * this.track.sampleCount + this.progressIdx - this.spawnOffset;
   }
 }
 

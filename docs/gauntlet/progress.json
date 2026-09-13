@@ -52,16 +52,46 @@
       "blender-mcp hyper3d/hunyuan3d backends (unverified)"
     ]
   },
-  "activeAgents": [],
+  "activeAgents": [
+    {
+      "id": "51b947c1",
+      "role": "gameplay-critic",
+      "task": "live 4-kart race critique"
+    }
+  ],
   "qualityUnits": [
-    {"id": "CORE-001", "status": "built"},
-    {"id": "CORE-002", "status": "built"},
-    {"id": "MOVE-001", "status": "built"},
-    {"id": "MOVE-002", "status": "built"},
-    {"id": "MOVE-003", "status": "built"},
-    {"id": "MOVE-004", "status": "built"},
-    {"id": "CAM-001", "status": "built"},
-    {"id": "TRACK-001", "status": "built"}
+    {
+      "id": "CORE-001",
+      "status": "built"
+    },
+    {
+      "id": "CORE-002",
+      "status": "built"
+    },
+    {
+      "id": "MOVE-001",
+      "status": "built"
+    },
+    {
+      "id": "MOVE-002",
+      "status": "built"
+    },
+    {
+      "id": "MOVE-003",
+      "status": "built"
+    },
+    {
+      "id": "MOVE-004",
+      "status": "built"
+    },
+    {
+      "id": "CAM-001",
+      "status": "built"
+    },
+    {
+      "id": "TRACK-001",
+      "status": "built"
+    }
   ],
   "integration": {
     "currentWave": 1,
@@ -118,5 +148,24 @@
       "date": "2026-09-13",
       "status": "done"
     }
+  ],
+  "phase": "executing",
+  "lastUpdated": "2026-09-13T14:49:56.070Z",
+  "wave": "1->2 transition",
+  "latestBuild": {
+    "typecheck": "clean",
+    "build": "clean",
+    "perf": {
+      "fps": 75,
+      "avgMs": 13.3,
+      "draws": 368,
+      "tris": 57560
+    }
+  },
+  "completedUnits": [
+    "AI-001-integration",
+    "kart-collision",
+    "race-positions",
+    "ai-tints"
   ]
 }

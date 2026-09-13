@@ -9,6 +9,7 @@ import { Race } from '../game/Race';
 import { RaceHud } from './RaceHud';
 import { Audio } from './Audio';
 import { AiDriver } from '../game/AiDriver';
+import { Items } from '../game/Items';
 import type { ControlState } from './Input';
 
 const IDLE: ControlState = { throttle: 0, brake: 0, steer: 0, drift: false };
@@ -28,6 +29,7 @@ export class Game {
   private readonly kart = new Kart();
   private readonly aiKarts: Kart[] = [];
   private readonly aiDrivers: AiDriver[] = [];
+  private items!: Items;
   private readonly race: Race;
   private readonly raceHud = new RaceHud();
   private readonly audio = new Audio();
@@ -69,9 +71,12 @@ export class Game {
     }
     this.race = new Race(this.track, undefined, 1 + AI_COUNT);
     this.race.restart(spawnPositions, 0);
+    this.items = new Items(this.track, [this.kart, ...this.aiKarts]);
+    this.scene.add(this.items.group);
 
     // R = restart race (input-edge handled here, not in ControlState).
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.repeat) this.items.use(0, this.simTime);
       if (e.code === 'KeyR' && !e.repeat) {
         const s = this.track.spawn();
         this.kart.reset(s.position, s.heading);
@@ -107,6 +112,7 @@ export class Game {
       scene: this.scene,
       kart: this.kart,
       aiKarts: this.aiKarts,
+      items: this.items,
       track: this.track,
       race: this.race,
       camera: this.chaseCam.camera,
@@ -135,8 +141,13 @@ export class Game {
       for (let i = 0; i < this.aiKarts.length; i++) {
         const cs = canDrive ? this.aiDrivers[i].update(this.aiKarts[i], this.track, SIM.fixedDt) : IDLE;
         this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime);
+        // AI uses held items on straights at speed — keeps the field lively.
+        if (this.items.held[i + 1] && this.aiKarts[i].speed > 18 && Math.random() < 0.4 * SIM.fixedDt) {
+          this.items.use(i + 1, this.simTime);
+        }
       }
       this.collideKarts();
+      this.items.update(this.simTime, SIM.fixedDt);
       const positions = [this.kart.position, ...this.aiKarts.map((k) => k.position)];
       this.race.update(positions, this.simTime, SIM.fixedDt);
       this.simTime += SIM.fixedDt;
@@ -146,7 +157,7 @@ export class Game {
     this.chaseCam.update(frameDt, this.kart, this.race);
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
-    this.raceHud.update(this.race, this.kart, this.simTime);
+    this.raceHud.update(this.race, this.kart, this.simTime, this.items.held[0]);
     this.audio.update(this.kart, this.race, this.simTime);
     this.renderer.render(this.scene, this.chaseCam.camera);
   }

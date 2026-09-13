@@ -41,9 +41,14 @@ export class RaceHud {
       'font-weight:800;color:#ff5a3c;display:none',
     );
     this.warnEl.textContent = 'WRONG WAY';
+    this.itemEl = mk(
+      'bottom:24px;right:18px;font-size:22px;font-weight:800;color:#7be8ff',
+    );
   }
 
-  update(race: Race, kart: Kart, simTime: number): void {
+  private readonly itemEl: HTMLDivElement;
+
+  update(race: Race, kart: Kart, simTime: number, heldItem?: string | null): void {
     this.center.textContent =
       race.phase === 'finished'
         ? 'FINISH'
@@ -63,6 +68,8 @@ export class RaceHud {
       (race.phase === 'finished' ? '<br>[R] restart' : '');
 
     this.warnEl.style.display = race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
+    this.itemEl.textContent =
+      race.phase === 'racing' && heldItem ? `${heldItem.toUpperCase()} [space]` : '';
     void kart;
   }
 }
