@@ -100,3 +100,18 @@ Only long-lived decisions belong here — not implementation trivia.
   placement must be curvature-verified per layout (a zone on the wrong
   edge is a detour, not a cut — see TRACK-006). `__game` uses live
   getters so QA handles survive world rebuilds.
+
+## ADR-010: Grand Prix is game-mode state, not a separate scene
+
+- **Date:** 2026-09-13
+- **Status:** Accepted
+- **Decided by:** Coordinator Devin
+- **Context:** With 3 layouts live, a championship mode needed only
+  leg tracking + points — not a second scene graph or menu system.
+- **Decision:** `gpMode/gpLeg/gpPoints` live on Game; `N` on the
+  results screen scores the leg by finishing position and calls
+  `buildWorld(nextIdx)` + `beginCountdown`. The results table doubles
+  as the standings screen (ranked by cup points on the final leg).
+- **Consequences:** Cup legs reuse the standard race/results flow —
+  no parallel UI to keep in sync. Fixed order (Proving → Switchback →
+  Neon); cup selection/difficulty-cup variants remain future gaps.
