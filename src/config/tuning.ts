@@ -131,9 +131,11 @@ export const AI = {
   brakeMin: 0.25,
   // Braking horizon = max(lookahead*brakeLookMul, speed*brakeTimeAhead); the
   // worst curvature found at these horizon fractions sets the target speed.
+  // 1.3 s at 28 m/s ≈ 36 m — enough to reach hairpin speed before a V-kink
+  // on a fast section (NN frac ~0.58 clipped walls at 1.1 s).
   brakeLookMul: 1.4,
-  brakeTimeAhead: 1.1,
-  curveSampleFracs: [0.35, 0.7, 1.0],
+  brakeTimeAhead: 1.3,
+  curveSampleFracs: [0.2, 0.35, 0.5, 0.65, 0.8, 1.0],
 
   // Off-line rejoin: beyond this |lateral| (m) shrink the lookahead so the bot
   // turns back to the centerline instead of cutting across the corner.

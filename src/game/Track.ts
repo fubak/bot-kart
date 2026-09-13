@@ -124,8 +124,10 @@ export const TRACKS: readonly TrackLayout[] = [
       [20, 4.0, 105],
       [-12, 2.0, 98],   // crest left — braking into the dip
       [-32, 1.0, 68],   // tight left drop (real corner 1)
-      [-14, 0.4, 44],   // switchback right
-      [-44, 1.2, 40],   // banking left
+      [-30, 0.6, 56],   // switchback right — a lean, not a reversal: x
+                        // keeps decreasing so ~55° bends over ~30 m (was
+                        // an R≈6 110° spike that wall-clipped the AI)
+      [-50, 1.2, 42],   // banking left
       [-88, 2.6, 55],   // ridge climb
       [-112, 2.0, 30],  // dive right — braking zone (real corner 2)
       [-95, 0.3, 2],    // tight bottom
@@ -133,8 +135,9 @@ export const TRACKS: readonly TrackLayout[] = [
       [-25, 0, -6],
     ],
     gravel: [
-      // Left drop after the crest (~0.55, +0.41 rad) — inside cut left.
-      { i0: 0.53, i1: 0.58, side: 1 },
+      // Left drop after the crest (~0.56, -0.68 rad) — inside cut left.
+      // Ends before the right-lean at ~0.58 (its inside is the far side).
+      { i0: 0.53, i1: 0.565, side: 1 },
       // Dive-to-hairpin complex (~0.72-0.78, +0.25 rad) — inside cut left.
       { i0: 0.7, i1: 0.8, side: 1 },
     ],

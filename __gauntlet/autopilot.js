@@ -30,9 +30,9 @@
       err = Math.atan2(Math.sin(err), Math.cos(err));
       steer = Math.max(-1, Math.min(1, -err * 2.4));
     }
-    const horizon = Math.max(look * 1.4, Math.max(0, fwd) * 1.1);
+    const horizon = Math.max(look * 1.4, Math.max(0, fwd) * 1.3);
     let minR = Infinity;
-    for (const f of [0.35, 0.7, 1.0]) {
+    for (const f of [0.2, 0.35, 0.5, 0.65, 0.8, 1.0]) {
       const d = Math.max(horizon * f, 1);
       const pp = tr.lookahead(k.position, d, k.trackIdx);
       const tan = tr.tangentAt(pp.index);
