@@ -568,3 +568,15 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   three circuits, as designed.
 - **Largest Gap:** kart headlights would sell the night further; neon
   accents (emissive signage) not yet placed.
+
+### MODE-001 — Grand Prix cup
+
+- **Domain:** Game modes
+- **Status:** Integrated
+- **Evidence:** `wave4/gp-title.png` (title shows GRAND PRIX — leg 1/3),
+  `wave4/gp-standings.png` (FINAL STANDINGS ranked by cup points,
+  champion starred). `G` toggles cup mode on title; `N` on results
+  scores the leg (10/7/5/3 by position) and loads the next circuit with
+  auto-countdown; leg 3 shows final standings. HUD shows `GP n/3`.
+- **Largest Gap:** no cup-selection (fixed order); no difficulty setting;
+  abandoning mid-cup discards standings silently.

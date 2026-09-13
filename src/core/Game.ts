@@ -82,6 +82,12 @@ export class Game {
     );
   }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
+  // Grand Prix cup: race all tracks in order for championship points.
+  private gpMode = false;
+  private gpLeg = 0;
+  private readonly gpPoints: number[] = [0, 0, 0, 0];
+  private gpDone = false;
+  private static readonly GP_POINTS = [10, 7, 5, 3];
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -135,6 +141,16 @@ export class Game {
         // opens options — everything else starts the race.
         if (e.code === 'KeyT' && !this.settings.open) {
           this.buildWorld((this.trackIdx + 1) % TRACKS.length);
+          return;
+        }
+        // G toggles Grand Prix: the cup always starts at leg 0 on the
+        // first circuit; single-race mode uses the selected track.
+        if (e.code === 'KeyG' && !this.settings.open) {
+          this.gpMode = !this.gpMode;
+          this.gpLeg = 0;
+          this.gpDone = false;
+          this.gpPoints.fill(0);
+          if (this.gpMode) this.buildWorld(0);
           return;
         }
         if (e.code === 'KeyO') this.settings.open = !this.settings.open;
@@ -197,6 +213,24 @@ export class Game {
       // Quit to title (Q): regrid + title phase, no reload needed (D3).
       if (e.code === 'KeyQ') {
         this.restartRace('title');
+      }
+      // Grand Prix advance: N on the results screen scores the leg and
+      // loads the next circuit (last leg → final standings shown).
+      if (e.code === 'KeyN' && this.gpMode && this.race.phase === 'finished' && !this.gpDone) {
+        const order = [...this.race.racers.keys()].sort(
+          (a, b) => this.race.positionOf(a) - this.race.positionOf(b),
+        );
+        order.forEach((r, pos) => {
+          this.gpPoints[r] += Game.GP_POINTS[pos] ?? 0;
+        });
+        this.gpLeg++;
+        if (this.gpLeg >= TRACKS.length) {
+          this.gpDone = true; // stay on results — final standings
+          this.paused = false;
+        } else {
+          this.buildWorld(this.gpLeg);
+          this.race.beginCountdown(this.simTime);
+        }
       }
       if (e.code === 'KeyR') {
         this.restartRace();
@@ -372,6 +406,13 @@ export class Game {
       this.paused,
       this.settings,
       this.track.name,
+      {
+        mode: this.gpMode,
+        leg: this.gpLeg,
+        total: TRACKS.length,
+        points: this.gpPoints,
+        done: this.gpDone,
+      },
     );
     this.minimap.update(
       [this.kart, ...this.aiKarts],

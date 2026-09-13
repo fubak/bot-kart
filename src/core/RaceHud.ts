@@ -10,6 +10,14 @@ export interface OptionsState {
   minimap: boolean;
 }
 
+export interface GpState {
+  mode: boolean;
+  leg: number;
+  total: number;
+  points: readonly number[];
+  done: boolean;
+}
+
 // Player-facing race HUD: countdown numbers, lap counter, running/best lap
 // times, wrong-way warning, finish banner. DOM overlay (cheap, accessible).
 // Separate from DebugHud — this is part of the game UI, not dev tooling.
@@ -116,6 +124,7 @@ export class RaceHud {
     paused = false,
     opts?: OptionsState,
     trackName?: string,
+    gp?: GpState,
   ): void {
     // Options overlay renders in every phase (openable from pause or title).
     if (opts?.open) {
@@ -144,9 +153,11 @@ export class RaceHud {
     }
     this.titleEl.style.display = race.phase === 'title' ? 'block' : 'none';
     if (race.phase === 'title') {
-      // Track line under PRESS ENTER (children[3]).
+      // Track + mode line under PRESS ENTER (children[3]).
       (this.titleEl.children[3] as HTMLElement).textContent =
-        trackName ? `◂ ${trackName} ▸   [T]` : '';
+        trackName
+          ? `◂ ${trackName} ▸  [T]      ${gp?.mode ? `GRAND PRIX — leg ${gp.leg + 1}/${gp.total}` : '1 RACE'}  [G]`
+          : '';
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
       if (simTime - this.titlePulseAt > 0.06) {
         this.titlePulseAt = simTime;
@@ -176,7 +187,8 @@ export class RaceHud {
     this.lapEl.textContent =
       race.phase === 'countdown'
         ? ''
-        : `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}   P${pos}/${race.racers.length}`;
+        : `${gp?.mode && !gp.done ? `GP ${gp.leg + 1}/${gp.total} · ` : ''}` +
+          `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}   P${pos}/${race.racers.length}`;
 
     const cur =
       race.phase === 'finished'
@@ -221,20 +233,32 @@ export class RaceHud {
           (a, b) => race.positionOf(a) - race.positionOf(b),
         );
         const names = ['YOU', 'BOT-B', 'BOT-C', 'BOT-A2'];
-        const rows = order
+        // Grand Prix final leg: rank by cup points, crown the champion.
+        const gpFinal = gp?.mode && gp.done;
+        const dispOrder = gpFinal
+          ? [...race.racers.keys()].sort((a, b) => gp.points[b] - gp.points[a])
+          : order;
+        const rows = dispOrder
           .map((r, i) => {
             const rr = race.racers[r];
             const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
             const best = fmt(rr.bestLapTime);
             const cls = r === 0 ? ' style="color:#7be8ff"' : '';
-            return `<div${cls}>P${i + 1}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}</div>`;
+            const pts = gp?.mode ? `   ${gp.points[r]} pts` : '';
+            const crown = gpFinal && i === 0 ? ' ★' : '';
+            return `<div${cls}>P${i + 1}${crown}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}${pts}</div>`;
           })
           .join('');
+        const footer = gp?.mode
+          ? gp.done
+            ? `[R] restart &nbsp;·&nbsp; [Q] title`
+            : `[N] next race &nbsp;·&nbsp; [Q] abandon cup`
+          : `[R] restart &nbsp;·&nbsp; [Q] title`;
         this.resultsEl.innerHTML =
-          `<div style="font-size:30px;font-weight:900;margin-bottom:10px">RESULTS</div>` +
+          `<div style="font-size:30px;font-weight:900;margin-bottom:10px">` +
+          `${gpFinal ? 'FINAL STANDINGS' : 'RESULTS'}${gp?.mode && !gp.done ? ` — leg ${gp.leg + 1}/${gp.total}` : ''}</div>` +
           rows +
-          `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">` +
-          `[R] restart &nbsp;·&nbsp; [Q] title</div>`;
+          `<div style="margin-top:12px;font-size:15px;color:#9fb4d0">${footer}</div>`;
       }
     } else {
       this.resultsEl.style.display = 'none';
