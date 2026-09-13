@@ -29,6 +29,8 @@ const RESTITUTION = 0.35; // bounciness of kart contact
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
+  private hemi!: THREE.HemisphereLight;
+  private sun!: THREE.DirectionalLight;
   private readonly chaseCam: ChaseCamera;
   private readonly hud: DebugHud;
   private track!: Track;
@@ -90,10 +92,11 @@ export class Game {
     this.scene.background = new THREE.Color(0x87b7e8);
     this.scene.fog = new THREE.Fog(0x87b7e8, 90, 320);
 
-    this.scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x3a5f3a, 0.9));
-    const sun = new THREE.DirectionalLight(0xfff3dd, 1.6);
-    sun.position.set(60, 90, 40);
-    this.scene.add(sun);
+    this.hemi = new THREE.HemisphereLight(0xbfd9ff, 0x3a5f3a, 0.9);
+    this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(0xfff3dd, 1.6);
+    this.sun.position.set(60, 90, 40);
+    this.scene.add(this.sun);
 
     // Build the kart field once (karts persist across track swaps — only
     // the world geometry/race/items/minimap are rebuilt by buildWorld).
@@ -258,9 +261,15 @@ export class Game {
     }
     this.track = new Track(TRACKS[idx]);
     this.scene.add(this.track.group);
-    // Per-track ambience: sky/fog recolor gives each circuit its own light.
-    (this.scene.background as THREE.Color).set(this.track.theme.sky);
-    (this.scene.fog as THREE.Fog).color.set(this.track.theme.sky);
+    // Per-track ambience: sky/fog + lighting rig recolor per theme.
+    const th = this.track.theme;
+    (this.scene.background as THREE.Color).set(th.sky);
+    (this.scene.fog as THREE.Fog).color.set(th.sky);
+    if (th.sunPos) this.sun.position.set(...th.sunPos);
+    else this.sun.position.set(60, 90, 40);
+    this.sun.color.set(th.sunColor ?? 0xfff3dd);
+    this.hemi.color.set(th.hemiSky ?? 0xbfd9ff);
+    this.hemi.groundColor.set(th.hemiGround ?? 0x3a5f3a);
 
     const spawn = this.track.spawn();
     this.kart.reset(spawn.position, spawn.heading);

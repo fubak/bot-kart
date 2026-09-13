@@ -20,6 +20,11 @@ export interface TrackLayout {
     canopy: number; // tree tops
     trunk: number;  // tree trunks
     rock: number;
+    /** Lighting: sun position + color, hemisphere sky/ground bounce. */
+    sunPos?: readonly [number, number, number];
+    sunColor?: number;
+    hemiSky?: number;
+    hemiGround?: number;
   };
 }
 
@@ -95,6 +100,10 @@ export const TRACKS: readonly TrackLayout[] = [
       canopy: 0x4a7a38,
       trunk: 0x5a4030,
       rock: 0x9a8570,
+      sunPos: [-80, 26, 40], // low western sun
+      sunColor: 0xffc890,
+      hemiSky: 0xf0c8a0,
+      hemiGround: 0x5a6a3a,
     },
   },
 ];
