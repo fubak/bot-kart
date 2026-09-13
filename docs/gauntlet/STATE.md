@@ -10,7 +10,7 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Wave 4 COMPLETE and live-verified: 6 items (boost/missile/slick/shield/
+Wave 4 + post-critic expansion COMPLETE and live-verified: 6 items (boost/missile/slick/shield/
 ink/swap) with position-weighted rolls, distinct rival chassis, gravel
 inside-cuts at both hairpins (geometry corrected to the true inside edge),
 rubber-band pacing (2.96 s pack spread verified), driver celebrations,
@@ -21,6 +21,9 @@ Second track SWITCHBACK RIDGE selectable on title via `T` (buildWorld
 rebuild; AI laps verified; both gravel cuts probed to correct inside
 edges). Driver limb emotes via the seated bots' articulated rigs —
 victory arm-pump, spin flail, head-into-turn tracking.
+Grand Prix cup mode (G): 3-race championship with 10/7/5/3 points and
+final standings. Options menu fully modal + persisted + difficulty
+(EASY/NORMAL/HARD scales AI skill). Night headlights on NEON NIGHT.
 Release evidence at RELEASE_EVIDENCE.md.
 
 ---
@@ -45,12 +48,14 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. ~~Settings menu~~ — DONE: O options overlay (volumes, reduced-motion,
-   minimap) with arrow navigation.
-2. ~~Second track~~ — DONE: Switchback Ridge, T to cycle on title.
-3. ~~Bot animation~~ — DONE: node-rig emotes (arm pump/flail, head look).
-4. **Item HUD iconography** — held item shows as text only; icons/pips
-   would polish readability.
+1. ~~Settings menu~~ — DONE: modal O options (volumes, difficulty,
+   reduced-motion, minimap), persisted.
+2. ~~Second track~~ — DONE ×2: Switchback Ridge + Neon Night, themed.
+3. ~~Bot animation~~ — DONE: node-rig emotes + blinks.
+4. ~~Item icons~~ — DONE: colored glyphs.
+5. ~~Grand Prix~~ — DONE: 3-leg cup with standings.
+6. **Key remapping** — fixed bindings only.
+7. **Bot leg animation** — legs static; arms/head/eyes done.
 4. ~~Item variety~~ — DONE: 6 kinds + position-weighted rolls.
 5. ~~Track shortcut~~ — DONE: 2 inside gravel cuts, cap 15 m/s.
 
