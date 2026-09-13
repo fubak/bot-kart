@@ -197,7 +197,7 @@ export class Game {
       [this.kart, ...this.aiKarts],
       this.race.phase !== 'title',
     );
-    this.audio.update(this.kart, this.race, this.simTime);
+    this.audio.update(this.kart, this.race, this.simTime, this.aiKarts);
     this.renderer.render(this.scene, this.chaseCam.camera);
   }
 

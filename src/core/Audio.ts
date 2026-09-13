@@ -19,6 +19,7 @@ export class Audio {
   private lastLap = 1;
   private lastPhase = 'countdown';
   private readonly music = new Music();
+  private rivalEngines: { osc: OscillatorNode; gain: GainNode }[] = [];
 
   /** Call once on a trusted user gesture (keydown/pointerdown). */
   unlock(): void {
@@ -72,6 +73,19 @@ export class Audio {
 
     this.music.attach(ctx, this.master);
     this.music.start();
+
+    // Rival engines: one quiet saw per AI kart, gain tracks distance so
+    // nearby racers are audible — sells the pack-racing fantasy.
+    for (let i = 0; i < 3; i++) {
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = 90;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      o.connect(g).connect(this.master);
+      o.start();
+      this.rivalEngines.push({ osc: o, gain: g });
+    }
   }
 
   private makeNoise(): AudioBuffer {
@@ -130,7 +144,7 @@ export class Audio {
   }
 
   /** Per-frame update: reads kart + race state, drives continuous sources. */
-  update(kart: Kart, race: Race, simTime: number): void {
+  update(kart: Kart, race: Race, simTime: number, rivals: Kart[] = []): void {
     if (!this.ctx || this.ctx.state === 'suspended') return;
 
     // --- countdown beeps ---
@@ -187,6 +201,18 @@ export class Audio {
       this.ctx.currentTime,
       0.12,
     );
+
+    // --- rival engines: distance-attenuated hum ---
+    for (let i = 0; i < this.rivalEngines.length; i++) {
+      const rk = rivals[i];
+      const e = this.rivalEngines[i];
+      if (!rk) continue;
+      const d = kart.position.distanceTo(rk.position);
+      const near = Math.max(0, 1 - d / 26); // audible within ~26 m
+      const rsp = rk.speed / 28;
+      e.osc.frequency.setTargetAtTime(70 + rsp * 150, this.ctx.currentTime, 0.08);
+      e.gain.gain.setTargetAtTime(near * 0.05, this.ctx.currentTime, 0.1);
+    }
 
     // Music intensity: sparse countdown → full race groove, hottest on the
     // last lap, drops out after the flag.
