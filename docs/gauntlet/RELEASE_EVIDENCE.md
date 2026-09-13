@@ -41,7 +41,17 @@ All captures are live in-game (Playwright-driven Chromium at :5173).
 | Slice audit | 4/10 FAIL | drag/boost-jolt/steer/drift-slip fixed |
 | Live critic #2 | 5/10 FAIL | drift runaway, wall rebound, camera lag fixed |
 | Live critic #3 | 7.5/10 PASS | results DNF-freeze, landing feedback, cosmetics fixed |
-| Release critic | pending | wave-3 whole-game pass |
+| Release critic | 8/10 PASS | all wave-3 verified; pause soft-lock + item leak fixed |
+
+## Release-critic highlights (wave-3)
+
+- 3 full races completed; player legitimately won race 3 (0:58.36 vs AI
+  1:01–1:04) — the field is beatable but not free
+- AI–AI proximity 0.8% of samples <2.75m (bar: <20%)
+- ~47 boost-samples/20s across field (baseline target: >0; was 0 pre-fix)
+- Minimap dots ≤1.3px error vs computed positions
+- Pause/resume exact: sim/vel/pos frozen 0.000, 1:1 resume, no burst
+- Music running (~20 osc/gain nodes/s), 0 console errors, 67–75 fps
 
 ## Performance
 

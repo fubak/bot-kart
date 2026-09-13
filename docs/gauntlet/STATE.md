@@ -10,16 +10,16 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Wave 3 polish landed: title/press-to-start, pause, minimap, slick item +
-spin-outs, driver expressiveness, reduced-motion toggle. Full autopilot
-gauntlet race verified end-to-end (all 4 finish, correct results, 73fps).
-Next: final whole-game critic pass → release evidence package.
+Release critic returned 8/10 — all wave-3 features verified live, three
+races completed cleanly (player legitimately won race 3). Its three pause
+edge-case defects are fixed and verified. Game is in release-candidate
+shape: release evidence index at docs/gauntlet/RELEASE_EVIDENCE.md.
 
 ---
 
 ## Active Managed Devins
 
-None running — release critic launching next.
+None running.
 
 Prior agents: Critics #1 (4/10) and #2 (5/10 — both fixed), Grok Concept
 Builder (A canonical), Blender Asset Builders (kart-a, grokbot-a, bot-a,
@@ -70,6 +70,10 @@ None.
   results DNF-freeze (2 Hz live re-render), landing squash/dust/thump,
   FINISH text overlap, -0 km/h. Minor noted: crest-lip contact 1/12
   passes, missiles beat off-line karts, no grass state.
+- Release critic: PASS 8/10 — every wave-3 feature verified live across
+  3 full races (player won one legitimately). Fixed post-report: P→R
+  soft-lock, Space items while paused, pause coverage countdown/finished.
+  Score arc: 4/10 → 5/10 → 7.5/10 → 8/10.
 
 ---
 
