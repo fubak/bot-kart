@@ -70,6 +70,14 @@ export class Game {
     } else {
       s.minimap = !s.minimap;
     }
+    this.saveSettings();
+  }
+
+  private saveSettings(): void {
+    localStorage.setItem(
+      'grok-kart-settings',
+      JSON.stringify({ ...this.settings, open: false, track: this.trackIdx }),
+    );
   }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
 
@@ -102,6 +110,16 @@ export class Game {
       // onto the gravel aprons through the cut zones every lap.
       this.aiDrivers.push(new AiDriver(skills[i], lines[i], i === 1));
       this.scene.add(aiKart.group, aiKart.vfx.object);
+    }
+    // Restore persisted settings + last-played track.
+    try {
+      const s = JSON.parse(localStorage.getItem('grok-kart-settings') ?? '{}');
+      Object.assign(this.settings, { open: false }, s);
+      if (typeof s.track === 'number' && s.track >= 0 && s.track < TRACKS.length) {
+        this.trackIdx = s.track;
+      }
+    } catch {
+      /* corrupt/absent storage — defaults stand */
     }
     this.buildWorld(this.trackIdx);
 
@@ -184,6 +202,10 @@ export class Game {
 
     this.chaseCam = new ChaseCamera(window.innerWidth / window.innerHeight);
     this.hud = new DebugHud(this.renderer);
+    // Apply persisted settings to live systems (loaded pre-buildWorld).
+    this.audio.setMasterVolume(this.settings.masterVol);
+    this.audio.setMusicVolume(this.settings.musicVol);
+    this.chaseCam.reducedMotion = this.settings.reducedMotion;
 
     initInput();
     // AudioContext unlocks on first trusted gesture.
@@ -236,6 +258,9 @@ export class Game {
     }
     this.track = new Track(TRACKS[idx]);
     this.scene.add(this.track.group);
+    // Per-track ambience: sky/fog recolor gives each circuit its own light.
+    (this.scene.background as THREE.Color).set(this.track.theme.sky);
+    (this.scene.fog as THREE.Fog).color.set(this.track.theme.sky);
 
     const spawn = this.track.spawn();
     this.kart.reset(spawn.position, spawn.heading);
@@ -252,6 +277,7 @@ export class Game {
     this.scene.add(this.items.group);
     this.minimap = new Minimap(this.track);
     this.celebrated.length = 0;
+    this.saveSettings();
   }
 
   // Shared regrid: restart (fresh countdown) or quit-to-title. Always

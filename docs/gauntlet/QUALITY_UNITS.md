@@ -523,3 +523,24 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   + name (⚡/✹/◍/◯/✦/⇄), dimmed [space] hint.
 - **Largest Gap:** glyphs are unicode, not authored icons; no
   incoming-hazard indicator.
+
+### TRACK-008 — Per-track theming
+
+- **Domain:** Track/Visual identity
+- **Status:** Integrated
+- **Evidence:** `wave4/track2-theme.png` — TrackLayout gains optional
+  `theme { sky, grass, skirt, canopy, trunk, rock }`; buildWorld recolors
+  scene.background + fog. Switchback Ridge runs a golden-hour palette
+  (peach sky, olive grass, dark pines, warm stone) vs Proving Grounds'
+  blue day.
+- **Largest Gap:** curbs/road/chevrons stay shared; lighting rig (sun
+  angle, hemisphere colors) doesn't vary per theme yet.
+
+### UI-007 — Settings persistence
+
+- **Domain:** UI
+- **Status:** Integrated
+- **Evidence:** settings + last-played track persist to
+  `grok-kart-settings` in localStorage; verified reload restored
+  SWITCHBACK RIDGE and applies volumes/reduced-motion on boot.
+- **Largest Gap:** no reset-to-defaults control in the menu.

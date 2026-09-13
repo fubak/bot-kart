@@ -12,6 +12,15 @@ export interface TrackLayout {
   readonly name: string;
   readonly points: ReadonlyArray<readonly [number, number, number]>;
   readonly gravel: ReadonlyArray<{ i0: number; i1: number; side: -1 | 1 }>;
+  /** Palette overrides — gives each circuit its own visual identity. */
+  readonly theme?: {
+    sky: number;    // scene background + fog
+    grass: number;  // ground plane
+    skirt: number;  // embankment fill
+    canopy: number; // tree tops
+    trunk: number;  // tree trunks
+    rock: number;
+  };
 }
 
 export const TRACKS: readonly TrackLayout[] = [
@@ -78,6 +87,15 @@ export const TRACKS: readonly TrackLayout[] = [
       // inside is the left edge (+1).
       { i0: 0.68, i1: 0.73, side: 1 },
     ],
+    // Golden-hour palette — dry ridge country vs Proving Grounds' blue day.
+    theme: {
+      sky: 0xe8b490,
+      grass: 0x9aa050,
+      skirt: 0x7a8a48,
+      canopy: 0x4a7a38,
+      trunk: 0x5a4030,
+      rock: 0x9a8570,
+    },
   },
 ];
 
@@ -90,6 +108,7 @@ interface Sample {
 export class Track {
   readonly group = new THREE.Group();
   readonly name: string;
+  readonly theme: NonNullable<TrackLayout['theme']>;
   private readonly curve: THREE.CatmullRomCurve3;
   private readonly samples: Sample[] = [];
   private readonly gravelZones: TrackLayout['gravel'];
@@ -97,6 +116,14 @@ export class Track {
   constructor(layout: TrackLayout = TRACKS[0]) {
     this.name = layout.name;
     this.gravelZones = layout.gravel;
+    this.theme = layout.theme ?? {
+      sky: 0x87b7e8,
+      grass: 0x3e8a4e,
+      skirt: 0x35793f,
+      canopy: 0x2f7a3f,
+      trunk: 0x6b4a2f,
+      rock: 0x8a8f96,
+    };
     this.curve = new THREE.CatmullRomCurve3(
       layout.points.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
       true,
@@ -338,7 +365,7 @@ export class Track {
     const hw = TRACK.roadHalfWidth;
     const grass = new THREE.Mesh(
       new THREE.PlaneGeometry(600, 600),
-      new THREE.MeshStandardMaterial({ color: 0x3e8a4e, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: this.theme.grass, roughness: 1 }),
     );
     grass.rotation.x = -Math.PI / 2;
     grass.position.y = -0.1; // clear of the road plane — avoids z-fighting
@@ -493,7 +520,7 @@ export class Track {
     // Embankment skirts: grass ribbon from each road edge outward+down to
     // ground, so elevated sections read as mounds instead of floating ribbon.
     const skirtMat = new THREE.MeshStandardMaterial({
-      color: 0x35793f,
+      color: this.theme.skirt,
       roughness: 1,
       side: THREE.DoubleSide,
     });
@@ -627,12 +654,12 @@ export class Track {
     const treeCount = 110;
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.3, 1.6, 6);
     const canopyGeo = new THREE.ConeGeometry(1.5, 3.2, 7);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, flatShading: true });
-    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2f7a3f, flatShading: true });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: this.theme.trunk, flatShading: true });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: this.theme.canopy, flatShading: true });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
     const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, treeCount);
     const rockGeo = new THREE.DodecahedronGeometry(0.9, 0);
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8f96, flatShading: true });
+    const rockMat = new THREE.MeshStandardMaterial({ color: this.theme.rock, flatShading: true });
     const rocks = new THREE.InstancedMesh(rockGeo, rockMat, 40);
     // Ground height for props beside the road: inside the skirt zone
     // (hw..hw+6) the terrain slopes from road height down to -0.35.
