@@ -23,8 +23,10 @@ export interface TrackLayout {
     /** Lighting: sun position + color, hemisphere sky/ground bounce. */
     sunPos?: readonly [number, number, number];
     sunColor?: number;
+    sunIntensity?: number;
     hemiSky?: number;
     hemiGround?: number;
+    hemiIntensity?: number;
   };
 }
 
@@ -104,6 +106,50 @@ export const TRACKS: readonly TrackLayout[] = [
       sunColor: 0xffc890,
       hemiSky: 0xf0c8a0,
       hemiGround: 0x5a6a3a,
+    },
+  },
+  {
+    name: 'NEON NIGHT',
+    // ~200×115 m flowing speed circuit: long straights, fast banked
+    // sweepers, gentle rises — top-speed management over corner survival.
+    points: [
+      [0, 0, 0],
+      [70, 0, 0],
+      [105, 0.5, 15],
+      [115, 1.5, 45],
+      [95, 3.0, 75],
+      [60, 4.5, 95],
+      [20, 4.0, 105],
+      [-12, 2.0, 98],   // crest left — braking into the dip
+      [-32, 1.0, 68],   // tight left drop (real corner 1)
+      [-14, 0.4, 44],   // switchback right
+      [-44, 1.2, 40],   // banking left
+      [-88, 2.6, 55],   // ridge climb
+      [-112, 2.0, 30],  // dive right — braking zone (real corner 2)
+      [-95, 0.3, 2],    // tight bottom
+      [-60, 0, -6],
+      [-25, 0, -6],
+    ],
+    gravel: [
+      // Left drop after the crest (~0.55, +0.41 rad) — inside cut left.
+      { i0: 0.53, i1: 0.58, side: 1 },
+      // Dive-to-hairpin complex (~0.72-0.78, +0.25 rad) — inside cut left.
+      { i0: 0.7, i1: 0.8, side: 1 },
+    ],
+    // Night palette: navy sky, dim grass, dark pines, cool moonlight.
+    theme: {
+      sky: 0x141c30,
+      grass: 0x2e4638,
+      skirt: 0x243a30,
+      canopy: 0x1e4a30,
+      trunk: 0x3a2e28,
+      rock: 0x4a5260,
+      sunPos: [40, 60, -80], // cool moonlight
+      sunColor: 0x8898c8,
+      sunIntensity: 1.2,
+      hemiSky: 0x4a5e92,
+      hemiGround: 0x2a3828,
+      hemiIntensity: 1.35,
     },
   },
 ];

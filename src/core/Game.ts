@@ -268,8 +268,10 @@ export class Game {
     if (th.sunPos) this.sun.position.set(...th.sunPos);
     else this.sun.position.set(60, 90, 40);
     this.sun.color.set(th.sunColor ?? 0xfff3dd);
+    this.sun.intensity = th.sunIntensity ?? 1.6;
     this.hemi.color.set(th.hemiSky ?? 0xbfd9ff);
     this.hemi.groundColor.set(th.hemiGround ?? 0x3a5f3a);
+    this.hemi.intensity = th.hemiIntensity ?? 0.9;
 
     const spawn = this.track.spawn();
     this.kart.reset(spawn.position, spawn.heading);

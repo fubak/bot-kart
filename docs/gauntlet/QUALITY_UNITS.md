@@ -555,3 +555,16 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   other finishers do a half-amplitude hop with a forward head-nod.
 - **Largest Gap:** blink is a uniform squash, no directional look; legs
   still unanimated.
+
+### TRACK-009 — Third track: NEON NIGHT
+
+- **Domain:** Track
+- **Status:** Integrated
+- **Evidence:** `wave4/track3-night.png` — flowing ~200×115 m speed
+  circuit, night palette (navy sky, moonlit world, hemiIntensity 1.35).
+  Curvature-verified gravel zones: left-drop cut at frac 0.53–0.58,
+  dive-hairpin cut at 0.70–0.80 (both `gravel` at inside lateral ±7,
+  `road` on the wrong side). AI laps at ~20 s pace — fastest of the
+  three circuits, as designed.
+- **Largest Gap:** kart headlights would sell the night further; neon
+  accents (emissive signage) not yet placed.
