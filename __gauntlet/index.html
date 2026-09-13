@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gauntlet Dashboard (dev)</title>
+    <style>
+      body { margin: 0; padding: 24px; background: #0b0e1a; color: #dfe7ff;
+             font: 14px/1.5 system-ui, sans-serif; }
+      h1 { font-size: 20px; color: #8ef; }
+      .card { background: #141a30; border-radius: 8px; padding: 16px;
+              margin: 12px 0; max-width: 720px; }
+      .key { color: #9ab; }
+      pre { background: #0d1120; padding: 12px; border-radius: 6px;
+            overflow: auto; max-width: 720px; }
+      a { color: #8ef; }
+    </style>
+  </head>
+  <body>
+    <h1>Gauntlet Dashboard</h1>
+    <p>Development-only project state viewer. Scaffold only &mdash; full
+       dashboard design is a Coordinator task. Source of truth:
+       <code>docs/gauntlet/progress.json</code></p>
+    <div class="card" id="summary">Loading&hellip;</div>
+    <pre id="raw"></pre>
+    <script type="module" src="/__gauntlet/main.ts"></script>
+  </body>
+</html>

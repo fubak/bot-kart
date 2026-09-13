@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Local env / secrets — never commit credentials
+.env
+.env.*
+*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Playwright / browser automation artifacts
+.playwright-cli/
+test-results/
+
+# Temporary render/capture output
+tmp/
+*.tmp
+.renders/
+captures/
+
+# Caches
+.cache/
+.parcel-cache/
+.vite/
+
+# OS junk
+.DS_Store
+Thumbs.db
+nul
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# NOTE: intentionally NOT ignored — these are project source of truth:
+#   docs/gauntlet/          (gauntlet state, registries, specs)
+#   .agents/skills/         (Devin skills)
+#   .devin/                 (Devin project config)
+#   assets/blender/**/*.blend   (editable 3D source)
+#   assets/media/prompts/   (prompt provenance)
