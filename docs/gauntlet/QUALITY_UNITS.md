@@ -437,3 +437,22 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Status:** Integrated
 - **Evidence:** driver.position.y oscillates 0.012→0.12 on finish
   (vs 0.022 idle bob) + arm-rock; fires alongside confetti per racer.
+
+### ITEM-005 — Swap + position-weighted rolls
+
+- **Domain:** Items
+- **Status:** Integrated
+- **Evidence:** live probe — swap exchanged positions/velocities/headings
+  with the kart directly ahead (both moved exactly 5.0 m); roll() weights
+  by race rank (leaders: boost/slick; trailers: missile/ink/swap).
+- **Largest Gap:** swap teleports (no portal/VFX); rank weighting uses
+  score only, not gap distance.
+
+### TRACK-005 — Second gravel cut (crest left-hander)
+
+- **Domain:** Track
+- **Status:** Integrated
+- **Evidence:** `surf=gravel` verified at lateral +7.2 (frac 0.365);
+  `wave4/shortcut2-crest.png` — apron + berm + wall gap; smoke clean.
+- **Largest Gap:** AI never routes onto aprons (line offsets max 3.5 m
+  < zone edge) — shortcuts are player-only decisions for now.

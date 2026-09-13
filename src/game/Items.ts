@@ -11,7 +11,7 @@ import { AI, KART } from '../config/tuning';
 // Items (v1): BOOST — burst of speed; MISSILE — homes forward along the
 // centerline and spins out the first kart it tags.
 
-export type ItemKind = 'boost' | 'missile' | 'slick' | 'shield' | 'ink';
+export type ItemKind = 'boost' | 'missile' | 'slick' | 'shield' | 'ink' | 'swap';
 
 const BOX_RADIUS = 1.6; // pickup distance, m
 const RESPAWN_S = 7;
@@ -97,6 +97,8 @@ export class Items {
   private readonly slicks: Slick[] = [];
   private readonly pads: Pad[] = [];
   private readonly karts: Kart[] = [];
+  /** Latest race scores (set by update) — position-weighted item rolls. */
+  private scores: number[] = [];
   /** Per-kart shield expiry (sim-time) + bubble mesh while active. */
   readonly shieldUntil: number[] = [];
   private readonly shieldMeshes: THREE.Mesh[] = [];
@@ -154,18 +156,28 @@ export class Items {
     }
   }
 
-  /** Roll a random item — boost most common; ink is the rarest. */
-  private roll(): ItemKind {
-    const r = Math.random();
-    return r < 0.32
-      ? 'boost'
-      : r < 0.56
-        ? 'missile'
-        : r < 0.72
-          ? 'slick'
-          : r < 0.86
-            ? 'shield'
-            : 'ink';
+  /** Roll a random item, weighted by race position — trailing racers draw
+   *  aggressive items (missile/ink/swap), leaders draw utility (genre
+   *  rubber-banding; pairs with the pace assist). */
+  private roll(kartIdx: number): ItemKind {
+    const n = this.scores.length;
+    const my = n > kartIdx ? this.scores[kartIdx] : 0;
+    let rank = 0;
+    for (let k = 0; k < n; k++) if (this.scores[k] > my) rank++;
+    const trailing = n > 1 ? rank / (n - 1) : 0.5; // 0 leader → 1 last
+    const w: Record<ItemKind, number> = {
+      boost: THREE.MathUtils.lerp(0.42, 0.1, trailing),
+      slick: THREE.MathUtils.lerp(0.26, 0.08, trailing),
+      shield: THREE.MathUtils.lerp(0.16, 0.16, trailing),
+      missile: THREE.MathUtils.lerp(0.1, 0.3, trailing),
+      ink: THREE.MathUtils.lerp(0.04, 0.2, trailing),
+      swap: THREE.MathUtils.lerp(0.02, 0.16, trailing),
+    };
+    let r = Math.random();
+    for (const k of Object.keys(w) as ItemKind[]) {
+      if ((r -= w[k]) <= 0) return k;
+    }
+    return 'boost';
   }
 
   /** Fire kart `k`'s held item. `scores` = race scores for ink targeting.
@@ -175,11 +187,39 @@ export class Items {
     if (!item) return null;
     this.held[kartIdx] = null;
     const kart = this.karts[kartIdx];
+    if (item === 'swap') {
+      // Swap positions/velocities with the racer directly ahead — chaotic
+      // but bounded (no one ahead → fizzle, same as leading-ink).
+      const sc = scores ?? this.scores;
+      if (!sc.length) return item;
+      let target = -1;
+      let bestGap = Infinity;
+      for (let k = 0; k < this.karts.length; k++) {
+        const gap = sc[k] - sc[kartIdx];
+        if (k !== kartIdx && gap > 0 && gap < bestGap) {
+          bestGap = gap;
+          target = k;
+        }
+      }
+      if (target < 0) return item; // leading — wasted
+      const other = this.karts[target];
+      const p = kart.position.clone();
+      const v = kart.velocity.clone();
+      const h = kart.heading;
+      kart.position.copy(other.position);
+      kart.velocity.copy(other.velocity);
+      kart.heading = other.heading;
+      other.position.copy(p);
+      other.velocity.copy(v);
+      other.heading = h;
+      return item;
+    }
     if (item === 'ink') {
       // Blooper: splats every racer ahead on score. Leading = wasted toss.
-      if (!scores) return item;
+      const sc = scores ?? this.scores;
+      if (!sc.length) return item;
       for (let k = 0; k < this.karts.length; k++) {
-        if (k === kartIdx || scores[k] <= scores[kartIdx]) continue;
+        if (k === kartIdx || sc[k] <= sc[kartIdx]) continue;
         if (simTime < this.shieldUntil[k]) {
           this.shieldUntil[k] = 0; // shield absorbs it, consumed
         } else {
@@ -231,7 +271,8 @@ export class Items {
     return item;
   }
 
-  update(simTime: number, dt: number): void {
+  update(simTime: number, dt: number, scores?: number[]): void {
+    if (scores) this.scores = scores;
     // Pickup checks
     for (const b of this.boxes) {
       const active = simTime >= b.respawnAt;
@@ -244,7 +285,7 @@ export class Items {
         const dx = p.x - b.pos.x;
         const dz = p.z - b.pos.z;
         if (dx * dx + dz * dz < BOX_RADIUS * BOX_RADIUS) {
-          this.held[k] = this.roll();
+          this.held[k] = this.roll(k);
           b.respawnAt = simTime + RESPAWN_S;
           b.mesh.visible = false;
           break;

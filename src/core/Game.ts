@@ -190,7 +190,7 @@ export class Game {
         }
       }
       this.collideKarts();
-      this.items.update(this.simTime, SIM.fixedDt);
+      this.items.update(this.simTime, SIM.fixedDt, scores);
       const positions = [this.kart.position, ...this.aiKarts.map((k) => k.position)];
       this.race.update(positions, this.simTime, SIM.fixedDt);
       // Finish celebration: confetti fountain the moment each racer crosses.

@@ -45,6 +45,9 @@ export class Track {
   // apex (frac ~0.62, right-hander) gets an inside cut — shorter, slower.
   private readonly gravelZones = [
     { i0: 0.6, i1: 0.662, side: -1 },
+    // Left-hander at ~0.36 (crest area): inside cut on the left edge —
+    // a second, tighter route decision earlier in the lap.
+    { i0: 0.352, i1: 0.382, side: 1 },
   ];
 
   constructor() {
