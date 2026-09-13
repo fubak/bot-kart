@@ -10,12 +10,13 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Wave 4 depth pass live-verified: 4th item (shield), distinct rival kart
-chassis (kart-b heavy + kart-c wedge), finish confetti, positional rival
-audio, **gravel shortcut** at the hairpin (route decision, 15 m/s cap,
-dust+rumble). AI smoke regression clean post-shortcut (0 wall hits,
-identical lap times, 7.8% traffic lock). Final integrated race + perf
-profile running; then release evidence finalization.
+Wave 4 COMPLETE and live-verified: 6 items (boost/missile/slick/shield/
+ink/swap) with position-weighted rolls, distinct rival chassis, gravel
+inside-cuts at both hairpins (geometry corrected to the true inside edge),
+rubber-band pacing (2.96 s pack spread verified), driver celebrations,
+anti-wedge AI recovery, Bot C AI shortcut-taker, confetti + positional
+audio, title-orbit framing fix. Release evidence at RELEASE_EVIDENCE.md.
+Next candidates: settings menu, second track, skeletal bot animation.
 
 ---
 
@@ -39,11 +40,11 @@ AI depth, items, track character.
 
 ## Highest Priority Quality Gaps
 
-1. **Item variety** — 4 kinds (boost/missile/slick/shield); genre wants ~6.
-2. **Bot skeletal animation** — drivers bob/lean but don't emote/celebrate.
-3. **Settings menu** — options exist as key toggles only (M, P, R).
-4. **Second track** — single circuit; a variant would multiply longevity.
-5. ~~Track shortcut~~ — DONE: gravel inside-cut at hairpin, cap 15 m/s.
+1. **Settings menu** — options exist as key toggles only (M, P, R).
+2. **Second track** — single circuit; a variant would multiply longevity.
+3. **Bot skeletal animation** — drivers bob/lean/celebrate; no limbs.
+4. ~~Item variety~~ — DONE: 6 kinds + position-weighted rolls.
+5. ~~Track shortcut~~ — DONE: 2 inside gravel cuts, cap 15 m/s.
 
 ---
 
