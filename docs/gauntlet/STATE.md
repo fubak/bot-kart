@@ -1,61 +1,90 @@
 # Gauntlet Operational State
 
 Last Updated: 2026-09-13
-Coordinator:
-Current Wave: 0
-Project Phase: Ready for Coordinator
-Overall Status: READY TO EXECUTE
+Coordinator: Devin Desktop (primary session)
+Current Wave: 1
+Project Phase: Execution
+Overall Status: EXECUTING
 
 ---
 
 ## Current Objective
 
-Start the Coordinator Devin and begin Wave 1 (Technical Spine).
+Wave 1 — Technical Spine: runtime architecture, game loop, kart controller,
+test track, chase camera, instrumentation. Goal: smallest playable driving
+slice that proves the driving experience can become excellent.
 
 ---
 
 ## Active Managed Devins
 
-None.
+None yet — Wave 1 architectural foundation is Coordinator-owned until
+conventions exist (avoid fan-out on unsettled architecture).
 
 ---
 
 ## Current Integration Wave
 
-Wave 0 — Initialization
+Wave 1 — Technical Spine
 
 ---
 
 ## Highest Priority Quality Gaps
 
-Not yet assessed.
+Everything is a gap — no gameplay exists yet. Priority order per spec §53:
+kart control feel > camera > race flow > content.
 
 ---
 
 ## Current Blockers
 
-None known.
+None.
+
+---
+
+## Preflight Result (2026-09-13)
+
+PASSED. All core conditions verified:
+
+- Game Director spec complete (no placeholder)
+- progress.json valid; STATE/TOOLCHAIN/registries consistent
+- 6/6 Skills present and match real environment
+- `npm run check:toolchain`: 15/15 pass
+- `npm run typecheck` + `npm run build`: pass (vite build 786ms)
+- Dev server :5173 renders WebGL scene, console clean
+- `/__gauntlet` dashboard serves live progress.json
+- Blender MCP repaired (addon conflict on port 9876 — see TOOLCHAIN.md)
+- Chrome DevTools MCP, Context7 enumerated live; playwright-cli live-tested
+- Grok CLI 1.0.30 authed (Imagine live-tested at init)
+- Zero-cost policy: all tools free/local/provisioned
+
+Repairs: `__gauntlet` favicon 404 fixed; Blender MCP addon conflict fixed
+(`scripts/assets/fix_blender_mcp_addon.py`).
+
+Degradations (optional, non-blocking): no standalone basisu (toktx covers),
+no Audacity/LMMS (audio pipeline TBD), blender-mcp hyper3d/hunyuan3d
+unverified, no linter or test runner configured yet (Wave 1 TODO).
+
+Baseline: Vite+TS+Three 0.185.1 shell only — spinning icosahedron bot on a
+box kart over a fog disc. No gameplay, assets, tests, or instrumentation yet.
 
 ---
 
 ## Next Actions
 
-1. ~~Insert complete Game Director specification.~~ Done (2026-09-13).
-2. Start Coordinator Devin — it must follow the startup procedure in `DEVIN_GAME_DIRECTOR.md` §59.
-3. Inspect and run application baseline (`npm install`, `npm run dev`).
-4. Establish architecture if not already present.
-5. Create initial playable driving prototype.
-6. Establish coordinate and scale conventions.
-7. Establish initial art direction.
-8. Decompose project into atomic quality units.
-9. Launch first Managed Devin wave.
-10. Begin Builder → Critic gauntlet.
+1. Architect runtime modules (loop, input, kart physics, camera, track,
+   debug overlay, `window.__game` hooks for QA).
+2. Establish 3D conventions (scale/axes/pivots) — record in DECISIONS.md.
+3. Build vertical slice: drivable kart on a simple closed track.
+4. Wire instrumentation (FPS/frame-time overlay) + baseline perf profile.
+5. Decompose Wave 1+ systems into QUALITY_UNITS.md.
+6. Fan out Managed Devins once conventions stabilize.
 
 ---
 
 ## Latest Whole-Game Critic Result
 
-Not yet performed.
+Not yet performed — nothing to critique.
 
 ---
 

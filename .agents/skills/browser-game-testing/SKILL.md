@@ -83,6 +83,16 @@ playwright-cli open --device="iPhone 15"
 - If a seeded RNG exists (future architecture decision), drive scenarios via
   `eval` to set the seed before each run.
 - Prefer `run-code`/`eval` hooks over pixel-timing assumptions.
+- **Held-key input is flaky via `keydown`/`keyup`** — after `goto`/navigations,
+  synthetic key delivery can stall or arrive late. For deterministic driving
+  tests, dispatch keys in-page instead (verified working 2026-09-13):
+
+  ```bash
+  playwright-cli eval "(async()=>{const kd=c=>window.dispatchEvent(new KeyboardEvent('keydown',{code:c}));const ku=c=>window.dispatchEvent(new KeyboardEvent('keyup',{code:c}));const wait=ms=>new Promise(r=>setTimeout(r,ms));kd('KeyW');await wait(1500);/* ... */ku('KeyW');return 'done'})()"
+  ```
+
+  Codes are physical (`KeyW`, `ShiftLeft`, `ArrowUp`). Read sim state via
+  `window.__game` (see `docs/gauntlet/DECISIONS.md` ADR-003).
 
 ## Limits
 

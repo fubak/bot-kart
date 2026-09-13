@@ -46,3 +46,39 @@ Only long-lived decisions belong here — not implementation trivia.
   Coordinator's first wave.
 - **Consequences:** Clear source/runtime split; format is the Three.js-native
   GLB; compression tools verified installed.
+
+## ADR-002: World scale, axes, and pivots
+
+- **Date:** 2026-09-13
+- **Status:** Accepted
+- **Decided by:** Coordinator Devin (preflight, Wave 1)
+- **Context:** All 3D work (runtime geometry, Blender assets, physics tuning)
+  needs one convention before any production (spec §52).
+- **Decision:**
+  - 1 world unit = 1 meter. Y-up, right-handed; "forward" is **-Z**
+    (Three.js camera convention; kart heading θ=0 faces -Z).
+  - Kart: ~1.6 m wide × ~2.6 m long, origin at ground center between wheels.
+  - Racer: ~1.2–1.6 m tall seated, origin at feet/seat base.
+  - Wheels: ~0.45 m diameter, pivot at axle center.
+  - Track: ~12 m road width (≈7 kart widths), origin at spline start.
+  - GLB export: +Y up (`export_yup=True`), apply transforms, keep pivots
+    semantic (wheels at axles, kart at ground center).
+- **Consequences:** Physics constants are human-scale (speeds in m/s);
+  Blender assets authored to these dims drop in without rescaling.
+
+## ADR-003: Fixed-timestep sim + debug hooks
+
+- **Date:** 2026-09-13
+- **Status:** Accepted
+- **Decided by:** Coordinator Devin (preflight, Wave 1)
+- **Context:** Kart physics must be deterministic and testable; Critics and
+  Playwright need introspection (skills: browser-game-testing,
+  performance-profiling).
+- **Decision:** Simulation runs at fixed 120 Hz with an accumulator and a
+  clamped frame delta; rendering decoupled via `setAnimationLoop`. All tuning
+  constants live in `src/config/tuning.ts` (data-driven, spec §48). A
+  `window.__game` handle exposes scene/renderer/sim state for QA
+  (`evaluate_script`, `playwright-cli eval`). Custom arcade physics — no
+  physics engine; kart feel needs bespoke slip/drift, not rigid-body realism.
+- **Consequences:** Deterministic sim enables replay tests and seeded
+  scenarios later; debug handle is the QA contract — keep it stable.

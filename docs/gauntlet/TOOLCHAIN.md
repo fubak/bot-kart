@@ -161,6 +161,16 @@ any Devin session.
 
 - A second `blender` MCP is also configured inside Grok CLI (`uvx --from git+...blender_mcp.git blender-mcp`), for Grok-side sessions.
 - Verify viewport results with `get_viewport_screenshot`; do not approve assets on code success alone.
+- **Repaired 2026-09-13:** stock Blender extension `bl_ext.lab_blender_org.mcp`
+  was enabled and holding port 9876 with an incompatible protocol, causing
+  "Incomplete JSON response received" on every call. Fix script:
+  `scripts/assets/fix_blender_mcp_addon.py` (disables the extension, enables
+  the `blender_mcp` addon, saves userpref). If MCP calls fail with that error
+  again, re-run it and restart Blender.
+- The MCP does **not** reliably auto-launch Blender — start
+  `blender.exe` first, wait for it to finish loading, then call MCP tools.
+  The `blender_mcp` addon auto-starts its v5 socket server on port 9876
+  once Blender is up.
 
 ---
 

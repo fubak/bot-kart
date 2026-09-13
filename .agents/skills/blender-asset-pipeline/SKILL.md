@@ -41,6 +41,17 @@ Headless alternative (no MCP needed):
 "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --python my_script.py
 ```
 
+### Troubleshooting
+
+- **"Incomplete JSON response received"** — Blender's stock
+  `bl_ext.lab_blender_org.mcp` extension is holding port 9876 with an
+  incompatible protocol. Run
+  `blender.exe --background --python scripts/assets/fix_blender_mcp_addon.py`
+  then restart Blender.
+- **"Not connected to Blender"** — the MCP does not reliably auto-launch
+  Blender. Start `blender.exe` manually, wait ~20s for the addon's socket
+  server (port 9876) to come up, then retry.
+
 ## Export to GLB (via `execute_blender_code`)
 
 ```python
