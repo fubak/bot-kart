@@ -44,8 +44,12 @@ export class Kart {
   private wheelSpin = 0;
   private steerVisual = 0;
   private lastDt = 0;
+  private readonly tint: THREE.Color | null;
 
-  constructor() {
+  /** tint multiplies the GLB materials — cheap rival differentiation until
+   *  distinct Bot B/C assets land. */
+  constructor(tint?: THREE.ColorRepresentation) {
+    this.tint = tint === undefined ? null : new THREE.Color(tint);
     this.body = new THREE.Group();
 
     const mat = (c: number) =>
@@ -133,7 +137,21 @@ export class Kart {
     });
     for (const o of this.proceduralBody) o.visible = false;
     for (const w of this.wheels) w.visible = false;
+    if (this.tint) this.tintModel(model);
     this.body.add(model);
+  }
+
+  private tintModel(root: THREE.Object3D): void {
+    root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const cloned = mats.map((m) => {
+        const c = m.clone();
+        if ('color' in c) (c.color as THREE.Color).lerp(this.tint!, 0.55);
+        return c;
+      });
+      o.material = Array.isArray(o.material) ? cloned : cloned[0];
+    });
   }
 
   /** Grok Bot A GLB as the driver — authored seated, origin at seat base. */

@@ -251,11 +251,18 @@ them in the actual running game; the Coordinator sequences them into waves.
 ### AI-001 — Opponent AI (racing line)
 
 - **Domain:** AI racers
-- **Status:** Planned
+- **Status:** Built (needs critic)
+- **Builder:** subagent + Coordinator integration
 - **Dependencies:** MOVE-001, TRACK-001
 - **Wave:** 2/3
 - **Spec:** Bot follows centerline with lateral offsets, throttle/brake for
   curvature, simple drift on tight corners; collides + reacts.
+- **Evidence:** `ai-field-01.png`; headless `__gauntlet/ai-smoke.ts` —
+  2 laps/60s, best 21.0s, 8 low-speed wall grazes at corners 380/430/701,
+  11% drift, avg 21.1 top 28.1 m/s, no wrong-way. Live: 3 AI on staggered
+  grid, skills 0.92/1.0/1.08, lap 2 while player idles, HUD P4/4.
+- **Largest Gap:** no kart-vs-kart collision (ghost racing); same Kart A
+  visual for all rivals; corner grazes at idx 380/430/701.
 
 ### HUD-001 — Race HUD
 
@@ -266,9 +273,9 @@ them in the actual running game; the Coordinator sequences them into waves.
 - **Wave:** 1+
 - **Spec:** Lap counter, race/lap/last/best times, countdown, wrong-way,
   finish banner — DOM overlay readable at speed. `src/core/RaceHud.ts`.
-- **Evidence:** `race-countdown.png`, `race-finish.png`
-- **Largest Gap:** no position/P1-P8 display (needs AI); no minimap;
-  styling is plain.
+- **Evidence:** `race-countdown.png`, `race-finish.png`, `ai-field-01.png`
+  (P4/4 position display live)
+- **Largest Gap:** no minimap; styling is plain.
 
 ---
 

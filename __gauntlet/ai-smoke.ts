@@ -105,7 +105,7 @@ function runOne(skill: number, simSeconds: number): RunResult {
 }
 
 try {
-  const results = [1.0].map((s) => runOne(s, 60));
+  const results = [0.85, 1.0, 1.1].map((s) => runOne(s, 90));
   const json = JSON.stringify(results, null, 2);
   const el = document.getElementById('out');
   if (el) el.textContent = json;

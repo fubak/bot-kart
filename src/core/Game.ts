@@ -13,6 +13,8 @@ import type { ControlState } from './Input';
 
 const IDLE: ControlState = { throttle: 0, brake: 0, steer: 0, drift: false };
 const AI_COUNT = 3; // rival bots on the grid
+const KART_RADIUS = 1.35; // m — collision circle for kart-vs-kart
+const RESTITUTION = 0.35; // bounciness of kart contact
 
 // Game root: renderer + scene + fixed-timestep sim loop (ADR-003).
 // Sim steps at SIM.fixedDt; render happens once per rAF.
@@ -55,9 +57,10 @@ export class Game {
     this.kart.reset(spawn.position, spawn.heading);
     const spawnPositions = [spawn.position.clone()];
     const skills = [0.92, 1.0, 1.08];
+    const tints = [0x8fd454, 0x54a8ff, 0xffd454]; // green / blue / yellow rivals
     for (let i = 0; i < AI_COUNT; i++) {
       const slot = this.track.gridSlot(10 + i * 7, i % 2 === 0 ? 2.2 : -2.2);
-      const aiKart = new Kart();
+      const aiKart = new Kart(tints[i]);
       aiKart.reset(slot.position, slot.heading);
       this.aiKarts.push(aiKart);
       this.aiDrivers.push(new AiDriver(skills[i]));
@@ -133,6 +136,7 @@ export class Game {
         const cs = canDrive ? this.aiDrivers[i].update(this.aiKarts[i], this.track, SIM.fixedDt) : IDLE;
         this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime);
       }
+      this.collideKarts();
       const positions = [this.kart.position, ...this.aiKarts.map((k) => k.position)];
       this.race.update(positions, this.simTime, SIM.fixedDt);
       this.simTime += SIM.fixedDt;
@@ -145,5 +149,44 @@ export class Game {
     this.raceHud.update(this.race, this.kart, this.simTime);
     this.audio.update(this.kart, this.race, this.simTime);
     this.renderer.render(this.scene, this.chaseCam.camera);
+  }
+
+  // Pairwise circle collision: separate overlap, exchange normal velocity
+  // with restitution, light scrub so contact costs momentum. Positions are
+  // re-constrained to the track afterwards so a shove can't tunnel a wall.
+  private collideKarts(): void {
+    const karts = [this.kart, ...this.aiKarts];
+    const minDist = KART_RADIUS * 2;
+    for (let i = 0; i < karts.length; i++) {
+      for (let j = i + 1; j < karts.length; j++) {
+        const a = karts[i];
+        const b = karts[j];
+        const dx = b.position.x - a.position.x;
+        const dz = b.position.z - a.position.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq >= minDist * minDist || distSq < 1e-9) continue;
+        const dist = Math.sqrt(distSq);
+        const nx = dx / dist;
+        const nz = dz / dist;
+        const push = (minDist - dist) * 0.5;
+        a.position.x -= nx * push;
+        a.position.z -= nz * push;
+        b.position.x += nx * push;
+        b.position.z += nz * push;
+        const rel = (b.velocity.x - a.velocity.x) * nx + (b.velocity.z - a.velocity.z) * nz;
+        if (rel < 0) {
+          const impulse = (-rel * (1 + RESTITUTION)) / 2;
+          a.velocity.x -= nx * impulse;
+          a.velocity.z -= nz * impulse;
+          b.velocity.x += nx * impulse;
+          b.velocity.z += nz * impulse;
+          a.velocity.multiplyScalar(0.98);
+          b.velocity.multiplyScalar(0.98);
+          if (a === this.kart || b === this.kart) this.kart.lastWallHit = this.simTime;
+        }
+        this.track.constrain(a.position);
+        this.track.constrain(b.position);
+      }
+    }
   }
 }
