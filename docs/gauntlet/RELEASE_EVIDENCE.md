@@ -133,3 +133,25 @@ traffic lock 7.8% unchanged.
   `wave4/item-icon.png`.
 - **Smoke regression** — identical baseline after the Track refactor:
   3 skills × 3 laps, 0 wall hits, traffic 7.8%.
+
+## Wave 4 — Round 5 Additions (GP cup, track 3, difficulty, headlights)
+
+- **Grand Prix** — `G` cup toggle, `N` leg advance, 10/7/5/3 points,
+  FINAL STANDINGS champion. `wave4/gp-title.png`, `wave4/gp-standings.png`.
+- **NEON NIGHT** — third circuit: flowing speed course, moonlit theme
+  (hemi 1.35), gravel cuts verified at fracs 0.55/0.75 inside edges,
+  AI ~20s laps. `wave4/track3-night.png`.
+- **Difficulty** — options row scales AI skill −0.13/0/+0.05, persisted.
+  `wave4/options-difficulty.png`.
+- **Night headlights** — lamp quads on all karts + player SpotLight
+  beam on night tracks. `wave4/night-headlights.png`.
+- **Settings persistence** — volumes/difficulty/reduced-motion/minimap/
+  last-track restored across reloads (localStorage).
+- **Per-track themes** — sky/fog/sun/hemi per layout; Switchback golden
+  hour vs Neon moonlight. `wave4/track2-sunset.png`.
+- **Emote expansion** — eye blinks (120ms squash, 2.5–5.5s), rank-aware
+  celebrations (winner pump vs gracious nod).
+- **Smoke regression** — identical baseline after every refactor.
+- **Critic2 post-fixes verified live** — modal menu (kart 0.0 m/s while
+  arrows adjust), items cleared on R, Q→title, Backspace→centerline,
+  Escape no longer starts race.
