@@ -10,10 +10,12 @@ Overall Status: EXECUTING
 
 ## Current Objective
 
-Post-release depth pass continues: 4th item (shield — verified absorb/
-consume live), distinct rival kart chassis (Blender kart-b heavy +
-kart-c wedge integrated), finish confetti per racer, positional rival
-engine audio. Release evidence index at docs/gauntlet/RELEASE_EVIDENCE.md.
+Wave 4 depth pass live-verified: 4th item (shield), distinct rival kart
+chassis (kart-b heavy + kart-c wedge), finish confetti, positional rival
+audio, **gravel shortcut** at the hairpin (route decision, 15 m/s cap,
+dust+rumble). AI smoke regression clean post-shortcut (0 wall hits,
+identical lap times, 7.8% traffic lock). Final integrated race + perf
+profile running; then release evidence finalization.
 
 ---
 
@@ -41,7 +43,7 @@ AI depth, items, track character.
 2. **Bot skeletal animation** — drivers bob/lean but don't emote/celebrate.
 3. **Settings menu** — options exist as key toggles only (M, P, R).
 4. **Second track** — single circuit; a variant would multiply longevity.
-5. **Track shortcut** — boost pads exist but no true alternate route.
+5. ~~Track shortcut~~ — DONE: gravel inside-cut at hairpin, cap 15 m/s.
 
 ---
 
@@ -54,9 +56,11 @@ None.
 ## Build State
 
 - `tsc --noEmit`: clean; `vite build`: clean.
-- Live: 4 racers on grid, AI laps at ~21 s, collision verified, position HUD
-  live (P n/N). Draws ~368 / tris ~57k @ 75 fps with 3 AI karts loaded.
-- Latest commit: kart-vs-kart collision + tinted rivals + per-racer Race.
+- Live: 4 racers on grid, AI laps at ~18-22 s, collision verified, position
+  HUD live (P n/N). Draws ~160-400 / tris ~35-58k @ 73-75 fps.
+- AI smoke (post-shortcut): all 3 skills 3 laps, 0 wall hits, traffic 7.8%
+  lock — identical lap times to pre-shortcut baseline (no regression).
+- Latest commit: gravel shortcut + wallHitCount metric split.
 
 ---
 

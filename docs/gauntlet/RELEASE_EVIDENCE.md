@@ -68,3 +68,21 @@ Vsync-capped at ~75 Hz throughout; no frame drops observed.
 - `__gauntlet/ai-smoke.ts` — AI laps on elevated track (all 3 skills, 0 wall
   hits, monotonic pace) + multi-kart traffic-lock regression (7.8%).
 - `__gauntlet/autopilot.js` — in-page player autopilot for full-race tests.
+
+## Wave-4 additions (post-8/10)
+
+- **Shield item** — absorb/consume verified live both paths
+- **Rival chassis** — kart-b/kart-c GLBs integrated; 4 distinct silhouettes
+- **Gravel shortcut** — hairpin inside-cut; 15 m/s cap, dust+rumble,
+  visible apron + berms, minimap deviation confirmed
+- **Finish confetti + positional rival audio**
+- **wallHitCount split** — landing thumps no longer inflate wall metric
+
+**Wave-4 gauntlet race:** P1 BOT-B 1:00.73 · P2 BOT-A2 1:00.95 ·
+P3 BOT-C 1:02.68 · P4 YOU 1:54.53 (autopilot) — all finished,
+`wave4/results-wave4.png` — 75 fps, 162 draws, 34.5k tris, 0 console
+errors.
+
+**Post-shortcut AI smoke:** solo 0.85/1.0/1.1 → 3 laps each, 0 wall hits,
+best laps 22.02/18.65/17.73 (identical to pre-shortcut baseline);
+traffic lock 7.8% unchanged.

@@ -372,3 +372,41 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Status:** Built
 - **Evidence:** `M` key kills camera shake + speed-FOV kicks.
 - **Largest Gap:** no remapping, colorblind mode, or subtitle option yet.
+
+### ITEM-003 — Shield
+
+- **Domain:** Items
+- **Status:** Integrated
+- **Evidence:** live probe — shield absorbed slick hit (spin=-1,
+  shieldUntil consumed); unshielded control spun. Bubble renders
+  translucent around kart (`wave4` bubble screenshot).
+- **Largest Gap:** single-hit consume + 8s expiry only; no hold/trade
+  decision like genre shields that toggle.
+
+### TRACK-004 — Gravel shortcut (hairpin inside-cut)
+
+- **Domain:** Track
+- **Status:** Integrated
+- **Evidence:** `wave3/gravel-shortcut*.png` — tan apron + dirt mounds;
+  throttle-held probe settles exactly 15.0 m/s on gravel vs ~28 asphalt;
+  minimap shows kart off the racing line.
+- **Largest Gap:** single zone; a second cut or elevated bridge would
+  deepen route choice.
+
+### KART-002 — Distinct rival chassis (kart-b heavy, kart-c wedge)
+
+- **Domain:** Karts/Characters
+- **Status:** Integrated
+- **Evidence:** Blender GLBs exported + validated (gltf-transform);
+  live grid shot shows 4 distinct silhouettes (cream pods, gunmetal
+  heavy w/ roll cage, violet wedge).
+- **Largest Gap:** shared wheel semantics worked but kart-b/c had extra
+  wheel_* sub-nodes — match pinned to exact names.
+
+### META-001 — wallHitCount metric split
+
+- **Domain:** QA/Harness
+- **Status:** Integrated
+- **Evidence:** post-shortcut smoke — 0 true wall hits all skills
+  (landings reuse lastWallHit for thump/shake and were inflating the
+  count); lap times identical to baseline → no AI regression.
