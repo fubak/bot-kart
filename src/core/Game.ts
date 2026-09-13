@@ -143,8 +143,9 @@ export class Game {
     const canDrive = this.race.allowsDrive;
     while (this.accumulator >= SIM.fixedDt) {
       this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime);
+      const allKarts = [this.kart, ...this.aiKarts];
       for (let i = 0; i < this.aiKarts.length; i++) {
-        const cs = canDrive ? this.aiDrivers[i].update(this.aiKarts[i], this.track, SIM.fixedDt) : IDLE;
+        const cs = canDrive ? this.aiDrivers[i].update(this.aiKarts[i], this.track, SIM.fixedDt, allKarts) : IDLE;
         this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime);
         // AI uses held items on straights at speed — keeps the field lively.
         if (this.items.held[i + 1] && this.aiKarts[i].speed > 18 && Math.random() < 0.4 * SIM.fixedDt) {

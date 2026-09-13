@@ -171,11 +171,15 @@ export class Race {
     return end - this.raceStart;
   }
 
-  /** 1-based position of racer `i` by (lap, progress). */
+  /** 1-based position of racer `i`. Finished racers rank by finishTime
+   *  (earlier = better) and always ahead of unfinished ones — a frozen
+   *  progress score can't reorder a decided result (critic: winner showed
+   *  P4/4 as each AI crossed the line). */
   positionOf(racerIdx: number): number {
-    const me = this.racers[racerIdx].score;
+    const rank = (r: RacerProgress) => (r.finished ? 1e9 - r.finishTime : r.score);
+    const myRank = rank(this.racers[racerIdx]);
     let pos = 1;
-    for (const r of this.racers) if (r.score > me) pos++;
+    for (const r of this.racers) if (rank(r) > myRank) pos++;
     return pos;
   }
 

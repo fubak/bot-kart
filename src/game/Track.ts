@@ -6,27 +6,28 @@ import { TRACK } from '../config/tuning';
 // kart constraint (on-road test + wall push-back). Flat for the Wave 1 slice;
 // elevation becomes its own quality unit.
 
-// Control points (XZ, meters). Roughly a 190×100 m circuit: long back
-// straight, sweeping right hander, S-curves, hairpin. Clockwise.
-const CONTROL_POINTS: ReadonlyArray<readonly [number, number]> = [
-  [0, 0],
-  [55, 0],
-  [88, 8],
-  [102, 32],
-  [92, 58],
-  [62, 66],
-  [52, 88],
-  [24, 96],
-  [-4, 86],
-  [-18, 62],
-  [-34, 48],
-  [-48, 60],
-  [-70, 58],
-  [-84, 38],
-  [-78, 14],
-  [-56, 4],
-  [-30, -6],
-  [-12, -4],
+// Control points (X, Y, Z — meters). Roughly a 190×100 m circuit: long back
+// straight, sweeping right hander over a CREST (climb-and-dive corner),
+// roller-coaster ridge through the S-curves, hairpin. Clockwise.
+const CONTROL_POINTS: ReadonlyArray<readonly [number, number, number]> = [
+  [0, 0, 0],
+  [55, 0, 0],
+  [88, 1.2, 8],
+  [102, 3.6, 32],
+  [92, 6.0, 58],
+  [62, 3.8, 66],
+  [52, 1.0, 88],
+  [24, 0, 96],
+  [-4, 0, 86],
+  [-18, 0, 62],
+  [-34, 1.0, 48],
+  [-48, 3.0, 60],
+  [-70, 4.5, 58],
+  [-84, 2.0, 38],
+  [-78, 0.4, 14],
+  [-56, 0, 4],
+  [-30, 0, -6],
+  [-12, 0, -4],
 ];
 
 interface Sample {
@@ -42,7 +43,7 @@ export class Track {
 
   constructor() {
     this.curve = new THREE.CatmullRomCurve3(
-      CONTROL_POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z)),
+      CONTROL_POINTS.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
       true,
       'centripetal',
     );
@@ -174,6 +175,36 @@ export class Track {
     return this.samples.length;
   }
 
+  /** Road surface height at a world position — projects onto the two
+   *  centerline segments adjacent to the nearest sample and interpolates. */
+  heightAt(pos: THREE.Vector3): number {
+    const n = this.samples.length;
+    const i = this.nearestIndex(pos);
+    let bestY = this.samples[i].point.y;
+    let bestD = Infinity;
+    for (const [a, b] of [
+      [i, (i + 1) % n],
+      [(i - 1 + n) % n, i],
+    ] as const) {
+      const pa = this.samples[a].point;
+      const pb = this.samples[b].point;
+      const dx = pb.x - pa.x;
+      const dz = pb.z - pa.z;
+      const lenSq = dx * dx + dz * dz;
+      const t = lenSq > 1e-9
+        ? THREE.MathUtils.clamp(((pos.x - pa.x) * dx + (pos.z - pa.z) * dz) / lenSq, 0, 1)
+        : 0;
+      const px = pa.x + dx * t;
+      const pz = pa.z + dz * t;
+      const d = (pos.x - px) * (pos.x - px) + (pos.z - pz) * (pos.z - pz);
+      if (d < bestD) {
+        bestD = d;
+        bestY = pa.y + (pb.y - pa.y) * t;
+      }
+    }
+    return bestY;
+  }
+
   /** Grid slot: `backSamples` behind the start line, `lateral` offset (m). */
   gridSlot(backSamples: number, lateral: number): { position: THREE.Vector3; heading: number } {
     const n = this.samples.length;
@@ -207,8 +238,8 @@ export class Track {
     for (let i = 0; i <= n; i++) {
       const s = this.samples[i % n];
       roadPos.push(
-        s.point.x + s.left.x * hw, 0, s.point.z + s.left.z * hw,
-        s.point.x - s.left.x * hw, 0, s.point.z - s.left.z * hw,
+        s.point.x + s.left.x * hw, s.point.y, s.point.z + s.left.z * hw,
+        s.point.x - s.left.x * hw, s.point.y, s.point.z - s.left.z * hw,
       );
       if (i < n) {
         const a = i * 2;
@@ -244,7 +275,7 @@ export class Track {
         [curbsR, -1],
       ] as const) {
         m.compose(
-          s.point.clone().addScaledVector(s.left, side * (hw - 0.15)).setY(0.06),
+          s.point.clone().addScaledVector(s.left, side * (hw - 0.15)).setY(s.point.y + 0.06),
           q,
           new THREE.Vector3(1, 1, 1),
         );
@@ -271,7 +302,7 @@ export class Track {
         const s = this.samples[i % n];
         const bx = s.point.x + s.left.x * side * off;
         const bz = s.point.z + s.left.z * side * off;
-        wallPos.push(bx, 0, bz, bx, h, bz);
+        wallPos.push(bx, s.point.y, bz, bx, s.point.y + h, bz);
         if (i < n) {
           const a = i * 2;
           // CCW when viewed from the road side.
@@ -286,6 +317,37 @@ export class Track {
       this.group.add(new THREE.Mesh(wallGeo, wallMat));
     }
 
+    // Embankment skirts: grass ribbon from each road edge outward+down to
+    // ground, so elevated sections read as mounds instead of floating ribbon.
+    const skirtMat = new THREE.MeshStandardMaterial({
+      color: 0x35793f,
+      roughness: 1,
+      side: THREE.DoubleSide,
+    });
+    for (const side of [1, -1]) {
+      const skPos: number[] = [];
+      const skIdx: number[] = [];
+      const inner = hw - 0.1;
+      const outer = hw + 6;
+      for (let i = 0; i <= n; i++) {
+        const s = this.samples[i % n];
+        skPos.push(
+          s.point.x + s.left.x * side * inner, s.point.y, s.point.z + s.left.z * side * inner,
+          s.point.x + s.left.x * side * outer, -0.35, s.point.z + s.left.z * side * outer,
+        );
+        if (i < n) {
+          const a = i * 2;
+          if (side > 0) skIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
+          else skIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+        }
+      }
+      const skGeo = new THREE.BufferGeometry();
+      skGeo.setAttribute('position', new THREE.Float32BufferAttribute(skPos, 3));
+      skGeo.setIndex(skIdx);
+      skGeo.computeVertexNormals();
+      this.group.add(new THREE.Mesh(skGeo, skirtMat));
+    }
+
     // Start/finish stripe.
     const s0 = this.samples[0];
     const stripe = new THREE.Mesh(
@@ -294,7 +356,7 @@ export class Track {
     );
     stripe.rotation.x = -Math.PI / 2;
     stripe.rotation.z = -Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
-    stripe.position.copy(s0.point).setY(0.03); // above road, below wheels
+    stripe.position.copy(s0.point).setY(s0.point.y + 0.03); // above road, below wheels
     this.group.add(stripe);
 
     // Centerline dashes — speed/racing-line readability (critic: flat
@@ -307,7 +369,7 @@ export class Track {
       const s = this.samples[(c * dashEvery) % n];
       q.setFromAxisAngle(up, Math.atan2(s.tangent.x, s.tangent.z));
       m.compose(
-        s.point.clone().setY(0.025),
+        s.point.clone().setY(s.point.y + 0.025),
         q,
         new THREE.Vector3(1, 1, 1),
       );
@@ -320,18 +382,18 @@ export class Track {
     const beamMat = new THREE.MeshStandardMaterial({ color: 0x2a3140 });
     for (const side of [1, -1]) {
       const post = new THREE.Mesh(postGeo, beamMat);
-      post.position.copy(s0.point).addScaledVector(s0.left, side * (hw + 1.2)).setY(2.75);
+      post.position.copy(s0.point).addScaledVector(s0.left, side * (hw + 1.2)).setY(s0.point.y + 2.75);
       this.group.add(post);
     }
     const beam = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 2.8, 0.5, 0.5), beamMat);
-    beam.position.copy(s0.point).setY(5.5);
+    beam.position.copy(s0.point).setY(s0.point.y + 5.5);
     beam.rotation.y = Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
     this.group.add(beam);
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(hw * 1.2, 1.0, 0.1),
       new THREE.MeshStandardMaterial({ color: 0xffb340 }),
     );
-    banner.position.copy(s0.point).setY(4.8);
+    banner.position.copy(s0.point).setY(s0.point.y + 4.8);
     banner.rotation.y = beam.rotation.y;
     this.group.add(banner);
 
@@ -352,6 +414,12 @@ export class Track {
     const rockGeo = new THREE.DodecahedronGeometry(0.9, 0);
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8f96, flatShading: true });
     const rocks = new THREE.InstancedMesh(rockGeo, rockMat, 40);
+    // Ground height for props beside the road: inside the skirt zone
+    // (hw..hw+6) the terrain slopes from road height down to -0.35.
+    const groundY = (s: Sample, dist: number) => {
+      const t = THREE.MathUtils.clamp((dist - hw) / 6, 0, 1);
+      return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35; // base sits ON skirt
+    };
     let placed = 0;
     let guard = 0;
     while (placed < treeCount && guard++ < treeCount * 4) {
@@ -359,11 +427,12 @@ export class Track {
       const side = rand() < 0.5 ? 1 : -1;
       const dist = hw + 3 + rand() * 30;
       const p = s.point.clone().addScaledVector(s.left, side * dist);
+      const gy = groundY(s, dist);
       const sc = 0.8 + rand() * 0.9;
       const rot = new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2);
-      m.compose(p.clone().setY(0.8 * sc), rot, new THREE.Vector3(sc, sc, sc));
+      m.compose(p.clone().setY(gy + 0.8 * sc), rot, new THREE.Vector3(sc, sc, sc));
       trunks.setMatrixAt(placed, m);
-      m.compose(p.clone().setY((1.6 + 1.6) * sc), rot, new THREE.Vector3(sc, sc, sc));
+      m.compose(p.clone().setY(gy + (1.6 + 1.6) * sc), rot, new THREE.Vector3(sc, sc, sc));
       canopies.setMatrixAt(placed, m);
       placed++;
     }
@@ -374,7 +443,7 @@ export class Track {
       const p = s.point.clone().addScaledVector(s.left, side * dist);
       const sc = 0.5 + rand() * 1.1;
       m.compose(
-        p.setY(0.4 * sc),
+        p.setY(groundY(s, dist) + 0.4 * sc),
         new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
         new THREE.Vector3(sc, sc * 0.7, sc),
       );

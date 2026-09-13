@@ -22,6 +22,11 @@ export const KART = {
   // Off-throttle deceleration (coast drag + rolling resistance).
   drag: 6,
 
+  // Elevation: vertical gravity (snappier than real — arcade airtime over
+  // crests) and the force of slope gravity along the heading.
+  gravity: 22,
+  slopeForce: 11,
+
   // Steering: rad/s at full lock, scaled by speedFactor(v).
   steerRate: 2.6,
   // Speed below which steering fades to near-zero (can't turn when parked).
@@ -53,8 +58,9 @@ export const KART = {
   driftSustainSpeed: 10,
   driftChargeSpeed: 12,
 
-  // Drift → mini-turbo: charge seconds needed per boost tier.
-  driftChargeTier: [0.9, 1.9],
+  // Drift → mini-turbo: charge seconds needed per boost tier. Real corners
+  // sustain ~0.6 s of drift (critic: 0.9 s tier-1 never fired in a race).
+  driftChargeTier: [0.45, 1.1],
   boostSpeed: 9, // added m/s during boost
   boostTime: [0.7, 1.4], // boost duration per tier
   boostAccel: 26,
@@ -148,4 +154,13 @@ export const AI = {
   // S-curve guard: release drift if the corner bends opposite the drift dir
   // by more than this tangent angle (rad).
   driftFlipAngle: 0.15,
+
+  // Traffic: a kart within blockLat of our line, 2..blockAhead m in front,
+  // blocks us — lift the throttle (no endless push-trains) and, after
+  // overtakeTime blocked, sidestep overtakeBias m toward the freer side.
+  blockAhead: 10,
+  blockLat: 2.4,
+  blockThrottle: 0.55,
+  overtakeTime: 0.8,
+  overtakeBias: 2.8,
 } as const;

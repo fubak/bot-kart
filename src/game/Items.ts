@@ -73,7 +73,7 @@ export class Items {
           track.leftAt(idx),
           spreads[(s + row) % 3],
         );
-        pos.y = 0.7;
+        pos.y += 0.7;
         const mesh = new THREE.Mesh(boxGeo, boxMat);
         mesh.position.copy(pos);
         mesh.rotation.set(0.5, (row + s) * 0.7, 0.4);
@@ -141,7 +141,7 @@ export class Items {
       m.progressIdx += step;
       m.travelled += m.speed * dt;
       const wp = this.track.pointAt(Math.floor(m.progressIdx));
-      wp.y = 0.5;
+      wp.y += 0.5;
       m.mesh.position.copy(wp);
       const t = this.track.tangentAt(Math.floor(m.progressIdx));
       m.mesh.quaternion.setFromUnitVectors(

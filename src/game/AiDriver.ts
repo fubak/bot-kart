@@ -21,6 +21,8 @@ export class AiDriver {
   private driftTime = 0;
   private recovering = false;
   private prevLateral = 0;
+  private blockedTime = 0;
+  private overtakeSide = 1;
 
   constructor(
     skill = 1.0,
@@ -40,9 +42,10 @@ export class AiDriver {
     this.driftTime = 0;
     this.recovering = false;
     this.prevLateral = 0;
+    this.blockedTime = 0;
   }
 
-  update(kart: Kart, track: Track, dt: number): ControlState {
+  update(kart: Kart, track: Track, dt: number, traffic?: Kart[]): ControlState {
     const idle: ControlState = { throttle: 0, brake: 0, steer: 0, drift: false };
     const fwdSpeed = kart.forwardSpeed;
 
@@ -89,8 +92,11 @@ export class AiDriver {
     if (Math.abs(lateral) > AI.rejoinLateral) look *= AI.rejoinLookMul;
 
     const target = track.lookaheadPoint(kart.position, look);
-    // Shift the pursuit point onto this bot's preferred line.
-    target.addScaledVector(track.leftAt(track.nearestIndex(target)), this.lineOffset);
+    // Shift the pursuit point onto this bot's preferred line — plus a
+    // temporary sidestep while executing an overtake (see traffic below).
+    let lineBias = this.lineOffset;
+    if (this.blockedTime > AI.overtakeTime) lineBias += this.overtakeSide * AI.overtakeBias;
+    target.addScaledVector(track.leftAt(track.nearestIndex(target)), lineBias);
     const toTarget = target.sub(kart.position).setY(0);
     if (toTarget.lengthSq() < 1e-6) return { ...idle, throttle: 1 };
     toTarget.normalize();
@@ -147,6 +153,33 @@ export class AiDriver {
       throttle = 1;
     }
     // Between target and target*margin: coast (drag trims the overshoot).
+
+    // --- traffic: blocked by a kart dead ahead → lift + sidestep overtake ---
+    // Without this the pack collapses into matched-speed push-trains at the
+    // collision minDist (critic: two bots welded together for 91% of a race).
+    let blocked = false;
+    if (traffic && fwdSpeed > 4) {
+      const fwd = kart.forward();
+      const right = kart.right();
+      for (const other of traffic) {
+        if (other === kart) continue;
+        const rel = other.position.clone().sub(kart.position);
+        const along = rel.dot(fwd);
+        if (along < 1.5 || along > AI.blockAhead) continue;
+        const side = rel.dot(right);
+        if (Math.abs(side) > AI.blockLat) continue;
+        blocked = true;
+        // Aim for the side with more room — away from the blocker.
+        this.overtakeSide = side > 0 ? -1 : 1;
+        break;
+      }
+    }
+    if (blocked) {
+      this.blockedTime += dt;
+      throttle = Math.min(throttle, AI.blockThrottle);
+    } else {
+      this.blockedTime = Math.max(0, this.blockedTime - dt * 2); // decay, not snap
+    }
 
     // --- drift state machine ---
     // Enter on tight near-corner radius at speed; Kart latches

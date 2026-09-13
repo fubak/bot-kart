@@ -34,6 +34,10 @@ export class Kart {
   private wallContact = false;
   private steerSmooth = 0;
   private impactSquash = 0; // 0..1 wall-hit squash, decays in syncVisual
+  vy = 0; // vertical velocity — crests at speed give real airtime
+  grounded = true;
+  slopePitch = 0; // road pitch under the kart — drives body tilt
+  slopeRoll = 0;
 
   private readonly wheels: THREE.Mesh[] = [];
   private readonly frontAxle = new THREE.Group();
@@ -358,6 +362,32 @@ export class Kart {
       this.wallContact = false;
     }
 
+    // --- elevation: follow road height, catch air over crests ---
+    // Grounded karts track the surface upward (climb); cresting fast leaves
+    // groundY below position.y → gravity pulls back down = real airtime.
+    const groundY = track.heightAt(this.position);
+    this.vy -= KART.gravity * dt;
+    this.position.y += this.vy * dt;
+    if (this.position.y <= groundY) {
+      this.position.y = groundY;
+      this.vy = 0;
+      this.grounded = true;
+    } else {
+      this.grounded = false;
+    }
+    // Slope gravity (grounded only): uphill bleeds speed, downhill adds it.
+    const fwdE = this.forward();
+    const hA = track.heightAt(this.position.clone().addScaledVector(fwdE, 1.4));
+    const hB = track.heightAt(this.position.clone().addScaledVector(fwdE, -1.4));
+    this.slopePitch = Math.atan2(hA - hB, 2.8);
+    if (this.grounded) {
+      this.velocity.addScaledVector(fwdE, -Math.sin(this.slopePitch) * KART.slopeForce * dt);
+    }
+    const rE = this.right();
+    const hR = track.heightAt(this.position.clone().addScaledVector(rE, 0.9));
+    const hL = track.heightAt(this.position.clone().addScaledVector(rE, -0.9));
+    this.slopeRoll = Math.atan2(hR - hL, 1.8);
+
     // Actual slip angle (velocity vs heading) drives the drift visual.
     const fAmt2 = this.velocity.dot(this.forward());
     const lat = this.velocity.clone().addScaledVector(this.forward(), -fAmt2);
@@ -404,7 +434,11 @@ export class Kart {
 
   private syncVisual(): void {
     this.group.position.copy(this.position);
+    this.group.rotation.order = 'YXZ'; // yaw-dominant: pitch/roll after heading
     this.group.rotation.y = this.heading;
+    // Pitch/roll the whole kart to the road grade — sells the elevation.
+    this.group.rotation.x = this.slopePitch * 0.7;
+    this.group.rotation.z = -this.slopeRoll * 0.6;
     this.wheelSpin += (this.forwardSpeed / KART.wheelRadius) * this.lastDt;
     for (const w of this.wheels) w.rotation.x = this.wheelSpin;
     for (const w of this.glbWheels) w.rotation.x = this.wheelSpin;
