@@ -456,3 +456,15 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   `wave4/shortcut2-crest.png` — apron + berm + wall gap; smoke clean.
 - **Largest Gap:** AI never routes onto aprons (line offsets max 3.5 m
   < zone edge) — shortcuts are player-only decisions for now.
+
+### TRACK-006 — AI shortcut routing + zone-1 geometry fix
+
+- **Domain:** Track/AI
+- **Status:** Integrated
+- **Evidence:** corner measured +1.79 rad LEFT — original zone was on the
+  outside edge (a detour). Moved to inside (+1); Bot C (takesShortcuts)
+  verified on `surf=gravel` at lat +6.0 through the apex, clean rejoin.
+  `wave4/shortcut-inside.png`.
+- **Largest Gap:** bot only brushes the apron apex — not a committed
+  full-zone cut; approach-pull wedged on the wall face, so the pull only
+  engages inside the zone.
