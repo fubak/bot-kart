@@ -91,14 +91,17 @@ export class Game {
         this.race.beginCountdown(this.simTime);
         return;
       }
-      if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase === 'racing') {
+      // Pause works in any play phase (not title — nothing to freeze there).
+      // Critic: gating to 'racing' + paused surviving restart = P→R soft-lock.
+      if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase !== 'title') {
         this.paused = !this.paused;
       }
       if (e.code === 'KeyM') {
         this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
       }
-      if (e.code === 'Space') this.items.use(0, this.simTime);
+      if (e.code === 'Space' && !this.paused) this.items.use(0, this.simTime);
       if (e.code === 'KeyR') {
+        this.paused = false; // restart always unfreezes (kills P→R soft-lock)
         const s = this.track.spawn();
         this.kart.reset(s.position, s.heading);
         const positions = [s.position.clone()];
