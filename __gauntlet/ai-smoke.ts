@@ -127,10 +127,17 @@ function runTraffic(simSeconds: number) {
   let simTime = 3.5; // pretend countdown already ran
   let locked = 0;
   let pairs = 0;
+  // D1 regression probe: a kart that beached on a wall and never escaped
+  // shows ~0 m of travel in the final 10 s — a healthy kart covers 200 m+.
+  const tailSnapshot = karts.map((k) => k.position.clone());
+  const tailMark = steps - Math.round(10 / dt);
   for (let i = 0; i < steps; i++) {
     for (let k = 0; k < 3; k++) {
       const cs = drivers[k].update(karts[k], track, dt, karts);
       karts[k].update(dt, cs, track, simTime);
+    }
+    if (i === tailMark) {
+      for (let k = 0; k < 3; k++) tailSnapshot[k].copy(karts[k].position);
     }
     for (let a = 0; a < 3; a++) {
       for (let b = a + 1; b < 3; b++) {
@@ -140,11 +147,16 @@ function runTraffic(simSeconds: number) {
     }
     simTime += dt;
   }
+  const movedLast10s = karts.map((k, i) =>
+    Math.round(k.position.distanceTo(tailSnapshot[i]) * 10) / 10,
+  );
   return {
     locked,
     pairs,
     lockedPct: Math.round((locked / pairs) * 1000) / 10,
     topSpeeds: karts.map((k) => Math.round(k.speed * 10) / 10),
+    movedLast10s,
+    stalled: movedLast10s.filter((m) => m < 15).length,
   };
 }
 
