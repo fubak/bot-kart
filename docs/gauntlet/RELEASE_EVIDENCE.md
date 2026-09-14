@@ -258,3 +258,14 @@ of NaN/bricked. D4 — player stuck hint is displacement-based
 D5 — M reduce-motion persists via saveSettings. D6 — PAUSED no
 longer stacks over RESULTS. D7 — unbound drive bindings render
 "arrows — drive · drift unbound" instead of "—AJD".
+
+**Post-critic5 whole-game sweep:** full GP on autopilot end-to-end —
+3 legs PG→SR→NN, all 4 racers finished every leg, points sorted
+27/22/17/9, ★ BOT-B champion, title re-arms `GRAND PRIX — leg 1/3`
+with `rec 0:20.93`. AI wedge ladder held under real racing (zero
+permanent beaches; the autopilot-driven *player* needed manual ⌫
+respawns — harness limitation, human gets the STUCK hint). Perf
+75 fps / p50 13.3 / p95 13.5 / worst 13.6 ms (379 draws, 57k tris).
+Console 0 errors/0 warnings. Build: vendor split lands —
+`three-*.js` 609 kB (154.6 kB gzip) + `index-*.js` 74 kB (25.5 kB
+gzip), no chunk warnings (commit f593a78).
