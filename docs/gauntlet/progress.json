@@ -216,18 +216,21 @@
   ],
   "agents": {},
   "latestCritic": {
-    "id": "wave4-critic5",
+    "id": "wave4-critic6",
     "score": 6,
     "verdict": "defects fixed post-report",
-    "report": "docs/gauntlet/evidence/wave4/CRITIC5_REPORT.md",
+    "report": "docs/gauntlet/evidence/wave4/CRITIC6_REPORT.md",
     "fixed": [
-      "AI permanent wall-beach deadlock (HIGH — wedge escape ladder + lakitu respawn)",
-      "★REC leak across buildWorld paths (MED)",
-      "corrupt record values brick track (MED — per-value load validation)",
-      "phantom 1.6 m/s pin defeats stuck hint (MED — displacement-based)",
-      "M reduce-motion not persisted (LOW)",
-      "PAUSED stacks over RESULTS (LOW)",
-      "—AJD unbound hint (LOW)"
+      "D1 residual AI wedge limit-cycle deadlock (HIGH — anchor-based wedge state, guaranteed lakitu respawn at 6s)",
+      "D8 swap teleport desyncs RacerProgress (MED — resync() re-anchors tracker to landing leg, mask reset prevents gate-skip)"
+    ],
+    "reverified": [
+      "D2 ★REC scoping",
+      "D3 record validation (all corrupt shapes)",
+      "D4 displacement stuck hint",
+      "D5 M persistence",
+      "D6 no PAUSED/results overlay",
+      "D7 unbound hints"
     ]
   },
   "wave3": {

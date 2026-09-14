@@ -83,8 +83,8 @@ None.
 - Full GP autopilot pass verified: leg points accumulate, final
   standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
 - Console audit: 0 errors / 0 warnings across the GP session.
-- Latest commits: `a23641e` leg animation → `abab038` gamepad →
-  `2a85fa4` per-track lap records → `61c433b` critic5 fix batch.
+- Latest commits: `2a85fa4` lap records → `61c433b` critic5 batch →
+  `f593a78` vendor chunk split → `54c82ea`/`5fe6294` critic6 batch.
 - Wave-4 critic5 (lap-records playtest): 6/10 —
   `evidence/wave4/CRITIC5_REPORT.md`. Records verified end-to-end
   (per-track persist, toast timing, no-overwrite, AI can't set).
@@ -94,6 +94,16 @@ None.
   validation), D4 phantom 1.6 m/s pin defeats hint (displacement-based
   detection), D5 M not persisted, D6 PAUSED over RESULTS, D7 "—AJD"
   unbound hint. Score arc: …8→7.5→6 (all fixed).
+- Wave-4 critic6 (fix re-verify): 6/10 —
+  `evidence/wave4/CRITIC6_REPORT.md`. 6/7 critic5 fixes re-verified
+  clean. Defects fixed: D1 residual — ladder's speed-exit reset
+  stuckTime into a reverse/re-wedge limit cycle (nose-in pins froze
+  65-150 s); now anchor-based wedge state (wall-clock, clears only on
+  >2.5 m real displacement, guaranteed lakitu at 6 s — live nose-in
+  tests escape ~2 s). D8 NEW — swap teleports desynced RacerProgress
+  (progress inflation, wrongWay lock, foldback wrong-leg): resync()
+  re-anchors trackers to the landing position/leg, mask resets so
+  teleports can't skip gates. SR smoke identical + stall probe 0.
 
 ---
 
