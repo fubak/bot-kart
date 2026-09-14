@@ -56,7 +56,10 @@ interface Slick {
 const boxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
 const boxMat = new THREE.MeshStandardMaterial({
   color: 0x7be8ff,
-  emissive: 0x2a9dc4,
+  // Brighter emissive pushed over the bloom gate (~linear 1.0): item boxes
+  // read as glowing pickups on every track (WS-POST).
+  emissive: 0x3fd0ff,
+  emissiveIntensity: 2.2,
   transparent: true,
   opacity: 0.85,
   flatShading: true,
@@ -120,7 +123,9 @@ const padGeo = new THREE.PlaneGeometry(2.2, 3.2);
 const padMat = new THREE.MeshStandardMaterial({
   map: chevronTexture(),
   color: 0x30e8a0,
-  emissive: 0x12a060,
+  // Brighter emissive + wider pulse so boost pads breathe over the bloom
+  // gate at the top of each pulse (WS-POST).
+  emissive: 0x20e8a0,
   transparent: true,
   opacity: 0.9,
   side: THREE.DoubleSide,
@@ -377,7 +382,9 @@ export class Items {
       }
     }
     // Boost pads pulse — the arrows throb to read "drive over me".
-    padMat.emissiveIntensity = 1.1 + Math.sin(simTime * 4.2) * 0.5;
+    // Pulse crosses the bloom gate near the top of the wave — pads breathe
+    // a green glow instead of sitting at a flat lit color (WS-POST).
+    padMat.emissiveIntensity = 1.6 + Math.sin(simTime * 4.2) * 0.7;
     for (const p of this.pads) {
       if (simTime < p.cooldownUntil) continue;
       for (const kart of this.karts) {

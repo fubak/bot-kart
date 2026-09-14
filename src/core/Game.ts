@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AI, SIM } from '../config/tuning';
+import { AI, KART, SIM } from '../config/tuning';
 import {
   initInput,
   pollInput,
@@ -23,6 +23,7 @@ import { Items } from '../game/Items';
 import { Fx } from '../game/Fx';
 import { Sky } from '../game/Sky';
 import { Minimap } from './Minimap';
+import { PostFX } from './PostFX';
 import { TRACKS } from '../game/Track';
 import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
 import botCUrl from '../../assets/exported/characters/grokbot-c-seated.glb?url';
@@ -39,6 +40,7 @@ const RESTITUTION = 0.35; // bounciness of kart contact
 
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
+  private postfx!: PostFX; // built in ctor once chaseCam's camera exists
   private readonly scene = new THREE.Scene();
   private hemi!: THREE.HemisphereLight;
   private sun!: THREE.DirectionalLight;
@@ -188,6 +190,10 @@ export class Game {
     this.renderer.toneMappingExposure = 1.12;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft deprecated in r185+
+    // info resets per render() call — the composer issues several per frame,
+    // so accumulate manually and reset once before the composer runs; the
+    // debug HUD + QA probes then see the FULL frame (scene + post quads).
+    this.renderer.info.autoReset = false;
     document.body.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(0x87b7e8);
@@ -391,6 +397,9 @@ export class Game {
     });
 
     this.chaseCam = new ChaseCamera(window.innerWidth / window.innerHeight);
+    // Post chain lives in PostFX (bloom/vignette/speed-CA) — render-side
+    // only. Needs the live chase camera, so it builds here (WS-POST).
+    this.postfx = new PostFX(this.renderer, this.scene, this.chaseCam.camera);
     this.hud = new DebugHud(this.renderer);
     // Apply persisted settings to live systems (loaded pre-buildWorld).
     this.audio.setMasterVolume(this.settings.masterVol);
@@ -404,6 +413,7 @@ export class Game {
     window.addEventListener('pointerdown', unlock, { once: false });
     window.addEventListener('resize', () => {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.postfx.setSize(window.innerWidth, window.innerHeight);
       this.chaseCam.resize(window.innerWidth / window.innerHeight);
     });
 
@@ -426,6 +436,7 @@ export class Game {
       },
       camera: this.chaseCam.camera,
       chaseCam: this.chaseCam,
+      postfx: this.postfx,
       audio: this.audio,
       sim: {
         fixedDt: SIM.fixedDt,
@@ -655,7 +666,14 @@ export class Game {
       this.race.phase !== 'title' && this.settings.minimap,
     );
     this.audio.update(this.kart, this.race, this.simTime, this.aiKarts);
-    this.renderer.render(this.scene, this.chaseCam.camera);
+    // Post chain: bloom + grade pass — speed factor drives the top-speed
+    // chromatic edge, reducedMotion keeps it fully disengaged (WS-POST).
+    this.renderer.info.reset(); // autoReset=false → one count for the whole frame
+    this.postfx.render(
+      frameDt,
+      this.kart.speed / KART.maxSpeed,
+      this.chaseCam.reducedMotion,
+    );
   }
 
   // Pairwise circle collision: separate overlap, exchange normal velocity

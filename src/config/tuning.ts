@@ -111,6 +111,38 @@ export const RACE = {
   countdown: 3.0, // seconds of input-locked 3-2-1 before GO
 } as const;
 
+// Post-processing (src/core/PostFX.ts) — render-side only, never touches
+// the fixed-dt sim. Chain: RenderPass → UnrealBloomPass (linear HDR) →
+// OutputPass (ACES tonemap + sRGB, reads renderer.toneMapping) → GradePass
+// (vignette + micro-grade + speed-gated chromatic edge, in display space).
+export const POSTFX = {
+  // Multisample the composer's HDR target — renderer.render() to canvas had
+  // antialias:true; without samples the pipeline loses that MSAA.
+  samples: 4,
+  bloom: {
+    // Luminosity high-pass gate on LINEAR pre-tonemap luminance: 1.0 keeps
+    // lit diffuse (checker ~0.7, sky ~0.5-0.7, dimmed clouds ~0.85) under
+    // the gate — only true HDR sources bloom: emissive pylons/rails/boxes/
+    // pads (intensity ≥2), additive sprite stacks, sun/moon disc.
+    threshold: 1.0,
+    strength: 0.32,
+    radius: 0.35,
+  },
+  grade: {
+    vignette: 0.3, // corner dimming depth (0 = off, 1 = black corners)
+    vignetteStart: 0.4, // radial start of falloff (0 center → ~1.41 corner)
+    saturation: 1.06, // gentle color lift — production grade, not a filter
+    contrast: 1.03,
+  },
+  speedFx: {
+    // Chromatic edge at top speed: ramps in past `start` fraction of
+    // KART.maxSpeed; uAberration is the max UV shift at screen corners.
+    start: 0.72,
+    aberration: 0.0045,
+    ease: 5, // per-second approach rate — smooth engage/disengage
+  },
+} as const;
+
 // AI drivers (src/game/AiDriver.ts) — pure-pursuit centerline following with
 // curvature-aware speed control and hold-to-drift on tight corners.
 export const AI = {

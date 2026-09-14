@@ -1,12 +1,35 @@
 # Gauntlet Operational State
 
-Last Updated: 2026-09-13
+Last Updated: 2026-09-14
 Coordinator: Devin Desktop (primary session)
-Current Wave: 2→3 transition
+Current Wave: 7 — meta-gauntlet (bounded sub-gauntlets per workstream)
 Project Phase: Execution
 Overall Status: EXECUTING
 
 ---
+
+## Meta-Gauntlet (wave 7) — active plan
+
+Assessed live: 75 fps / p95 14.9 ms baseline, 0 console errors, smoke
+baseline intact (PG 22.69/19.22/18.12 · 0 hits · stalled 0).
+Coordinator fix committed: title/menu legibility + 25 m prop-exclusion
+ring around the spawn orbit + checkered gantry banner (commit cfda739,
+evidence `wave7/fix-title-*.png`).
+
+Workstreams (serial sub-gauntlets, file-owned):
+1. WS-POST post-processing (bloom/vignette/speed-blur) — Game.ts render
+   path + new PostFX + tuning
+2. WS-DRESS set-dressing density per theme — Track.ts scenery
+3. WS-ANIM world animation (crowd/flags/signs/billboards/props) — Track.ts
+   animated registry + tick
+4. WS-MAT material richness (kart gloss, road specular, emissives) —
+   Kart.ts/Track.ts/Sky.ts materials
+5. WS-CHAR kart/character life (look-around, hit reactions, lean,
+   squash/stretch) — Kart.ts rig
+6. WS-AUDIO audio/music depth (ambience, jingles, per-track music) —
+   Audio.ts/Music.ts + Game.ts hooks
+Critic after every 1–2 integrated streams; final critic ≥8.5/10 or two
+consecutive clean passes to ship.
 
 ## Current Objective
 

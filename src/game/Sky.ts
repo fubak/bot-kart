@@ -120,15 +120,24 @@ export class Sky {
     const horizon = theme.skyHorizon !== undefined
       ? new THREE.Color(theme.skyHorizon)
       : sky.clone().lerp(new THREE.Color(0xffffff), 0.45);
-    u.topColor.value.copy(top);
-    u.horizonColor.value.copy(horizon);
+    // PostFX grade compensation (WS-POST): the dome shader writes linear
+    // color that now passes through ACES + sRGB (OutputPass) where it used
+    // to hit the canvas verbatim — un-compensated the sky reads pale/washed.
+    // Squaring each channel ≈ inverts sRGB-encode for midtones while keeping
+    // the authored hue; sun disc/stars are left untouched (they're meant to
+    // ride over the bloom gate).
+    u.topColor.value.copy(top.multiply(top));
+    u.horizonColor.value.copy(horizon.multiply(horizon));
     u.sunDir.value.set(...(theme.sunPos ?? [60, 90, 40])).normalize();
     u.sunColor.value.set(theme.sunColor ?? 0xfff3dd);
     u.sunSize.value = night ? 0.9985 : 0.9993; // moon reads slightly bigger
     u.sunGlow.value = night ? 0.5 : 0.35;
     u.stars.value = theme.stars ?? (night ? 1 : 0);
 
-    const cloudTint = new THREE.Color(theme.cloud ?? 0xffffff);
+    // Clouds sit just under the bloom threshold (POSTFX.bloom.threshold ≈
+    // linear 1.0): 0.85 keeps them reading white without blooming into a
+    // sky-wide haze veil over day tracks (WS-POST).
+    const cloudTint = new THREE.Color(theme.cloud ?? 0xffffff).multiplyScalar(0.85);
     for (const c of this.clouds) {
       (c.sprite.material as THREE.SpriteMaterial).color.copy(cloudTint);
     }
@@ -138,7 +147,10 @@ export class Sky {
     // vanish); nearer = darker, farther = closer to the horizon color.
     this.mountains.clear();
     const rng = (() => { let s = 777; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff); })();
+    // Same grade compensation as the dome (squared — was raw, now graded);
+    // `horizon` is already compensated so the far ring blends to the dome.
     const base = new THREE.Color(theme.mountain ?? 0x3a5848);
+    base.multiply(base);
     for (const [count, rMin, rMax, hMin, hMax, fade] of [
       [16, 250, 310, 22, 55, 0.18],
       [12, 340, 410, 40, 85, 0.5],

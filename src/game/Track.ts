@@ -628,7 +628,12 @@ export class Track {
     // painted lip, ties the circuit into the classic kart-racer look.
     const railMat = new THREE.MeshStandardMaterial({
       color: this.theme.night ? 0x35f0c8 : 0xe04a3a,
-      emissive: this.theme.night ? 0x18b89a : 0x481410,
+      // Night rail is the circuit's light line: pushed over the bloom gate
+      // (~linear 1.0) so it glows on NEON NIGHT; the day rail stays matte.
+      // 1.9 not higher — the rail is a continuous ribbon and big bloom
+      // energy over a huge screen area reads as a glowing river (WS-POST).
+      emissive: this.theme.night ? 0x28e8c0 : 0x481410,
+      emissiveIntensity: this.theme.night ? 1.9 : 1.0,
       side: THREE.DoubleSide,
     });
     for (const side of [1, -1]) {
@@ -847,7 +852,10 @@ export class Track {
     const chevPostGeo = new THREE.BoxGeometry(0.12, TRACK.wallHeight + 1.0, 0.12);
     const arrowMat = new THREE.MeshStandardMaterial({
       color: 0xffc23c,
-      emissive: 0xc07818,
+      // Chevron boards glow at night (over the bloom gate); on day tracks
+      // they keep the old flat amber — no bloom, no wash.
+      emissive: this.theme.night ? 0xffa028 : 0xc07818,
+      emissiveIntensity: this.theme.night ? 2.2 : 1.0,
       side: THREE.DoubleSide,
     });
     const arrowGeo = new THREE.PlaneGeometry(1.1, 0.5);
@@ -1059,7 +1067,9 @@ export class Track {
           new THREE.MeshStandardMaterial({
             color: 0x101418,
             emissive: e,
-            emissiveIntensity: 1.6,
+            // 2.0 pushes the pylon emissive over the bloom gate so the
+            // posts read as neon tubes, not just bright sticks.
+            emissiveIntensity: 2.0,
             roughness: 0.4,
           }),
       );
