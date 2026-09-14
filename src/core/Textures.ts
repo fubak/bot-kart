@@ -24,7 +24,7 @@ function load(url: string, repeat?: number): THREE.Texture {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.repeat.set(repeat, repeat);
   }
-  t.anisotropy = 4;
+  t.anisotropy = 8; // sharper oblique views — softens distant tiling moiré
   return t;
 }
 
@@ -55,7 +55,7 @@ export function checkerTexture(cells = 12): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 4;
+  t.anisotropy = 8; // sharper oblique views — softens distant tiling moiré
   return t;
 }
 

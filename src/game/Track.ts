@@ -826,7 +826,10 @@ export class Track {
       roughness: 0.6,
       side: THREE.DoubleSide,
     });
-    const chevGeo = new THREE.PlaneGeometry(1.6, 0.9);
+    // Thin box, not a bare plane — a plane reads as a floating shard
+    // edge-on (critic8). The post grounds the board on the wall top.
+    const chevGeo = new THREE.BoxGeometry(1.6, 0.9, 0.08);
+    const chevPostGeo = new THREE.BoxGeometry(0.12, TRACK.wallHeight + 1.0, 0.12);
     const arrowMat = new THREE.MeshStandardMaterial({
       color: 0xffc23c,
       emissive: 0xc07818,
@@ -854,13 +857,19 @@ export class Track {
           .setY(s.point.y + TRACK.wallHeight + 0.75);
         // Face the approaching driver — normal points back along tangent.
         board.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z);
+        board.castShadow = true;
+        const post = new THREE.Mesh(chevPostGeo, chevMat);
+        post.position.copy(board.position).setY(
+          s.point.y + (TRACK.wallHeight + 1.0) / 2 - 0.1,
+        );
+        post.rotation.y = board.rotation.y;
         arrow.position.copy(board.position);
         arrow.rotation.y = board.rotation.y;
-        arrow.position.addScaledVector(s.tangent, -0.06); // in front of the board face
+        arrow.position.addScaledVector(s.tangent, -0.1); // in front of the board face
         // Chevron arrow: shear/tilt to point the turn direction.
         arrow.rotation.z = rightTurn ? -0.5 : 0.5;
         arrow.scale.x = rightTurn ? -1 : 1;
-        this.group.add(board, arrow);
+        this.group.add(board, arrow, post);
       }
       i += 60; // space boards out — skip past this corner
     }
@@ -994,7 +1003,8 @@ export class Track {
     // Anchor: well outside the left wall at the start line — a backdrop
     // landmark, not a roadside object (was hw+9 and loomed over the track).
     const anchor = s0.point.clone().addScaledVector(s0.left, hw + 20);
-    g.position.set(anchor.x, s0.point.y, anchor.z);
+    // Flat field height (y=0) — same float-on-elevation fix as billboards.
+    g.position.set(anchor.x, 0, anchor.z);
     g.rotation.y = Math.atan2(s0.left.x, s0.left.z) + Math.PI / 2;
     // Face the crowd toward the track.
     g.rotateY(Math.PI);
@@ -1032,7 +1042,9 @@ export class Track {
       back.rotation.y = Math.PI;
       g.add(back);
       const pos = s.point.clone().addScaledVector(s.left, side * (hw() + 7));
-      g.position.set(pos.x, s.point.y, pos.z);
+      // Sit on the flat field (y=0 beyond the skirt), not road height —
+      // on elevated sections the old s.point.y floated the post (critic8).
+      g.position.set(pos.x, 0, pos.z);
       // Face back along the travel direction so drivers see it on approach.
       g.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z) + (side > 0 ? 0.35 : -0.35);
       this.group.add(g);

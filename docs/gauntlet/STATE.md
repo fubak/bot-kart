@@ -98,6 +98,16 @@ None.
   (0 wall hits, stalled 0 ×3); 68.3 fps / p95 15.2 ms @ ~600–790
   draws / ~100k tris; build clean (game 92 kB + three vendor 612 kB,
   textures as cached assets). Evidence: `evidence/wave6/`.
+- Wave-6 critic8 (visual review): 7/10 —
+  `evidence/wave6/CRITIC8_REPORT.md` (60 shots). Skies, particles,
+  items, GP, records, 0 console errors all held. Fixed: D1 billboard
+  black-monolith backs (mirrored poster planes), D2/D3 title orbit
+  gantry clip + SR rock burial (r 8.5→5.2 inside the gantry footprint,
+  look +1.3 drops kart below menu text), D4 scatter through grandstand
+  (16 m exclusion), D5 AI wall-creep stragglers — escape required only
+  displacement so grinders looped forever; now requires !onWall plus a
+  grind detector (onWall && speed<8, 4 s → ladder). Smoke identical,
+  stalled 0.
 - Wave-4 critic5 (lap-records playtest): 6/10 —
   `evidence/wave4/CRITIC5_REPORT.md`. Records verified end-to-end
   (per-track persist, toast timing, no-overwrite, AI can't set).

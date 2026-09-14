@@ -318,3 +318,10 @@ ladder's displacement escape while still clamped; escape now requires
 !onWall, plus a new grind detector (onWall && speed<8 for 4 s) arms
 the ladder at the forward rung. 3-track smoke identical baselines,
 stalled 0.
+
+**Critic8 LOW batch (this commit):** chevron boards were bare planes
+(floating shards edge-on, amber rectangles at night) → thin boxes on
+grounding posts; billboards + grandstand used road height → float on
+elevated sections, now grounded at field level (y=0); texture
+anisotropy 4→8 for oblique-view tiling. Verified live
+(`fix8-low-*.png`).
