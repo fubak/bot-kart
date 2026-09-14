@@ -13,6 +13,10 @@ export interface TrackLayout {
   readonly name: string;
   readonly points: ReadonlyArray<readonly [number, number, number]>;
   readonly gravel: ReadonlyArray<{ i0: number; i1: number; side: -1 | 1 }>;
+  /** Signature prop set — the visual landmark vocabulary that makes each
+   *  circuit feel authored, not re-skinned: flower meadows (pastoral),
+   *  rock outcrops (ridge), neon pylons (neon). */
+  readonly signature?: 'pastoral' | 'ridge' | 'neon';
   /** Palette overrides — gives each circuit its own visual identity. */
   readonly theme?: {
     sky: number;    // scene background + fog
@@ -72,6 +76,7 @@ export const TRACKS: readonly TrackLayout[] = [
       // Left-hander at ~0.36 (crest area): inside cut on the left edge.
       { i0: 0.352, i1: 0.382, side: 1 },
     ],
+    signature: 'pastoral',
   },
   {
     name: 'SWITCHBACK RIDGE',
@@ -104,6 +109,7 @@ export const TRACKS: readonly TrackLayout[] = [
       // inside is the left edge (+1).
       { i0: 0.68, i1: 0.73, side: 1 },
     ],
+    signature: 'ridge',
     // Golden-hour palette — dry ridge country vs Proving Grounds' blue day.
     theme: {
       sky: 0xe8b490,
@@ -155,6 +161,7 @@ export const TRACKS: readonly TrackLayout[] = [
       // Dive-to-hairpin complex (~0.72-0.78, +0.25 rad) — inside cut left.
       { i0: 0.7, i1: 0.8, side: 1 },
     ],
+    signature: 'neon',
     // Night palette: navy sky, dim grass, dark pines, cool moonlight.
     theme: {
       sky: 0x141c30,
@@ -193,10 +200,12 @@ export class Track {
   private readonly curve: THREE.CatmullRomCurve3;
   private readonly samples: Sample[] = [];
   private readonly gravelZones: TrackLayout['gravel'];
+  private readonly signature: TrackLayout['signature'];
 
   constructor(layout: TrackLayout = TRACKS[0]) {
     this.name = layout.name;
     this.gravelZones = layout.gravel;
+    this.signature = layout.signature;
     this.theme = layout.theme ?? {
       sky: 0x87b7e8,
       grass: 0x3e8a4e,
@@ -952,6 +961,108 @@ export class Track {
     this.buildBillboards();
     this.buildFlags(s0, hw);
     this.buildBalloons();
+    this.buildSignatureProps(hw, rand);
+  }
+
+  /** Per-circuit signature props — the authored landmark vocabulary. */
+  private buildSignatureProps(hw: number, rand: () => number): void {
+    const n = this.samples.length;
+    const m = new THREE.Matrix4();
+    const up = new THREE.Vector3(0, 1, 0);
+    const groundY = (s: Sample, dist: number) => {
+      const t = THREE.MathUtils.clamp((dist - hw) / 6, 0, 1);
+      return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35;
+    };
+    if (this.signature === 'pastoral') {
+      // Flower meadows: instanced low blossoms scattered on the infield —
+      // bright confetti dots that make PG read as a friendly garden circuit.
+      const geo = new THREE.IcosahedronGeometry(0.16, 0);
+      const mat = new THREE.MeshStandardMaterial({ flatShading: true });
+      const COUNT = 220;
+      const flowers = new THREE.InstancedMesh(geo, mat, COUNT);
+      const palette = [0xffe14a, 0xff7ab0, 0xfaf6ea, 0xff9a3c, 0xc86ef0];
+      for (let c = 0; c < COUNT; c++) {
+        const s = this.samples[Math.floor(rand() * n)];
+        const side = rand() < 0.5 ? 1 : -1;
+        const dist = hw + 1.5 + rand() * 22;
+        const p = s.point.clone().addScaledVector(s.left, side * dist);
+        const sc = 0.6 + rand() * 1.0;
+        m.compose(
+          p.setY(groundY(s, dist) + 0.18 * sc),
+          new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
+          new THREE.Vector3(sc, sc * 0.7, sc),
+        );
+        flowers.setMatrixAt(c, m);
+        flowers.setColorAt(
+          c,
+          new THREE.Color(palette[Math.floor(rand() * palette.length)]),
+        );
+      }
+      this.group.add(flowers);
+    } else if (this.signature === 'ridge') {
+      // Ridge outcrops: big clustered rock formations on corner outsides —
+      // sells the dry-ridge scale the small scatter rocks can't.
+      const geo = new THREE.DodecahedronGeometry(1.4, 0);
+      const mat = new THREE.MeshStandardMaterial({
+        color: this.theme.rock,
+        flatShading: true,
+      });
+      const COUNT = 26;
+      const outcrops = new THREE.InstancedMesh(geo, mat, COUNT);
+      for (let c = 0; c < COUNT; c++) {
+        const s = this.samples[Math.floor(rand() * n)];
+        const side = rand() < 0.5 ? 1 : -1;
+        const dist = hw + 5 + rand() * 20;
+        const p = s.point.clone().addScaledVector(s.left, side * dist);
+        const sc = 1.6 + rand() * 2.8;
+        m.compose(
+          p.setY(groundY(s, dist) + 0.5 * sc),
+          new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
+          new THREE.Vector3(sc, sc * (0.6 + rand() * 0.5), sc),
+        );
+        outcrops.setMatrixAt(c, m);
+      }
+      outcrops.castShadow = true;
+      this.group.add(outcrops);
+    } else if (this.signature === 'neon') {
+      // Neon pylons: emissive glow pillars alternating cyan/magenta along
+      // the wall — the circuit's light rails at night. Two instanced
+      // meshes because instanceColor can't tint emissive.
+      const geo = new THREE.CylinderGeometry(0.14, 0.18, 2.4, 8);
+      const mats = [0x36f0ff, 0xff4ad8].map(
+        (e) =>
+          new THREE.MeshStandardMaterial({
+            color: 0x101418,
+            emissive: e,
+            emissiveIntensity: 1.6,
+            roughness: 0.4,
+          }),
+      );
+      const HALF = 32;
+      const pylons = mats.map(
+        (mm) => new THREE.InstancedMesh(geo, mm, HALF),
+      );
+      const counts = [0, 0];
+      let ord = 0;
+      for (let i = 0; i < n; i += Math.floor(n / HALF), ord++) {
+        const s = this.samples[i];
+        for (const side of [1, -1]) {
+          // Alternating run on each edge, opposite phase per side —
+          // reads as paired light rails sweeping the circuit.
+          const which = (ord + (side < 0 ? 1 : 0)) % 2;
+          if (counts[which] >= HALF) continue;
+          const p = s.point.clone().addScaledVector(s.left, side * (hw + 1.1));
+          m.compose(
+            p.setY(s.point.y + 1.2),
+            new THREE.Quaternion(),
+            new THREE.Vector3(1, 1, 1),
+          );
+          pylons[which].setMatrixAt(counts[which]++, m);
+        }
+      }
+      pylons.forEach((pl, k) => (pl.count = counts[k]));
+      this.group.add(...pylons);
+    }
   }
 
   // ---------- production scenery (wave 6) ----------
