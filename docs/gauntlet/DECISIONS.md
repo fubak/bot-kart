@@ -134,3 +134,28 @@ Only long-lived decisions belong here — not implementation trivia.
 - **Consequences:** Single-slot model keeps the UI flat (six rows,
   no chord editor); alternates can't be removed (deliberate — a
   keyboard can always drive); gamepad bindings remain a later unit.
+
+## ADR-012: Visual stack is shared systems + generated textures, not per-object bespoke
+
+- **Date:** 2026-09-14
+- **Status:** Accepted
+- **Decided by:** Coordinator Devin
+- **Context:** The wave-6 "Mario Kart grade" pass needed sky, particles,
+  textured surfaces, and production scenery without exploding draw
+  calls or coupling visuals to gameplay code.
+- **Decision:** Three shared systems own the look: `Sky` (one
+  gradient-dome shader + cloud sprites + silhouette mountains,
+  re-themed per track via `applyTheme`), `Fx` (two instanced billboard
+  pools — additive sparks + luminance-alpha smoke — every emitter in
+  the game funnels through it, replacing per-kart particle objects),
+  and `Textures` (one loader with procedural fallbacks — a missing
+  generated file degrades to a checker/glow, never crashes). Track
+  theme objects carry all sky/light/fog palette fields so new tracks
+  get full art direction from data alone. Generated images ship as
+  external cached PNGs (no bundle bloat) after ffmpeg processing to
+  power-of-two runtime sizes.
+- **Consequences:** Two extra draw calls cover ALL particles; theme
+  swaps are recolor-only (no rebuild); luminance-as-alpha was required
+  for white-on-black sprites (source alpha is opaque); shadow-mapped
+  sun follows only the player (rivals off-box lose shadows — accepted
+  budget trade at 68 fps / ~600 draws).
