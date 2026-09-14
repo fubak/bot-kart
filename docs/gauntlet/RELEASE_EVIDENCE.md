@@ -269,3 +269,17 @@ respawns — harness limitation, human gets the STUCK hint). Perf
 Console 0 errors/0 warnings. Build: vendor split lands —
 `three-*.js` 609 kB (154.6 kB gzip) + `index-*.js` 74 kB (25.5 kB
 gzip), no chunk warnings (commit f593a78).
+
+**Critic6 (6/10) fix batch (this commit):** 6/7 critic5 fixes
+re-verified clean (D2 ★REC scoping, D3 record validation incl.
+numeric-string/0 shapes, D4 displacement hint at phantom 1.8 m/s,
+D5 M persist, D6 no overlay stack, D7 unbound hints). Two defects
+fixed: D1 residual — the ladder's reverse-exit reset stuckTime into
+a limit cycle (nose-in pins froze 65-150 s); now an anchor-based
+wedge state with wall-clock timing — escape clears only on >2.5 m
+real displacement, guaranteed respawn at 6 s (both live nose-in
+tests escaped ~2 s). D8 NEW — swap teleports desynced
+RacerProgress: added resync() re-anchoring lastIdx/progressIdx/
+gates to the landing position (verified: progressIdx 45→501, score
+followed, no wrongWay flap). SR smoke identical + stall probe
+stalled:0.
