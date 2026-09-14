@@ -27,10 +27,25 @@ function gauntletState(): Plugin {
 export default defineConfig({
   plugins: [gauntletState()],
   build: {
+    // three.js minifies to ~610 kB and can't shrink via chunking — the
+    // vendor split above is the actual mitigation; the limit just stops
+    // the advisory from crying wolf on every build.
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       input: {
         main: resolve(rootDir, 'index.html'),
         gauntlet: resolve(rootDir, '__gauntlet/index.html'),
+      },
+    },
+    rolldownOptions: {
+      output: {
+        // Split three.js into its own vendor chunk — it dwarfs the game
+        // code (~600 kB of the ~680 kB bundle) and changes far less
+        // often, so separate chunks cache better and drop the main
+        // chunk under the size warning.
+        advancedChunks: {
+          groups: [{ name: 'three', test: /node_modules[\\/]three/ }],
+        },
       },
     },
   },
