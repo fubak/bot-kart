@@ -111,6 +111,45 @@ export const RACE = {
   countdown: 3.0, // seconds of input-locked 3-2-1 before GO
 } as const;
 
+// Set dressing (src/game/Props.ts, driven from Track.ts) — per-theme scatter
+// density and the lateral band props live in. Everything is instanced;
+// counts below are per-track instance targets, tuned to ~2-3× the wave-6
+// prop density while keeping net draw calls in single digits per theme.
+export const SCENERY = {
+  // Lateral band from centerline: [bandMin, bandMax] on both sides of the
+  // road, plus infield clusters inside the loop. `margin` is the minimum
+  // clearance past the drivable edge on the NEAREST leg (includes gravel
+  // aprons) — folded layouts put parallel legs inside the band, so every
+  // candidate is re-tested against the whole centerline, not just its
+  // source sample.
+  bandMin: TRACK.roadHalfWidth + 1.5,
+  bandMax: TRACK.roadHalfWidth + 45,
+  margin: 1.5,
+
+  pastoral: {
+    tallFlowers: 150,  // stem + blossom pairs, meadow depth
+    bushes: 120,       // rounded shrubs, infield-weighted
+    hayBales: 44,
+    orchardTrees: 46,  // round-canopy second species vs the pines
+    fenceRuns: 5,      // wooden fence stretches, posts + 2 rails
+    fenceLenMin: 40,   // run length range in centerline samples (~0.55 m each)
+    fenceLenMax: 85,
+  },
+  ridge: {
+    strataSlabs: 96,   // tilted layered rock plates
+    cairns: 34,        // 3-stone stacked trail markers
+    scrub: 150,        // dry tuft cones
+    snags: 30,         // dead trunk spikes
+  },
+  neon: {
+    gates: 4,          // emissive bars spanning the road on straights
+    signs: 18,         // glow boards on posts (two emissive colors)
+    holoColumns: 40,   // thin light strips, infield-weighted
+    crates: 56,        // dark tech boxes, some stacked
+    studs: 120,        // low runway-style light studs
+  },
+} as const;
+
 // Post-processing (src/core/PostFX.ts) — render-side only, never touches
 // the fixed-dt sim. Chain: RenderPass → UnrealBloomPass (linear HDR) →
 // OutputPass (ACES tonemap + sRGB, reads renderer.toneMapping) → GradePass

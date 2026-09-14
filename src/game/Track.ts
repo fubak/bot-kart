@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import { TRACK } from '../config/tuning';
 import { TEX, checkerTexture } from '../core/Textures';
+import {
+  AnimatedProp,
+  ScatterCtx,
+  dressNeon,
+  dressPastoral,
+  dressRidge,
+} from './Props';
 
 // Test track: a closed Catmull-Rom circuit ("Proving Grounds").
 // Provides the road/barrier meshes plus a sampled centerline lookup used for
@@ -202,9 +209,12 @@ export class Track {
   private readonly gravelZones: TrackLayout['gravel'];
   private readonly signature: TrackLayout['signature'];
   // Exclusion anchors for prop scatter: the grandstand footprint and the
-  // title-camera orbit ring around the player spawn.
+  // title-camera orbit ring around the player spawn. `avoidPts` collects
+  // authored-prop footprints (billboards, arches, gate posts) so scattered
+  // props never stab through a set piece.
   private readonly standPt = new THREE.Vector3();
   private readonly spawnPt = new THREE.Vector3();
+  private readonly avoidPts: { p: THREE.Vector3; r: number }[] = [];
 
   constructor(layout: TrackLayout = TRACKS[0]) {
     this.name = layout.name;
@@ -304,7 +314,12 @@ export class Track {
   query(
     pos: THREE.Vector3,
     hint?: number,
-  ): { lateral: number; tangent: THREE.Vector3; index: number } {
+  ): {
+    lateral: number;
+    tangent: THREE.Vector3;
+    index: number;
+    surface: 'road' | 'gravel';
+  } {
     const i =
       hint === undefined
         ? this.nearestIndex(pos)
@@ -323,7 +338,11 @@ export class Track {
     }
     const s = this.samples[bestI];
     const rel = pos.clone().sub(s.point);
-    return { lateral: rel.dot(s.left), tangent: s.tangent, index: bestI };
+    const lateral = rel.dot(s.left);
+    const z = this.zoneAt(bestI);
+    const surface: 'road' | 'gravel' =
+      z && lateral * z.side > TRACK.roadHalfWidth - 0.5 ? 'gravel' : 'road';
+    return { lateral, tangent: s.tangent, index: bestI, surface };
   }
 
   /** Gravel zone containing a sample index, or null. `margin` shrinks the
@@ -907,19 +926,37 @@ export class Track {
     const treeCount = 110;
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.3, 1.6, 6);
     const canopyGeo = new THREE.ConeGeometry(1.5, 3.2, 7);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: this.theme.trunk, flatShading: true });
-    const canopyMat = new THREE.MeshStandardMaterial({ color: this.theme.canopy, flatShading: true });
+    // Ridge golden hour: the low sun + dark-olive hemisphere bounce left
+    // prop backfaces near-black, reading as sky blobs at driver height.
+    // A low emissive floor in the prop's own color keeps the shadow side
+    // material-colored (way under the ~1.0 linear bloom gate). Ridge only —
+    // PG's high day sun and NN's emissive night don't need the lift.
+    const ridgeLift = this.signature === 'ridge';
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: this.theme.trunk,
+      flatShading: true,
+      emissive: ridgeLift ? this.theme.trunk : 0x000000,
+      emissiveIntensity: ridgeLift ? 0.4 : 0,
+    });
+    const canopyMat = new THREE.MeshStandardMaterial({
+      // instanceColor multiplies the base color — on ridge the base goes
+      // near-white so the per-tree canopy tint reads as true canopy green
+      // instead of canopy² (compounded the dark-blob problem).
+      color: ridgeLift ? 0xf2f6ec : this.theme.canopy,
+      flatShading: true,
+      emissive: ridgeLift ? this.theme.canopy : 0x000000,
+      emissiveIntensity: ridgeLift ? 0.32 : 0,
+    });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
     const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, treeCount);
     const rockGeo = new THREE.DodecahedronGeometry(0.9, 0);
-    const rockMat = new THREE.MeshStandardMaterial({ color: this.theme.rock, flatShading: true });
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: this.theme.rock,
+      flatShading: true,
+      emissive: ridgeLift ? this.theme.rock : 0x000000,
+      emissiveIntensity: ridgeLift ? 0.45 : 0,
+    });
     const rocks = new THREE.InstancedMesh(rockGeo, rockMat, 40);
-    // Ground height for props beside the road: inside the skirt zone
-    // (hw..hw+6) the terrain slopes from road height down to -0.35.
-    const groundY = (s: Sample, dist: number) => {
-      const t = THREE.MathUtils.clamp((dist - hw) / 6, 0, 1);
-      return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35; // base sits ON skirt
-    };
     // Grandstand footprint exclusion — the stand anchors at hw+20 left
     // of s0 with a ~22×10 m body; scattered pines/rocks must not stab
     // through it (critic8: trees clipped through the crowd tiers).
@@ -937,8 +974,14 @@ export class Track {
       const side = rand() < 0.5 ? 1 : -1;
       const dist = hw + 3 + rand() * 30;
       const p = s.point.clone().addScaledVector(s.left, side * dist);
-      if (nearStand(p) || this.nearStart(p)) continue;
-      const gy = groundY(s, dist);
+      // roadClearance re-tests against the NEAREST leg — folded layouts put
+      // parallel legs inside the scatter band (and gravel aprons widen the
+      // drivable edge on zone sides).
+      if (nearStand(p) || this.nearStart(p) || this.roadClearance(p) < 1.4)
+        continue;
+      // fieldY measures the leg actually under the prop — on folded
+      // sections the source sample isn't always the nearest (float fix).
+      const gy = this.fieldY(p);
       const sc = 0.8 + rand() * 0.9;
       const rot = new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2);
       m.compose(p.clone().setY(gy + 0.8 * sc), rot, new THREE.Vector3(sc, sc, sc));
@@ -951,28 +994,38 @@ export class Track {
       canopies.setColorAt(placed, tint);
       placed++;
     }
+    let rocksPlaced = 0;
     for (let c = 0; c < 40; c++) {
       let s = this.samples[0];
       let dist = 0;
       const p = new THREE.Vector3();
-      for (let retry = 0; retry < 8; retry++) {
+      let ok = false;
+      for (let retry = 0; retry < 8 && !ok; retry++) {
         s = this.samples[Math.floor(rand() * n)];
         const side = rand() < 0.5 ? 1 : -1;
         dist = hw + 4 + rand() * 24;
         p.copy(s.point).addScaledVector(s.left, side * dist);
-        if (!nearStand(p) && !this.nearStart(p)) break;
+        ok =
+          !nearStand(p) &&
+          !this.nearStart(p) &&
+          this.roadClearance(p) >= 1.4;
       }
+      if (!ok) continue; // all retries landed on a leg/exclusion — skip it
       const sc = 0.5 + rand() * 1.1;
       m.compose(
-        p.setY(groundY(s, dist) + 0.4 * sc),
+        p.setY(this.fieldY(p) + 0.4 * sc),
         new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
         new THREE.Vector3(sc, sc * 0.7, sc),
       );
-      rocks.setMatrixAt(c, m);
+      rocks.setMatrixAt(rocksPlaced++, m);
     }
+    rocks.count = rocksPlaced;
     trunks.castShadow = true;
     canopies.castShadow = true;
     rocks.castShadow = true;
+    trunks.userData.dress = 'trunks';
+    canopies.userData.dress = 'canopies';
+    rocks.userData.dress = 'rocks';
     this.group.add(trunks, canopies, rocks);
 
     this.buildGrandstand(s0, hw);
@@ -980,6 +1033,7 @@ export class Track {
     this.buildFlags(s0, hw);
     this.buildBalloons();
     this.buildSignatureProps(hw, rand);
+    this.buildDressing(hw, rand);
   }
 
   /** Prop-vs-camera clearance tests. nearStand keeps scatter out of the
@@ -995,15 +1049,122 @@ export class Track {
     return dx * dx + dz * dz < 25 * 25;
   }
 
+  /**
+   * Clearance (m) of p past the drivable edge on the NEAREST centerline leg
+   * — positive means off the road/wall/gravel. Folded layouts put parallel
+   * legs inside the scatter band, and gravel aprons widen the drivable edge
+   * on zone sides, so every scatter candidate is re-tested here against the
+   * whole track rather than trusting its source-sample lateral.
+   */
+  private roadClearance(p: THREE.Vector3): number {
+    const i = this.nearestIndex(p);
+    const { lateral } = this.query(p, i);
+    const z = this.zoneAt(i);
+    const edge =
+      z && Math.sign(lateral) === z.side
+        ? TRACK.roadHalfWidth + TRACK.gravelWidth + 0.9 // gravel apron + berm
+        : TRACK.roadHalfWidth;
+    return Math.abs(lateral) - edge;
+  }
+
+  /** Terrain height under a world point: skirt lerp measured from the leg
+   *  actually beneath the prop — folded legs at different elevations made
+   *  source-sample heights float props (critic8 D9 floated boards). */
+  private fieldY(p: THREE.Vector3): number {
+    const i = this.nearestIndex(p);
+    const { lateral } = this.query(p, i);
+    const s = this.samples[i];
+    const t = THREE.MathUtils.clamp(
+      (Math.abs(lateral) - TRACK.roadHalfWidth) / 6,
+      0,
+      1,
+    );
+    return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35;
+  }
+
+  /** Straightest sample index within frac range [f0,f1] passing `ok` —
+   *  sites road-spanning set pieces (stone arch, neon gates) on real
+   *  straights. Returns -1 when no candidate passes. */
+  private straightSpot(
+    f0: number,
+    f1: number,
+    ok?: (i: number) => boolean,
+  ): number {
+    const n = this.samples.length;
+    let best = -1;
+    let bestScore = -1;
+    for (let i = Math.floor(f0 * n); i < Math.floor(f1 * n); i++) {
+      const s = this.samples[i];
+      if (this.nearStart(s.point) || this.nearStand(s.point)) continue;
+      if (ok && !ok(i)) continue;
+      const score = Math.abs(
+        s.tangent.dot(this.samples[(i + 16) % n].tangent),
+      );
+      if (score > bestScore) {
+        bestScore = score;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * WS-DRESS density pass: per-theme second prop vocabulary (pastoral
+   * meadows+fences, ridge strata+cairns+arch, neon gates+signs+columns).
+   * All scatter flows through Props.scatter which re-tests every candidate
+   * against the nearest leg's drivable edge plus the exclusion anchors.
+   */
+  private buildDressing(hw: number, rand: () => number): void {
+    const n = this.samples.length;
+    // Loop centroid — which lateral side faces the infield, per sample.
+    const centroid = new THREE.Vector3();
+    for (const s of this.samples) centroid.add(s.point);
+    centroid.multiplyScalar(1 / n);
+    const ctx: ScatterCtx = {
+      samples: this.samples,
+      hw,
+      rand,
+      canopy: this.theme.canopy,
+      rock: this.theme.rock,
+      night: !!this.theme.night,
+      roadClearance: (p) => this.roadClearance(p),
+      excluded: (p) => {
+        if (this.nearStart(p) || this.nearStand(p)) return true;
+        for (const a of this.avoidPts) {
+          const dx = p.x - a.p.x, dz = p.z - a.p.z;
+          if (dx * dx + dz * dz < a.r * a.r) return true;
+        }
+        return false;
+      },
+      avoid: (p, r) => this.avoidPts.push({ p: p.clone(), r }),
+      fieldY: (p) => this.fieldY(p),
+      innerSide: (s) =>
+        s.left.x * (centroid.x - s.point.x) +
+          s.left.z * (centroid.z - s.point.z) >=
+        0
+          ? 1
+          : -1,
+      straightSpot: (f0, f1, ok) => this.straightSpot(f0, f1, ok),
+    };
+    const dressed =
+      this.signature === 'pastoral'
+        ? dressPastoral(ctx)
+        : this.signature === 'ridge'
+          ? dressRidge(ctx)
+          : this.signature === 'neon'
+            ? dressNeon(ctx)
+            : { objects: [], animated: [] };
+    this.group.add(...dressed.objects);
+    this.animated.push(...dressed.animated);
+  }
+
   /** Per-circuit signature props — the authored landmark vocabulary. */
   private buildSignatureProps(hw: number, rand: () => number): void {
     const n = this.samples.length;
     const m = new THREE.Matrix4();
     const up = new THREE.Vector3(0, 1, 0);
-    const groundY = (s: Sample, dist: number) => {
-      const t = THREE.MathUtils.clamp((dist - hw) / 6, 0, 1);
-      return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35;
-    };
+    // fieldY resolves the leg actually under each prop — correct on folded
+    // sections where the source sample isn't the nearest.
     if (this.signature === 'pastoral') {
       // Flower meadows: instanced low blossoms scattered on the infield —
       // bright confetti dots that make PG read as a friendly garden circuit.
@@ -1012,49 +1173,77 @@ export class Track {
       const COUNT = 220;
       const flowers = new THREE.InstancedMesh(geo, mat, COUNT);
       const palette = [0xffe14a, 0xff7ab0, 0xfaf6ea, 0xff9a3c, 0xc86ef0];
+      let placed = 0;
       for (let c = 0; c < COUNT; c++) {
         const s = this.samples[Math.floor(rand() * n)];
         const side = rand() < 0.5 ? 1 : -1;
         const dist = hw + 1.5 + rand() * 22;
         const p = s.point.clone().addScaledVector(s.left, side * dist);
-        if (this.nearStand(p) || this.nearStart(p)) continue;
+        if (
+          this.nearStand(p) ||
+          this.nearStart(p) ||
+          this.roadClearance(p) < 1.0
+        )
+          continue;
         const sc = 0.6 + rand() * 1.0;
         m.compose(
-          p.setY(groundY(s, dist) + 0.18 * sc),
+          p.setY(this.fieldY(p) + 0.18 * sc),
           new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
           new THREE.Vector3(sc, sc * 0.7, sc),
         );
-        flowers.setMatrixAt(c, m);
+        flowers.setMatrixAt(placed, m);
         flowers.setColorAt(
-          c,
+          placed,
           new THREE.Color(palette[Math.floor(rand() * palette.length)]),
         );
+        placed++;
       }
+      flowers.count = placed;
       this.group.add(flowers);
     } else if (this.signature === 'ridge') {
       // Ridge outcrops: big clustered rock formations on corner outsides —
-      // sells the dry-ridge scale the small scatter rocks can't.
+      // sells the dry-ridge scale the small scatter rocks can't. Band ≥hw+12
+      // with a 12 m clearance margin: on plateau sections they sit on the
+      // valley floor below the road instead of towering into the driver
+      // frame as near-black masses (wave-7 reject). Emissive floor lifts
+      // the sun-away faces to rock-brown in the low golden-hour light.
       const geo = new THREE.DodecahedronGeometry(1.4, 0);
       const mat = new THREE.MeshStandardMaterial({
-        color: this.theme.rock,
+        color: new THREE.Color(this.theme.rock).lerp(
+          new THREE.Color(0xffffff),
+          0.12,
+        ),
+        emissive: this.theme.rock,
+        emissiveIntensity: 0.45,
         flatShading: true,
       });
       const COUNT = 26;
       const outcrops = new THREE.InstancedMesh(geo, mat, COUNT);
-      for (let c = 0; c < COUNT; c++) {
+      let placed = 0;
+      let guard = 0;
+      while (placed < COUNT && guard++ < COUNT * 10) {
         const s = this.samples[Math.floor(rand() * n)];
         const side = rand() < 0.5 ? 1 : -1;
-        const dist = hw + 5 + rand() * 20;
+        const dist = hw + 12 + rand() * 16;
         const p = s.point.clone().addScaledVector(s.left, side * dist);
-        if (this.nearStand(p) || this.nearStart(p)) continue;
-        const sc = 1.6 + rand() * 2.8;
+        if (
+          this.nearStand(p) ||
+          this.nearStart(p) ||
+          this.roadClearance(p) < 12
+        )
+          continue;
+        // Scale cap ~2.4 → ≤~5 m tall; at the 18 m minimum distance that
+        // subtends ~15° of driver frame, not a looming wall.
+        const sc = 1.1 + rand() * 1.3;
         m.compose(
-          p.setY(groundY(s, dist) + 0.5 * sc),
+          p.setY(this.fieldY(p) + 0.5 * sc),
           new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2),
           new THREE.Vector3(sc, sc * (0.6 + rand() * 0.5), sc),
         );
-        outcrops.setMatrixAt(c, m);
+        outcrops.setMatrixAt(placed, m);
+        placed++;
       }
+      outcrops.count = placed;
       outcrops.castShadow = true;
       this.group.add(outcrops);
     } else if (this.signature === 'neon') {
@@ -1081,11 +1270,15 @@ export class Track {
       let ord = 0;
       for (let i = 0; i < n; i += Math.floor(n / HALF), ord++) {
         const s = this.samples[i];
+        const z = this.zoneAt(i);
         for (const side of [1, -1]) {
           // Alternating run on each edge, opposite phase per side —
           // reads as paired light rails sweeping the circuit.
           const which = (ord + (side < 0 ? 1 : 0)) % 2;
           if (counts[which] >= HALF) continue;
+          // Skip a pylon whose side opens onto a gravel apron — it would
+          // stand on the drivable shortcut surface.
+          if (z && z.side === side) continue;
           const p = s.point.clone().addScaledVector(s.left, side * (hw + 1.1));
           if (this.nearStart(p)) continue;
           m.compose(
@@ -1101,14 +1294,12 @@ export class Track {
     }
   }
 
-  // ---------- production scenery (wave 6) ----------
-  // Animated props register here; tick(simTime) advances them.
-  private readonly animated: {
-    obj: THREE.Object3D;
-    kind: 'flag' | 'balloon';
-    phase: number;
-    baseY: number;
-  }[] = [];
+  // ---------- production scenery (wave 6+) ----------
+  // Animated props register here; tick(simTime) advances them. The kind
+  // union comes from Props.ts — 'sign'/'gate'/'arch'/'scrub' are WS-DRESS
+  // tags; tick pulses emissive sign/gate materials and leaves the rest
+  // idle-stable for the follow-up animation stream.
+  private readonly animated: AnimatedProp[] = [];
 
   /** Stepped grandstand + crowd + flags beside the start line. */
   private buildGrandstand(s0: Sample, hw: number): void {
@@ -1195,6 +1386,9 @@ export class Track {
       back.rotation.y = Math.PI;
       g.add(back);
       const pos = s.point.clone().addScaledVector(s.left, side * (hw + 7));
+      // Register the board's footprint so WS-DRESS scatter never stabs a
+      // shrub/fence through the frame.
+      this.avoidPts.push({ p: pos.clone(), r: 5 });
       // Sit on the flat field (y=0 beyond the skirt), not road height —
       // on elevated sections the old s.point.y floated the post (critic8).
       g.position.set(pos.x, 0, pos.z);
@@ -1260,16 +1454,27 @@ export class Track {
     }
   }
 
-  /** Advance ambient animations (flag flutter, balloon bob/drift). */
+  /** Advance ambient animations (flag flutter, balloon bob/drift, neon
+   *  sign/gate emissive breathing). 'arch'/'scrub' stay tagged + idle for
+   *  the follow-up animation stream. */
   tick(simTime: number): void {
     for (const a of this.animated) {
       if (a.kind === 'flag') {
         a.obj.rotation.y = Math.sin(simTime * 3.1 + a.phase) * 0.45;
         a.obj.rotation.z = Math.sin(simTime * 5.3 + a.phase * 2) * 0.12;
-      } else {
+      } else if (a.kind === 'balloon') {
         a.obj.position.y = a.baseY + Math.sin(simTime * 0.4 + a.phase) * 3;
         a.obj.position.x += Math.sin(simTime * 0.05 + a.phase) * 0.004;
         a.obj.rotation.y = simTime * 0.03 + a.phase;
+      } else if (a.kind === 'sign' || a.kind === 'gate') {
+        // Neon breathing: whole instanced mesh shares one material, so a
+        // single intensity write pulses every panel/bar together. baseY
+        // carries the resting emissiveIntensity; amplitude stays over the
+        // ~1.0 linear bloom gate on the night circuit.
+        const mat = (a.obj as THREE.InstancedMesh)
+          .material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity =
+          a.baseY + Math.sin(simTime * 2.2 + a.phase) * 0.22;
       }
     }
   }

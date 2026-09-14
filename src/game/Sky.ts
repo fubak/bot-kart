@@ -147,10 +147,12 @@ export class Sky {
     // vanish); nearer = darker, farther = closer to the horizon color.
     this.mountains.clear();
     const rng = (() => { let s = 777; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff); })();
-    // Same grade compensation as the dome (squared — was raw, now graded);
-    // `horizon` is already compensated so the far ring blends to the dome.
+    // Partial grade compensation for mountains — full squaring (as used on
+    // the dome) drives the authored mid-dark tones near-black, and the
+    // rings read as giant dark domes instead of a distant range (wave-7
+    // SR defect). Half-lerp keeps them silhouetted but tonally seated.
     const base = new THREE.Color(theme.mountain ?? 0x3a5848);
-    base.multiply(base);
+    base.lerp(base.clone().multiply(base), 0.55);
     for (const [count, rMin, rMax, hMin, hMax, fade] of [
       [16, 250, 310, 22, 55, 0.18],
       [12, 340, 410, 40, 85, 0.5],
