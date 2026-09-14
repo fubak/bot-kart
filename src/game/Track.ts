@@ -211,6 +211,62 @@ interface Sample {
   left: THREE.Vector3; // unit vector toward TRUE road-left (driver's left)
 }
 
+/**
+ * WS-MAT: asphalt roughness map — a linear-space canvas (green channel is
+ * what MeshStandardMaterial samples) where darker = smoother. Mid-gray
+ * base (~0.78), soft darker tar patches, two polished "tire line" bands at
+ * the traffic lanes, and fine aggregate speckle. Multiplied by a scalar of
+ * 1.0 the values read as absolute roughness ≈0.5-0.9 — sealed asphalt
+ * sheen, never a mirror.
+ */
+function asphaltRoughness(): THREE.CanvasTexture {
+  const s = 256;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = s;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = 'rgb(200,200,200)'; // ~0.78 — sealed but matte overall
+  g.fillRect(0, 0, s, s);
+  const rnd = (() => {
+    let x = 731;
+    return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 0xffffffff);
+  })();
+  // Soft tar patches — irregular smoother blots.
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * s;
+    const y = rnd() * s;
+    const r = 14 + rnd() * 40;
+    const v = Math.round(150 + rnd() * 40); // ~0.6-0.75
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, `rgba(${v},${v},${v},0.55)`);
+    grad.addColorStop(1, `rgba(${v},${v},${v},0)`);
+    g.fillStyle = grad;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // Polished tire lines — constant-u bands run the length of the road
+  // (v tiles along the ribbon), feathered shoulders so they blend in.
+  for (const uc of [0.34, 0.66]) {
+    const cx = uc * s;
+    const w = s * 0.09;
+    const grad = g.createLinearGradient(cx - w, 0, cx + w, 0);
+    grad.addColorStop(0, 'rgba(140,140,140,0)');
+    grad.addColorStop(0.5, 'rgba(140,140,140,0.75)'); // ~0.55 polished
+    grad.addColorStop(1, 'rgba(140,140,140,0)');
+    g.fillStyle = grad;
+    g.fillRect(cx - w, 0, w * 2, s);
+  }
+  // Aggregate speckle — fine per-pixel grain both ways.
+  for (let i = 0; i < 2400; i++) {
+    const v = 150 + Math.floor(rnd() * 100);
+    g.fillStyle = `rgba(${v},${v},${v},0.35)`;
+    g.fillRect(rnd() * s, rnd() * s, 1, 1);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  // No colorSpace — stays linear, correct for a data map.
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
 export class Track {
   readonly group = new THREE.Group();
   readonly name: string;
@@ -612,8 +668,13 @@ export class Track {
       roadGeo,
       new THREE.MeshStandardMaterial({
         map: asphalt,
+        // WS-MAT: varied specular response — the canvas roughness map's tar
+        // patches + polished tire lines modulate a scalar of 1.0, so the
+        // sun and the low scene.environment produce a subtle sealed-asphalt
+        // sheen instead of uniform matte (was flat roughness 0.85).
+        roughnessMap: asphaltRoughness(),
         color: new THREE.Color(0x8a92a0).lerp(new THREE.Color(0xffffff), 0.35),
-        roughness: 0.85,
+        roughness: 1.0,
       }),
     );
     road.receiveShadow = true;
@@ -872,6 +933,21 @@ export class Track {
     banner.position.copy(s0.point).setY(s0.point.y + 4.8);
     banner.rotation.y = beam.rotation.y;
     this.group.add(banner);
+    // WS-MAT: warm emissive bulb strip along the banner's bottom edge — a
+    // small lit accent on the start gantry. ~1.15 peeks just over the
+    // ~1.0 linear bloom gate for a faint halo on day circuits; a touch
+    // hotter at night where it counters the cyan/magenta rails.
+    const lampStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(hw * 1.2, 0.09, 0.12),
+      new THREE.MeshStandardMaterial({
+        color: 0x1c1710,
+        emissive: 0xffb45c,
+        emissiveIntensity: this.theme.night ? 1.6 : 1.15,
+      }),
+    );
+    lampStrip.position.copy(banner.position).setY(banner.position.y - 0.55);
+    lampStrip.rotation.y = banner.rotation.y;
+    this.group.add(lampStrip);
 
     // Corner chevrons: glowing arrow boards on the outside wall at corner
     // entries — readable turn direction + severity at speed. Detect corners

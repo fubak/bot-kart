@@ -105,18 +105,37 @@ export class Kart {
     this.kartUrl = kartUrl ?? kartGlbUrl;
     this.body = new THREE.Group();
 
-    const mat = (c: number) =>
-      new THREE.MeshStandardMaterial({ color: c, flatShading: true });
+    // WS-MAT: glossy paint on body panels (clearcoat over a mid-roughness
+    // base — the coat carries the sun/env highlight so the base keeps its
+    // stylized diffuse shape), metal for the engine block. flatShading is
+    // preserved — facets stay stylized, only the response changes.
+    const paint = (c: number) =>
+      new THREE.MeshPhysicalMaterial({
+        color: c,
+        flatShading: true,
+        roughness: 0.55,
+        clearcoat: 0.7,
+        clearcoatRoughness: 0.32,
+      });
+    const metal = (c: number) =>
+      new THREE.MeshPhysicalMaterial({
+        color: c,
+        flatShading: true,
+        roughness: 0.45,
+        metalness: 0.6,
+        clearcoat: 0.25,
+        clearcoatRoughness: 0.4,
+      });
 
     // Chassis — low wide body, cockpit tub, engine block behind.
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(KART.width, 0.32, KART.length), mat(0xff7847));
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(KART.width, 0.32, KART.length), paint(0xff7847));
     chassis.position.y = 0.32;
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(KART.width * 0.72, 0.22, 0.7), mat(0xe8622c));
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(KART.width * 0.72, 0.22, 0.7), paint(0xe8622c));
     nose.position.set(0, 0.3, -KART.length / 2 - 0.2);
-    const engine = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 0.7), mat(0x3a3f52));
+    const engine = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 0.7), metal(0x3a3f52));
     engine.position.set(0, 0.55, KART.length / 2 - 0.45);
     // Driver placeholder: faceted bot head with eyes — silhouette reads at speed.
-    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), mat(0x46c8ff));
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), paint(0x46c8ff));
     head.position.set(0, 0.95, 0.15);
     const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
     const eyeMat = new THREE.MeshStandardMaterial({ color: 0x0b0e1a });
@@ -211,8 +230,80 @@ export class Kart {
     });
     for (const o of this.proceduralBody) o.visible = false;
     for (const w of this.wheels) w.visible = false;
+    this.glossMaterials(model);
     if (this.tint) this.tintModel(model);
     this.body.add(model);
+  }
+
+  /**
+   * WS-MAT: promote the GLB's flat MeshStandardMaterials to
+   * MeshPhysicalMaterial — clearcoat paint on body panels, modest metalness
+   * on metal trim — so sun/env produce readable specular at chase distance.
+   * Emissive `*glow` accents and rubber `tire` keep their cheap standard
+   * shading; shared materials convert once (cache) and the originals are
+   * disposed. Runs BEFORE tintModel so tinted clones inherit the gloss.
+   */
+  private glossMaterials(root: THREE.Object3D): void {
+    const cache = new Map<THREE.Material, THREE.Material>();
+    root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const out = mats.map((m) => {
+        let u = cache.get(m);
+        if (!u) {
+          u = Kart.toGloss(m);
+          cache.set(m, u);
+        }
+        return u;
+      });
+      o.material = Array.isArray(o.material) ? out : out[0];
+    });
+    for (const [oldM, newM] of cache) {
+      if (oldM !== newM) oldM.dispose();
+    }
+  }
+
+  /** Standard→physical upgrade; materials that should stay cheap pass
+   *  through unchanged. `MeshPhysicalMaterial.copy` can't consume a
+   *  standard source (physical props read undefined), so fields are
+   *  carried over by hand. */
+  private static toGloss(m: THREE.Material): THREE.Material {
+    if (!(m instanceof THREE.MeshStandardMaterial) || m instanceof THREE.MeshPhysicalMaterial) return m;
+    const name = m.name ?? '';
+    if (/glow|tire/i.test(name)) return m; // emitters + rubber stay standard
+    const p = new THREE.MeshPhysicalMaterial();
+    p.name = name;
+    p.color.copy(m.color);
+    p.map = m.map;
+    p.emissive.copy(m.emissive);
+    p.emissiveMap = m.emissiveMap;
+    p.emissiveIntensity = m.emissiveIntensity;
+    p.flatShading = m.flatShading;
+    p.transparent = m.transparent;
+    p.opacity = m.opacity;
+    p.side = m.side;
+    p.alphaTest = m.alphaTest;
+    p.depthWrite = m.depthWrite;
+    p.vertexColors = m.vertexColors;
+    p.normalMap = m.normalMap;
+    p.aoMap = m.aoMap;
+    p.envMapIntensity = m.envMapIntensity;
+    const glassy = /visor|windshield|glass|lens/i.test(name);
+    if (!glassy && m.metalness > 0.15) {
+      // Polished metal trim — capped so it reads as trim, not chrome.
+      p.metalness = Math.min(0.62, m.metalness + 0.12);
+      p.roughness = Math.min(m.roughness, 0.45);
+      p.clearcoat = 0.3;
+      p.clearcoatRoughness = 0.28;
+    } else {
+      // Glossy paint: clearcoat carries the highlight; authored roughness
+      // keeps the base coat's diffuse shape.
+      p.metalness = 0;
+      p.roughness = m.roughness;
+      p.clearcoat = glassy ? 0.9 : 0.7;
+      p.clearcoatRoughness = glassy ? 0.18 : 0.3;
+    }
+    return p;
   }
 
   private tintModel(root: THREE.Object3D): void {
@@ -245,6 +336,7 @@ export class Kart {
         bot.traverse((o) => {
           if (o instanceof THREE.Mesh) o.castShadow = true;
         });
+        this.glossMaterials(bot); // bot shells read as glossy plastic
         for (const o of this.placeholderDriver) o.visible = false;
         for (const name of ['arm_l', 'arm_r', 'head', 'leg_l', 'leg_r']) {
           const node = bot.getObjectByName(name);

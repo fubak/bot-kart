@@ -24,6 +24,7 @@ import { Fx } from '../game/Fx';
 import { Sky } from '../game/Sky';
 import { Minimap } from './Minimap';
 import { PostFX } from './PostFX';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { TRACKS } from '../game/Track';
 import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
 import botCUrl from '../../assets/exported/characters/grokbot-c-seated.glb?url';
@@ -44,6 +45,9 @@ export class Game {
   private readonly scene = new THREE.Scene();
   private hemi!: THREE.HemisphereLight;
   private sun!: THREE.DirectionalLight;
+  /** PMREM result — kept alive for the app's lifetime: scene.environment
+   *  samples this RT's texture (disposing the RT frees the texture). */
+  private envRT!: THREE.WebGLRenderTarget;
   private readonly chaseCam: ChaseCamera;
   private readonly hud: DebugHud;
   private track!: Track;
@@ -194,6 +198,12 @@ export class Game {
     // so accumulate manually and reset once before the composer runs; the
     // debug HUD + QA probes then see the FULL frame (scene + post quads).
     this.renderer.info.autoReset = false;
+    // The physical-material shaders emit benign ANGLE/D3D X4122 constant-
+    // precision warnings in their program info logs; three.js dumps any
+    // non-empty log to console when checkShaderErrors is on. Off per the
+    // production recommendation — real breakage still shows as failed
+    // renders, and CI smoke/typecheck cover the code paths.
+    this.renderer.debug.checkShaderErrors = false;
     document.body.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(0x87b7e8);
@@ -213,6 +223,22 @@ export class Game {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.03;
     this.scene.add(this.sun, this.sun.target);
+
+    // WS-MAT: subtle image-based lighting — a PMREM-processed
+    // RoomEnvironment gives clearcoat/metal materials gentle reflections so
+    // kart paint + trim read as glossy at chase distance. Intensity stays
+    // low: enough to open up speculars, not enough to wash the flat-shaded
+    // art direction or lift the night circuit's darkness. envRT must stay
+    // alive — the env texture lives inside it (RT.dispose would free the
+    // texture's GPU object); the one-shot generator + room scene are
+    // disposed instead.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const roomEnv = new RoomEnvironment();
+    this.envRT = pmrem.fromScene(roomEnv, 0.04);
+    this.scene.environment = this.envRT.texture;
+    this.scene.environmentIntensity = 0.3;
+    pmrem.dispose();
+    roomEnv.dispose();
 
     // Build the kart field once (karts persist across track swaps — only
     // the world geometry/race/items/minimap are rebuilt by buildWorld).
@@ -471,6 +497,9 @@ export class Game {
     this.hemi.color.set(th.hemiSky ?? 0xbfd9ff);
     this.hemi.groundColor.set(th.hemiGround ?? 0x3a5f3a);
     this.hemi.intensity = th.hemiIntensity ?? 0.9;
+    // Env lift: slightly lower on night circuits so the dark mood and neon
+    // contrast hold — clearcoat still reads via headlights/neon speculars.
+    this.scene.environmentIntensity = th.night ? 0.22 : 0.3;
     // Night circuits run headlights: lamp quads on every kart, a real
     // beam only on the player (one extra light stays cheap).
     this.kart.setNight(!!th.night, true);

@@ -785,3 +785,25 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   15.4 ms @ 564 draws; 0 console errors/warnings.
 - **Largest Gap:** sway is whole-canopy lean (no flutter within a
   crown); crowd hops are sync-banded not per-fan.
+
+### MAT-001 — Material richness (wave 7)
+
+- **Domain:** Kart/Track/Game
+- **Status:** Integrated
+- **Evidence:** `wave7/mat-{before,after}-*.png` matched pairs +
+  `int-mat-live.png`.
+- **Shipped:** kart paint/nose/driver-head → MeshPhysicalMaterial
+  clearcoat 0.7/cc-rough 0.32 (flatShading kept); `glossMaterials()`
+  upgrades GLB mats once per shared material (visor/glass coat 0.9,
+  metals capped 0.62+0.3 coat, glow/tire stay standard); engine metal.
+  `scene.environment` = PMREM RoomEnvironment (envRT kept alive,
+  generator disposed), intensity 0.3 day / 0.22 night. Road:
+  `asphaltRoughness()` 256² canvas roughnessMap — 0.78 base, tar
+  patches, polished tire-line bands at u 0.34/0.66, speckle. Gantry
+  warm lamp strip (0xffb45c, 1.15 day / 1.6 night — faint bloom halo).
+  `renderer.debug.checkShaderErrors = false` — physical-material
+  shaders emit benign ANGLE X4122 constant-precision info-log noise.
+- **Verified:** build clean; smoke identical ×3; NN live full race
+  68.1 fps p95 15.3 ms @ 784 draws; 0 console errors/warnings.
+- **Largest Gap:** env response is uniform (no per-material
+  envMapIntensity tuning); road roughnessMap has no normal map.
