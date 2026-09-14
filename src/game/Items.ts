@@ -188,7 +188,7 @@ export class Items {
     kartIdx: number,
     simTime: number,
     scores?: number[],
-    racers?: { resync(pos: THREE.Vector3): void }[],
+    racers?: { resync(pos: THREE.Vector3, hint?: number): void }[],
   ): ItemKind | null {
     const item = this.held[kartIdx];
     if (!item) return null;
@@ -224,8 +224,8 @@ export class Items {
       other.trackIdx = ti;
       // The progress trackers must follow the teleport too — otherwise
       // the ±48-sample continuity window walks a phantom path (critic6 D8).
-      racers?.[kartIdx].resync(kart.position);
-      racers?.[target].resync(other.position);
+      racers?.[kartIdx].resync(kart.position, kart.trackIdx);
+      racers?.[target].resync(other.position, other.trackIdx);
       return item;
     }
     if (item === 'ink') {

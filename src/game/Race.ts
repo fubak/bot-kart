@@ -129,9 +129,12 @@ export class RacerProgress {
    *  where the kart actually is: progress follows the teleport (score
    *  drops when sent backward — the swap really exchanges places) and
    *  the gate mask resets so forward teleports can't skip gates. */
-  resync(pos: THREE.Vector3): void {
+  resync(pos: THREE.Vector3, hint = -1): void {
     const n = this.track.sampleCount;
-    const i = this.track.nearestIndex(pos);
+    // Prefer the kart's own continuity hint (swap exchanges trackIdx too)
+    // — a global lookup can land on a parallel foldback leg.
+    const i =
+      hint >= 0 ? this.track.nearestIndexNear(pos, hint) : this.track.nearestIndex(pos);
     this.lastIdx = i;
     this.progressIdx = (this.lap - 1) * n + i;
     this.mask = 0;
