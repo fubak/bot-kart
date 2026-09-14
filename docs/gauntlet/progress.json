@@ -175,7 +175,8 @@
     "2026-09-13: wave4 critic4 7.5/10 — HIGH nose-in wall velocity runaway fixed (frame-derived normal; parked kart read 28m/s → now 0.03, stuck hint fires), MED alternate-bind footgun + stale key hints fixed, LOW ×5 fixed (bd09ab8)",
     "2026-09-13: leg animation shipped (a23641e) — pedal work + spin/celebration kicks; all documented quality gaps closed",
     "2026-09-13: gamepad support shipped (abab038) — pad axes merge into ControlState, buttons dispatch through the key pipeline; mock-verified",
-    "2026-09-13: per-track lap records — grok-kart-records persistence, title rec line, NEW LAP RECORD toast, results ★REC; live-verified incl. no-overwrite; PG smoke identical (18.12s, 0 hits)"
+    "2026-09-13: per-track lap records — grok-kart-records persistence, title rec line, NEW LAP RECORD toast, results ★REC; live-verified incl. no-overwrite; PG smoke identical (18.12s, 0 hits)",
+    "2026-09-14: wave4 critic5 6/10 — D1 HIGH AI wall-beach deadlock fixed (reverse→forward→lakitu-respawn ladder), D2 ★REC buildWorld leak, D3 corrupt-record bricking, D4 displacement-based stuck hint, D5 M persist, D6 overlay stack, D7 unbound hint — all verified (61c433b)"
   ],
   "blockers": [],
   "milestones": [
@@ -215,19 +216,18 @@
   ],
   "agents": {},
   "latestCritic": {
-    "id": "wave4-critic4",
-    "score": 7.5,
-    "verdict": "pass",
-    "report": "docs/gauntlet/evidence/wave4/CRITIC4_REPORT.md",
+    "id": "wave4-critic5",
+    "score": 6,
+    "verdict": "defects fixed post-report",
+    "report": "docs/gauntlet/evidence/wave4/CRITIC5_REPORT.md",
     "fixed": [
-      "nose-in wall velocity runaway (HIGH — frame-derived contact normal)",
-      "universal-alternate bind footgun (MED — arrows/RShift capture-rejected)",
-      "stale key hints (MED — item/stuck/title render live bindings)",
-      "M dead on title",
-      "options renders over PAUSED",
-      "silent reserved-key denial (now NOT A DRIVE KEY flash)",
-      "malformed stored binding kills action (code-grammar validation)",
-      "Esc does not close options on title"
+      "AI permanent wall-beach deadlock (HIGH — wedge escape ladder + lakitu respawn)",
+      "★REC leak across buildWorld paths (MED)",
+      "corrupt record values brick track (MED — per-value load validation)",
+      "phantom 1.6 m/s pin defeats stuck hint (MED — displacement-based)",
+      "M reduce-motion not persisted (LOW)",
+      "PAUSED stacks over RESULTS (LOW)",
+      "—AJD unbound hint (LOW)"
     ]
   },
   "wave3": {

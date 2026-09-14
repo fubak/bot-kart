@@ -83,11 +83,17 @@ None.
 - Full GP autopilot pass verified: leg points accumulate, final
   standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
 - Console audit: 0 errors / 0 warnings across the GP session.
-- Latest commits: `3aaabcd` NN geometry → `21fdfad` key remapping →
-  `bd09ab8` critic4 fix batch → `a23641e` leg animation → `abab038`
-  gamepad → lap records (this commit): per-track best-lap persistence
-  (`grok-kart-records`), title `rec` line, `★ NEW LAP RECORD!` toast,
-  results `★REC` star — all verified live; slower laps don't overwrite.
+- Latest commits: `a23641e` leg animation → `abab038` gamepad →
+  `2a85fa4` per-track lap records → `61c433b` critic5 fix batch.
+- Wave-4 critic5 (lap-records playtest): 6/10 —
+  `evidence/wave4/CRITIC5_REPORT.md`. Records verified end-to-end
+  (per-track persist, toast timing, no-overwrite, AI can't set).
+  Defects fixed + verified: D1 HIGH AI permanent wall-beach (wedge
+  escape ladder reverse→forward→lakitu-respawn), D2 ★REC leak across
+  buildWorld, D3 corrupt record values brick track (per-value
+  validation), D4 phantom 1.6 m/s pin defeats hint (displacement-based
+  detection), D5 M not persisted, D6 PAUSED over RESULTS, D7 "—AJD"
+  unbound hint. Score arc: …8→7.5→6 (all fixed).
 
 ---
 
