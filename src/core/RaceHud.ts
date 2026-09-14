@@ -91,14 +91,15 @@ export class RaceHud {
       'border-radius:10px;display:none;text-align:left;line-height:1.9;min-width:320px',
     );
     this.titleEl = mk(
-      'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;' +
-      'color:#fff;display:none',
+      'top:41%;left:50%;transform:translate(-50%,-50%);text-align:center;' +
+      'color:#fff;display:none;background:rgba(7,11,20,.42);padding:20px 46px;' +
+      'border-radius:16px',
     );
     this.titleEl.innerHTML =
       `<div style="font-size:64px;font-weight:900;letter-spacing:.06em;` +
       `background:linear-gradient(180deg,#fff,#7be8ff);-webkit-background-clip:text;` +
       `-webkit-text-fill-color:transparent">GROK KART</div>` +
-      `<div style="font-size:15px;color:#9fb4d0;margin-top:6px">a grok bots racing game</div>` +
+      `<div style="font-size:15px;color:#c9d8ec;margin-top:6px">a grok bots racing game</div>` +
       `<div style="font-size:26px;font-weight:800;margin-top:26px;color:#ffe28a">` +
       `PRESS ENTER</div>` +
       `<div style="font-size:16px;font-weight:800;margin-top:12px;color:#7be8ff"></div>` +

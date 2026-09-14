@@ -201,6 +201,10 @@ export class Track {
   private readonly samples: Sample[] = [];
   private readonly gravelZones: TrackLayout['gravel'];
   private readonly signature: TrackLayout['signature'];
+  // Exclusion anchors for prop scatter: the grandstand footprint and the
+  // title-camera orbit ring around the player spawn.
+  private readonly standPt = new THREE.Vector3();
+  private readonly spawnPt = new THREE.Vector3();
 
   constructor(layout: TrackLayout = TRACKS[0]) {
     this.name = layout.name;
@@ -819,9 +823,11 @@ export class Track {
     beam.position.copy(s0.point).setY(s0.point.y + 5.5);
     beam.rotation.y = Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
     this.group.add(beam);
+    const bannerTex = checkerTexture();
+    bannerTex.repeat.set(1.5, 1);
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(hw * 1.2, 1.0, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0xffb340 }),
+      new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.7 }),
     );
     banner.position.copy(s0.point).setY(s0.point.y + 4.8);
     banner.rotation.y = beam.rotation.y;
@@ -912,6 +918,10 @@ export class Track {
     const standAnchor = s0.point.clone().addScaledVector(s0.left, hw + 20);
     const nearStand = (p: THREE.Vector3) =>
       p.distanceToSquared(standAnchor) < 16 * 16;
+    this.standPt.copy(standAnchor);
+    this.spawnPt.copy(
+      this.samples[Math.floor(this.samples.length * 0.01)].point,
+    );
     let placed = 0;
     let guard = 0;
     while (placed < treeCount && guard++ < treeCount * 4) {
@@ -919,7 +929,7 @@ export class Track {
       const side = rand() < 0.5 ? 1 : -1;
       const dist = hw + 3 + rand() * 30;
       const p = s.point.clone().addScaledVector(s.left, side * dist);
-      if (nearStand(p)) continue;
+      if (nearStand(p) || this.nearStart(p)) continue;
       const gy = groundY(s, dist);
       const sc = 0.8 + rand() * 0.9;
       const rot = new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2);
@@ -942,7 +952,7 @@ export class Track {
         const side = rand() < 0.5 ? 1 : -1;
         dist = hw + 4 + rand() * 24;
         p.copy(s.point).addScaledVector(s.left, side * dist);
-        if (!nearStand(p)) break;
+        if (!nearStand(p) && !this.nearStart(p)) break;
       }
       const sc = 0.5 + rand() * 1.1;
       m.compose(
@@ -958,10 +968,23 @@ export class Track {
     this.group.add(trunks, canopies, rocks);
 
     this.buildGrandstand(s0, hw);
-    this.buildBillboards();
+    this.buildBillboards(hw);
     this.buildFlags(s0, hw);
     this.buildBalloons();
     this.buildSignatureProps(hw, rand);
+  }
+
+  /** Prop-vs-camera clearance tests. nearStand keeps scatter out of the
+   *  grandstand body; nearStart keeps the title orbit (5.2 m ring around
+   *  the player spawn, h≈3.3) clear — ridge outcrops reached inside it
+   *  and buried the title frame behind rock (critic8 D3 residual). */
+  private nearStand(p: THREE.Vector3): boolean {
+    const dx = p.x - this.standPt.x, dz = p.z - this.standPt.z;
+    return dx * dx + dz * dz < 16 * 16;
+  }
+  private nearStart(p: THREE.Vector3): boolean {
+    const dx = p.x - this.spawnPt.x, dz = p.z - this.spawnPt.z;
+    return dx * dx + dz * dz < 25 * 25;
   }
 
   /** Per-circuit signature props — the authored landmark vocabulary. */
@@ -986,6 +1009,7 @@ export class Track {
         const side = rand() < 0.5 ? 1 : -1;
         const dist = hw + 1.5 + rand() * 22;
         const p = s.point.clone().addScaledVector(s.left, side * dist);
+        if (this.nearStand(p) || this.nearStart(p)) continue;
         const sc = 0.6 + rand() * 1.0;
         m.compose(
           p.setY(groundY(s, dist) + 0.18 * sc),
@@ -1014,6 +1038,7 @@ export class Track {
         const side = rand() < 0.5 ? 1 : -1;
         const dist = hw + 5 + rand() * 20;
         const p = s.point.clone().addScaledVector(s.left, side * dist);
+        if (this.nearStand(p) || this.nearStart(p)) continue;
         const sc = 1.6 + rand() * 2.8;
         m.compose(
           p.setY(groundY(s, dist) + 0.5 * sc),
@@ -1052,6 +1077,7 @@ export class Track {
           const which = (ord + (side < 0 ? 1 : 0)) % 2;
           if (counts[which] >= HALF) continue;
           const p = s.point.clone().addScaledVector(s.left, side * (hw + 1.1));
+          if (this.nearStart(p)) continue;
           m.compose(
             p.setY(s.point.y + 1.2),
             new THREE.Quaternion(),
@@ -1123,7 +1149,7 @@ export class Track {
   }
 
   /** Sponsor billboards around the circuit — generated poster art. */
-  private buildBillboards(): void {
+  private buildBillboards(hw: number): void {
     const n = this.samples.length;
     const spots = [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95];
     const postMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.8 });
@@ -1132,6 +1158,12 @@ export class Track {
       const idx = Math.floor(spots[i] * n);
       const s = this.samples[idx];
       const side = i % 2 === 0 ? 1 : -1;
+      // A board inside the title-orbit ring swallows the intro camera —
+      // drop the spot rather than fight the framing (critic8 residual).
+      const px = s.point.x + s.left.x * side * (hw + 7);
+      const pz = s.point.z + s.left.z * side * (hw + 7);
+      const sdx = px - this.spawnPt.x, sdz = pz - this.spawnPt.z;
+      if (sdx * sdx + sdz * sdz < 24 * 24) continue;
       const g = new THREE.Group();
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 0.5), postMat);
       post.position.y = 2.2;
@@ -1152,7 +1184,7 @@ export class Track {
       back.position.z = -0.14;
       back.rotation.y = Math.PI;
       g.add(back);
-      const pos = s.point.clone().addScaledVector(s.left, side * (hw() + 7));
+      const pos = s.point.clone().addScaledVector(s.left, side * (hw + 7));
       // Sit on the flat field (y=0 beyond the skirt), not road height —
       // on elevated sections the old s.point.y floated the post (critic8).
       g.position.set(pos.x, 0, pos.z);
@@ -1160,7 +1192,6 @@ export class Track {
       g.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z) + (side > 0 ? 0.35 : -0.35);
       this.group.add(g);
     }
-    function hw() { return TRACK.roadHalfWidth; }
   }
 
   /** Waving pennant flags on the start gantry posts. */

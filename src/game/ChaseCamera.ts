@@ -47,7 +47,7 @@ export class ChaseCamera {
       // Switchback's rock mounds bury the kart mid-orbit (critic8).
       targetPos = kart.position
         .clone()
-        .add(new THREE.Vector3(Math.sin(a) * 5.2, 3.0, Math.cos(a) * 5.2));
+        .add(new THREE.Vector3(Math.sin(a) * 5.2, 3.35, Math.cos(a) * 5.2));
       this.initialized = false;
     } else if (!this.initialized) {
       this.camera.position.copy(targetPos);
@@ -61,10 +61,10 @@ export class ChaseCamera {
     this.camera.position.lerp(targetPos, kp);
 
     const wantLook = inCountdown
-      // Aim above the kart so it drops into the lower third of frame —
+      // Aim above the kart so it drops into the lower quarter of frame —
       // center-frame put it behind the PRESS ENTER/menu text (critic8),
       // while aiming low framed the gantry banner across the top.
-      ? kart.position.clone().add(new THREE.Vector3(0, 1.3, 0))
+      ? kart.position.clone().add(new THREE.Vector3(0, 1.95, 0))
       : kart.position.clone().addScaledVector(fwd, CAMERA.lookAhead).add(new THREE.Vector3(0, 1.0, 0));
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
