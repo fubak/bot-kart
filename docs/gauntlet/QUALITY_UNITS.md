@@ -383,7 +383,7 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Largest Gap:** single-hit consume + 8s expiry only; no hold/trade
   decision like genre shields that toggle.
 
-### TRACK-004 — Gravel shortcut (hairpin inside-cut)
+### TRACK-004b — Gravel shortcut (hairpin inside-cut)
 
 - **Domain:** Track
 - **Status:** Integrated
