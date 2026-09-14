@@ -181,8 +181,15 @@ export class Items {
   }
 
   /** Fire kart `k`'s held item. `scores` = race scores for ink targeting.
+   *  `racers` = RacerProgress list so teleports (swap) can re-anchor the
+   *  continuity trackers they bypass (critic6 D8).
    *  Returns the item used (or null). */
-  use(kartIdx: number, simTime: number, scores?: number[]): ItemKind | null {
+  use(
+    kartIdx: number,
+    simTime: number,
+    scores?: number[],
+    racers?: { resync(pos: THREE.Vector3): void }[],
+  ): ItemKind | null {
     const item = this.held[kartIdx];
     if (!item) return null;
     this.held[kartIdx] = null;
@@ -215,6 +222,10 @@ export class Items {
       other.velocity.copy(v);
       other.heading = h;
       other.trackIdx = ti;
+      // The progress trackers must follow the teleport too — otherwise
+      // the ±48-sample continuity window walks a phantom path (critic6 D8).
+      racers?.[kartIdx].resync(kart.position);
+      racers?.[target].resync(other.position);
       return item;
     }
     if (item === 'ink') {

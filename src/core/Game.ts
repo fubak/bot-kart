@@ -316,7 +316,12 @@ export class Game {
       }
       if (e.code === 'KeyM') this.toggleMotion();
       if (e.code === bindings.item && !this.paused && this.race.phase === 'racing') {
-        this.items.use(0, this.simTime, this.race.racers.map((r) => r.score));
+        this.items.use(
+          0,
+          this.simTime,
+          this.race.racers.map((r) => r.score),
+          this.race.racers,
+        );
       }
       // Respawn (Backspace): lakitu-style reset onto the racing line at the
       // nearest sample — recovers wall-pinned karts (critic D3).
@@ -545,7 +550,7 @@ export class Game {
         this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime);
         // AI uses held items on straights at speed — keeps the field lively.
         if (this.items.held[i + 1] && this.aiKarts[i].speed > 18 && Math.random() < 0.4 * SIM.fixedDt) {
-          this.items.use(i + 1, this.simTime, scores);
+          this.items.use(i + 1, this.simTime, scores, this.race.racers);
         }
       }
       this.collideKarts();

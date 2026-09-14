@@ -33,6 +33,12 @@ export class AiDriver {
   private lastPos = new THREE.Vector3();
   private posTimer = 0;
   private stuckTime = 0;
+  // Wedge state: anchored once stuckTime trips; wedgeTime then runs on
+  // wall-clock (not the displacement counter) so the reverse→forward
+  // limit cycle can't reset the ladder — it only clears on a real
+  // escape (>2.5 m from the anchor) or the lakitu respawn (critic6 D1).
+  private readonly wedgeAnchor = new THREE.Vector3();
+  private wedgeTime = -1; // <0 = not wedged
 
   constructor(
     skill = 1.0,
@@ -61,6 +67,7 @@ export class AiDriver {
     this.blockedTime = 0;
     this.posTimer = 0;
     this.stuckTime = 0;
+    this.wedgeTime = -1;
   }
 
   update(kart: Kart, track: Track, dt: number, traffic?: Kart[]): ControlState {
@@ -96,36 +103,45 @@ export class AiDriver {
       }
       this.lastPos.copy(kart.position);
     }
-    if (this.stuckTime >= 2) {
+    if (this.stuckTime >= 2 && this.wedgeTime < 0) {
+      this.wedgeTime = 0;
+      this.wedgeAnchor.copy(kart.position);
+    }
+    if (this.wedgeTime >= 0) {
       // Escape ladder (critic5 D1: a fixed {brake} response deadlocks —
       // steering has zero authority at ~0 speed, and braking digs a
-      // tail-to-wall kart deeper):
-      //   ~1-4 s frozen → reverse out steering toward the line.
-      //   ~4-6 s frozen → drive forward out (tail-to-wall case).
-      //   6+ s frozen → lakitu respawn onto the racing line — the same
+      // tail-to-wall kart deeper. critic6 D1: the reverse-exit reset
+      // created a limit cycle that never reached the upper rungs):
+      //   0-3 s wedged → reverse out steering toward the line.
+      //   3-6 s wedged → drive forward out (tail-to-wall case).
+      //   6+ s wedged → lakitu respawn onto the racing line — the same
       //     recovery the player gets on Backspace; wedges the driver
       //     can't solve (beached against a wall face) must not cost the
       //     kart the whole race.
-      const desired = Math.atan2(-tanNow.x, -tanNow.z);
-      const err = wrapAngle(desired - kart.heading);
-      if (this.stuckTime >= 12) {
-        const i = track.nearestIndexNear(kart.position, kart.trackIdx);
-        const t = track.tangentAt(i);
-        kart.reset(track.pointAt(i), Math.atan2(-t.x, -t.z));
-        kart.trackIdx = -1;
+      // The ladder only clears on real displacement from the anchor —
+      // an attempt that rocks the kart but re-wedges keeps climbing.
+      this.wedgeTime += dt;
+      if (kart.position.distanceTo(this.wedgeAnchor) > 2.5) {
+        this.wedgeTime = -1;
         this.stuckTime = 0;
-        this.recovering = false;
-        return idle;
-      }
-      if (kart.forwardSpeed < -1) {
-        // Reversed enough — drive off steering toward the line.
-        this.stuckTime = 0;
-        return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
-      }
-      if (this.stuckTime < 8) {
+      } else {
+        const desired = Math.atan2(-tanNow.x, -tanNow.z);
+        const err = wrapAngle(desired - kart.heading);
+        if (this.wedgeTime > 6) {
+          const i = track.nearestIndexNear(kart.position, kart.trackIdx);
+          const t = track.tangentAt(i);
+          kart.reset(track.pointAt(i), Math.atan2(-t.x, -t.z));
+          kart.trackIdx = -1;
+          this.stuckTime = 0;
+          this.wedgeTime = -1;
+          this.recovering = false;
+          return idle;
+        }
+        if (this.wedgeTime > 3) {
+          return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
+        }
         return { ...idle, brake: 1, steer: clampSteer(err * AI.steerGain) };
       }
-      return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
     }
 
     // --- recovery: nose pointing backward along the track ---

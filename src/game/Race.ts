@@ -120,6 +120,27 @@ export class RacerProgress {
   get score(): number {
     return this.lap * this.track.sampleCount + this.progressIdx - this.spawnOffset;
   }
+
+  /** Re-anchor the continuity tracker after an EXTERNAL teleport (swap
+   *  item, debug jumps): the ±48-sample window otherwise walks a phantom
+   *  path — inflating progress through gates never driven, or locking
+   *  onto a parallel foldback leg with a permanent wrongWay flap
+   *  (critic6 D8). Keeps lap/history; rebinds position bookkeeping to
+   *  where the kart actually is: progress follows the teleport (score
+   *  drops when sent backward — the swap really exchanges places) and
+   *  the gate mask resets so forward teleports can't skip gates. */
+  resync(pos: THREE.Vector3): void {
+    const n = this.track.sampleCount;
+    const i = this.track.nearestIndex(pos);
+    this.lastIdx = i;
+    this.progressIdx = (this.lap - 1) * n + i;
+    this.mask = 0;
+    this.nextCross = this.gates.map((g) =>
+      g > i ? g + (this.lap - 1) * n : g + this.lap * n,
+    );
+    this.backwardAccum = 0;
+    this.wrongWay = false;
+  }
 }
 
 export class Race {
