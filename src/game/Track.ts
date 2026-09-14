@@ -686,7 +686,9 @@ export class Track {
     // overhung the lower skirt and the slabs read as floating planks
     // ringing every corner (critic9). Y sits 1 cm into the road so banked
     // samples never open an air gap under the plank.
-    const curbGeo = new THREE.BoxGeometry(0.8, 0.12, 2.4);
+    // 0.08 tall (was 0.12): the old slab stood proud enough that karts
+    // crossing the edge read as mounting/beaching on a curb (critic10).
+    const curbGeo = new THREE.BoxGeometry(0.8, 0.08, 2.4);
     const red = new THREE.MeshStandardMaterial({ color: 0xd8443c });
     const white = new THREE.MeshStandardMaterial({ color: 0xe8e8e8 });
     const curbCount = Math.floor(n / 8);
@@ -703,7 +705,7 @@ export class Track {
         [curbsR, -1],
       ] as const) {
         m.compose(
-          s.point.clone().addScaledVector(s.left, side * (hw - 0.4)).setY(s.point.y + 0.05),
+          s.point.clone().addScaledVector(s.left, side * (hw - 0.4)).setY(s.point.y + 0.03),
           q,
           new THREE.Vector3(1, 1, 1),
         );
@@ -738,6 +740,12 @@ export class Track {
       // Wall face sits just past the clamp edge so contact visually touches.
       const off = hw + 0.05;
       const h = TRACK.wallHeight;
+      // Battered footing (critic10 D1): the old wall bottom sat AT road
+      // height, so on elevated legs the face ended in mid-air above the
+      // falling skirt — walls+kerbs read as floating ribbons. The wall is
+      // now a 3-vertex strip: vertical face + a footing that runs outward
+      // and down until it embeds ~8 cm under the embankment surface.
+      const offFoot = hw + 1.6;
       // Skip samples inside this side's gravel zone → a visible gap where
       // the shortcut apron opens (karts drive onto dirt, not through wall).
       const railPos: number[] = [];
@@ -748,8 +756,15 @@ export class Track {
         const gapped = !!z && z.side === side;
         const bx = s.point.x + s.left.x * side * off;
         const bz = s.point.z + s.left.z * side * off;
+        const fx = s.point.x + s.left.x * side * offFoot;
+        const fz = s.point.z + s.left.z * side * offFoot;
+        // Embankment surface at the footing lateral (same slope the skirt
+        // ribbons draw): lerp roadY → grade over the 6 m shoulder band.
+        const ft = Math.min((offFoot - (hw - 0.1)) / 6, 1);
+        const fy = THREE.MathUtils.lerp(s.point.y, -0.1, ft) - 0.08;
         const base = wallPos.length / 3;
-        wallPos.push(bx, s.point.y, bz, bx, s.point.y + h, bz);
+        const rbase = railPos.length / 3;
+        wallPos.push(fx, fy, fz, bx, s.point.y - 0.02, bz, bx, s.point.y + h, bz);
         railPos.push(bx, s.point.y + h - 0.16, bz, bx, s.point.y + h, bz);
         // Emit quads only when this AND the next sample are both ungapped.
         if (i < n) {
@@ -757,10 +772,17 @@ export class Track {
           const gapNext = !!zNext && zNext.side === side;
           if (!gapped && !gapNext) {
             const a = base;
-            if (side > 0) wallIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-            else wallIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-            if (side > 0) railIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-            else railIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+            const r = rbase;
+            if (side > 0) {
+              // foot→knee quad then knee→top quad, same winding as before
+              wallIdx.push(a, a + 1, a + 3, a + 1, a + 4, a + 3);
+              wallIdx.push(a + 1, a + 2, a + 4, a + 2, a + 5, a + 4);
+              railIdx.push(r, r + 1, r + 2, r + 1, r + 3, r + 2);
+            } else {
+              wallIdx.push(a, a + 3, a + 1, a + 1, a + 3, a + 4);
+              wallIdx.push(a + 1, a + 4, a + 2, a + 2, a + 4, a + 5);
+              railIdx.push(r, r + 2, r + 1, r + 1, r + 2, r + 3);
+            }
           }
         }
       }
@@ -794,20 +816,31 @@ export class Track {
       const gUv: number[] = [];
       const gIdx: number[] = [];
       const inner = hw - 0.6;
-      const outer = hw + TRACK.gravelWidth + 0.9;
       const i0 = Math.floor(z.i0 * n);
       const i1 = Math.floor(z.i1 * n);
+      // 3-vertex strip (critic10 D1): the drivable apron stays flat out to
+      // just past the kart clamp edge, then a drop-face runs down to the
+      // embankment — the old flat ribbon ended in mid-air on elevated legs,
+      // a dirt shelf hovering over the falling skirt.
+      const flat = hw + TRACK.gravelWidth + 0.2; // just past clamp edge
+      const drop = hw + TRACK.gravelWidth + 1.8;
       for (let i = i0; i <= i1; i++) {
         const s = this.samples[i];
-        const a = (i - i0) * 2;
+        const a = (i - i0) * 3;
+        const dt = Math.min((drop - (hw - 0.1)) / 6, 1);
+        const dy = THREE.MathUtils.lerp(s.point.y, -0.1, dt) - 0.06;
         gPos.push(
           s.point.x + s.left.x * z.side * inner, s.point.y - 0.015, s.point.z + s.left.z * z.side * inner,
-          s.point.x + s.left.x * z.side * outer, s.point.y - 0.015, s.point.z + s.left.z * z.side * outer,
+          s.point.x + s.left.x * z.side * flat, s.point.y - 0.03, s.point.z + s.left.z * z.side * flat,
+          s.point.x + s.left.x * z.side * drop, dy, s.point.z + s.left.z * z.side * drop,
         );
         const v = (i * spacing) / 3;
-        gUv.push(0, v, 1.4, v);
+        gUv.push(0, v, 0.9, v, 1.4, v);
         if (i < i1) {
-          gIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
+          gIdx.push(
+            a, a + 1, a + 3, a + 3, a + 1, a + 4,
+            a + 1, a + 2, a + 4, a + 4, a + 2, a + 5,
+          );
         }
       }
       const gGeo = new THREE.BufferGeometry();
@@ -830,8 +863,13 @@ export class Track {
       for (let c = 0; c < bermCount; c++) {
         const s = this.samples[i0 + c * 4];
         bq.setFromAxisAngle(bup, Math.atan2(s.tangent.x, s.tangent.z) + Math.PI / 2);
+        // Seat at the apron drop-face toe (critic10 D1): the old
+        // s.point.y+0.05 left berms floating beside elevated legs.
+        const bl = drop + 0.6;
+        const bt = Math.min((bl - (hw - 0.1)) / 6, 1);
+        const by = THREE.MathUtils.lerp(s.point.y, -0.1, bt) + 0.06;
         bm.compose(
-          s.point.clone().addScaledVector(s.left, z.side * (outer + 0.5)).setY(s.point.y + 0.05),
+          s.point.clone().addScaledVector(s.left, z.side * bl).setY(by),
           bq,
           new THREE.Vector3(1, 1, 1),
         );
@@ -861,7 +899,10 @@ export class Track {
         const s = this.samples[i % n];
         skPos.push(
           s.point.x + s.left.x * side * inner, s.point.y, s.point.z + s.left.z * side * inner,
-          s.point.x + s.left.x * side * outer, -0.35, s.point.z + s.left.z * side * outer,
+          // Outer edge meets the grade plane (-0.1) exactly — the old -0.35
+          // dipped under the field so flat legs showed a ditch ring instead
+          // of a shoulder that reaches grade (critic10 D1).
+          s.point.x + s.left.x * side * outer, -0.1, s.point.z + s.left.z * side * outer,
         );
         const v = (i * spacing) / 5;
         skUv.push(0, v, 1.2, v);
@@ -928,7 +969,15 @@ export class Track {
     bannerTex.repeat.set(1.5, 1);
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(hw * 1.2, 1.0, 0.1),
-      new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.7 }),
+      // emissiveMap reuses the checker at low gain — the back/underside
+      // stops reading as a dark quad against the sky at night (critic10).
+      new THREE.MeshStandardMaterial({
+        map: bannerTex,
+        emissiveMap: bannerTex,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.22,
+        roughness: 0.7,
+      }),
     );
     banner.position.copy(s0.point).setY(s0.point.y + 4.8);
     banner.rotation.y = beam.rotation.y;
@@ -1196,7 +1245,10 @@ export class Track {
       0,
       1,
     );
-    return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35;
+    // Grade target -0.1 matches the skirt's outer edge / field plane; the
+    // +0.1 keeps prop bases ~0.1 proud (identical to the old formula at both
+    // ends — -0.35+0.35 = -0.1+0.1 = 0 — only mid-slope seats tighter).
+    return THREE.MathUtils.lerp(s.point.y, -0.1, t) + 0.1;
   }
 
   /** Straightest sample index within frac range [f0,f1] passing `ok` —
@@ -1452,12 +1504,34 @@ export class Track {
         mast.position.y = 3.7;
         mast.castShadow = true;
         py.add(mast);
+        // Dim edge rails on the mast — the bare dark slab read as a void
+        // slab from behind/side-on at night (critic10 NN pylon back).
+        const edgeMat = new THREE.MeshStandardMaterial({
+          color: 0x0c1018,
+          emissive: 0x36f0ff,
+          emissiveIntensity: 0.7,
+          roughness: 0.5,
+        });
+        for (const ex of [-0.72, 0.72]) {
+          const edge = new THREE.Mesh(new THREE.BoxGeometry(0.07, 7.2, 0.44), edgeMat);
+          edge.position.set(ex, 3.7, 0);
+          py.add(edge);
+        }
         const face = new THREE.Mesh(
           new THREE.PlaneGeometry(1.28, 6.9),
           new THREE.MeshBasicMaterial({ map: scanTex }),
         );
         face.position.set(0, 3.7, 0.21);
         py.add(face);
+        // Wrap the screen around the back too — the pylon stands roadside
+        // on a looped course, so half the orbit sees its rear (critic10).
+        const faceBack = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.28, 6.9),
+          new THREE.MeshBasicMaterial({ map: scanTex }),
+        );
+        faceBack.position.set(0, 3.7, -0.21);
+        faceBack.rotation.y = Math.PI;
+        py.add(faceBack);
         // Ground on the skirt field (road shoulder drops away) — embedded
         // a touch so the mast can't hover on a graded edge.
         py.position.copy(p).setY(this.fieldY(p) - 0.15);
@@ -1681,7 +1755,14 @@ export class Track {
     const postMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.8 });
     // Lifted off void-black — a barely-visible dark rim vs a light-swallowing
     // slab where the poster back loses the depth test at range (critic9).
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x39434f, roughness: 0.6 });
+    // Lightened again + faint emissive (critic10 D3): at grazing angles the
+    // frame edge is all you see — it must not fall to black at night.
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x4a5568,
+      roughness: 0.55,
+      emissive: 0x1a2230,
+      emissiveIntensity: 0.5,
+    });
     // WS-ANIM: placed boards collected for the featured-spin pick below.
     const boards: { g: THREE.Group; pos: THREE.Vector3 }[] = [];
     for (let i = 0; i < spots.length; i++) {
@@ -1708,13 +1789,21 @@ export class Track {
       );
       art.position.set(0, 5.6, 0.14);
       g.add(art);
+      // Back lip — a slightly oversized rim behind the poster giving the
+      // board a readable silhouette edge-on/at grazing angles (critic10 D3:
+      // rotating boards still flashed pure-black backs).
+      const lip = new THREE.Mesh(
+        new THREE.BoxGeometry(7.0, 3.3, 0.05),
+        frameMat,
+      );
+      lip.position.set(0, 5.6, -0.155);
+      g.add(lip);
       // Poster on the back face too — the looped track exposes the back
       // constantly, and a bare frame read as a black monolith (critic8).
-      // -0.18 not -0.14: the frame's back face sits at -0.125, and the old
-      // 15 mm gap z-fought at chase-cam distance — the poster lost in
-      // patches and the board read as a black slab again (critic9).
+      // -0.215: sits just proud of the lip's back face (-0.18) — wide enough
+      // gap that neither z-fights at chase distance.
       const back = art.clone();
-      back.position.z = -0.18;
+      back.position.z = -0.215;
       back.rotation.y = Math.PI;
       g.add(back);
       const pos = s.point.clone().addScaledVector(s.left, side * (hw + 7));

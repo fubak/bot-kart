@@ -248,8 +248,11 @@ export const AI = {
   // Rubber-band: AI pace assist vs the player's race score — trailing bots
   // get a real top-speed edge, runaway leaders ease off. Compresses the
   // pack so positions actually swap (critic: field read as processional).
-  rubberBandGain: 0.004, // assist per score-point of gap (≈ per ~3 m)
-  rubberBandUp: 0.08, // trailing: up to +8% top speed
+  // critic10 D8: gain 0.004→0.006, up 0.08→0.14 — best-lap spread ran
+  // ~22s vs ~45s (≈2×); with AiDriver now honoring the assist cap the
+  // deeper reserve pulls stragglers back toward ~1.3–1.5× leader pace.
+  rubberBandGain: 0.006, // assist per score-point of gap (≈ per ~3 m)
+  rubberBandUp: 0.14, // trailing: up to +14% top speed
   rubberBandDown: 0.05, // leading: up to -5%
 
   // Ink item: splat duration — victim's vision is degraded this long.

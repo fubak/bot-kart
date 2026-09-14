@@ -807,3 +807,28 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   68.1 fps p95 15.3 ms @ 784 draws; 0 console errors/warnings.
 - **Largest Gap:** env response is uniform (no per-material
   envMapIntensity tuning); road roughnessMap has no normal map.
+
+### FIX-002 — Critic-10 defect batch (wave 10)
+
+- **Domain:** Whole-game
+- **Status:** Integrated
+- **Evidence:** `wave10/CRITIC10_REPORT.md` (7.0/10, 1H/7M/6L) +
+  `wave10/fix10-*.png`, `int-fix10-*.png`.
+- **Fixed + verified:** battered wall footing — wall is now a 3-vertex
+  strip (foot→knee→top) running down to embed ~8 cm under the
+  embankment; gravel aprons get the same drop-face + berms seat at the
+  drop toe; skirt outer edge -0.35→-0.1 meets grade exactly; fieldY
+  aligned. Kerbs slimmed 0.12→0.08 (mount/beach mitigated). Item box
+  emissive 1.55→0.5 (under bloom gate). Billboard frame lightened +
+  faint emissive (grazing angles). NN sign posts glow-foot; pylon edge
+  rails + back scanline face. Banner emissiveMap back. GP rows
+  provisional "…pts" until finish; award uses row order not live
+  positionOf. Driver head matte-down (coat≤0.25, env≤0.45, rough≥0.55)
+  + fill 7.5→4.2 lifted. Rubber-band honored at assisted cap (gain
+  0.006/up 0.14). Q-quit disarms gpMode.
+- **Verified:** build clean; smoke identical (NN spot 25.54/21.61/
+  20.90, 0 hits, stalled 0); NN live 68.2 fps p95 15.4 ms; 0 console
+  errors/warnings.
+- **Remaining accepted nits:** banner underside dark edge-on;
+  head still bright-ish at some NN angles; far item boxes read bright;
+  kerb-beaching is mostly autopilot limitation; orange kart detail.

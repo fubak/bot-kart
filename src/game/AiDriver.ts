@@ -308,7 +308,15 @@ export class AiDriver {
       );
       targetSpeed = Math.max(targetSpeed, AI.cornerMinSpeed);
     }
-    targetSpeed = Math.min(targetSpeed * this.skill, KART.maxSpeed);
+    // Rubber-band headroom (critic10 D8): Game raises the kart's physical
+    // cap via paceAssist, but the old KART.maxSpeed clamp meant a trailing
+    // bot could never actually use it — the field stayed strung out. Cap
+    // at the ASSISTED speed so a trailing bot genuinely runs faster.
+    // paceAssist is 0 in the solo smoke harness → baselines unchanged.
+    targetSpeed = Math.min(
+      targetSpeed * this.skill,
+      KART.maxSpeed * (1 + kart.paceAssist),
+    );
 
     let throttle = 0;
     let brake = 0;

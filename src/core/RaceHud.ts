@@ -368,6 +368,11 @@ export class RaceHud {
         const rows = dispOrder
           .map((r, i) => {
             const rr = race.racers[r];
+            // Unfinished rows are provisional (critic10 D6): the table used
+            // to print a concrete "P#  +N → M pts" off live score order,
+            // then the racer's real finish reordered it — the displayed
+            // delta contradicted what the N-press actually awarded.
+            const pos = rr.finished ? `P${i + 1}` : '…';
             const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
             const best =
               fmt(rr.bestLapTime) +
@@ -377,17 +382,22 @@ export class RaceHud {
             if (gp?.mode) {
               if (gp.done) {
                 pts = `   ${gp.points[r]} pts`;
-              } else {
+              } else if (rr.finished) {
                 // Game.ts awards position points to EVERY racer incl. DNFs
                 // (GP_POINTS[pos], P4 still gets +3) — the delta must match
                 // what the N-press will actually add (critic9: a DNF showed
-                // "+0 → 13" then totaled 16).
-                const earned = GP_PTS[race.positionOf(r) - 1] ?? 0;
+                // "+0 → 13" then totaled 16). Use the ROW index i — the same
+                // sorted order the award loop uses — so a same-tick finish
+                // tie can't display +10 to a row the award scores +7
+                // (critic10: positionOf ties on equal finishTime).
+                const earned = GP_PTS[i] ?? 0;
                 pts = `   +${earned} → ${gp.points[r] + earned} pts`;
+              } else {
+                pts = '   …pts provisional';
               }
             }
             const crown = gpFinal && i === 0 ? ' ★' : '';
-            return `<div${cls}>P${i + 1}${crown}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}${pts}</div>`;
+            return `<div${cls}>${pos}${crown}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}${pts}</div>`;
           })
           .join('');
         const footer = gp?.mode

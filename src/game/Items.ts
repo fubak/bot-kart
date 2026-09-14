@@ -56,11 +56,12 @@ interface Slick {
 const boxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
 const boxMat = new THREE.MeshStandardMaterial({
   color: 0x7be8ff,
-  // Emissive stays over the bloom gate (~linear 1.0) so boxes read as
-  // glowing pickups — but 2.2 clipped them to solid white cubes at night
-  // (critic9). 1.55 keeps the glow without blowing out.
+  // Emissive sits well UNDER the ~1.0 linear bloom gate (critic10): 1.55
+  // clipped the boxes to white diamonds — even 0.85 bloomed once the lit
+  // diffuse + environment term stacked on top. 0.5 + the bright base color
+  // keeps pickups readable as glowing cubes, not blown lights.
   emissive: 0x3fd0ff,
-  emissiveIntensity: 1.55,
+  emissiveIntensity: 0.5,
   transparent: true,
   opacity: 0.85,
   flatShading: true,

@@ -337,6 +337,21 @@ export class Kart {
           if (o instanceof THREE.Mesh) o.castShadow = true;
         });
         this.glossMaterials(bot); // bot shells read as glossy plastic
+        // Matte the head dome down (critic10): the physical clearcoat +
+        // env response clipped the whole head to a white orb under the
+        // night fill. Eyes keep their own glow mats (toGloss passes them).
+        const headNode = bot.getObjectByName('head');
+        headNode?.traverse((o) => {
+          if (!(o instanceof THREE.Mesh)) return;
+          const ms = Array.isArray(o.material) ? o.material : [o.material];
+          for (const hm of ms) {
+            if (hm instanceof THREE.MeshPhysicalMaterial) {
+              hm.clearcoat = Math.min(hm.clearcoat, 0.25);
+              hm.envMapIntensity = Math.min(hm.envMapIntensity, 0.45);
+              hm.roughness = Math.max(hm.roughness, 0.55);
+            }
+          }
+        });
         for (const o of this.placeholderDriver) o.visible = false;
         for (const name of ['arm_l', 'arm_r', 'head', 'leg_l', 'leg_r']) {
           const node = bot.getObjectByName(name);
@@ -367,8 +382,10 @@ export class Kart {
       this.group.add(this.headlight, this.headlight.target);
       // Soft warm fill so the player's kart doesn't vanish into the dark —
       // one extra light, same budget discipline as the beam.
-      this.fill = new THREE.PointLight(0xffd8b0, 7.5, 9, 1.8);
-      this.fill.position.set(0, 2.6, 0.8);
+      // 7.5→4.2 and lifted higher/forward (critic10): the close hot fill
+      // clipped the driver's glossy head to a featureless white orb.
+      this.fill = new THREE.PointLight(0xffd8b0, 4.2, 9, 1.8);
+      this.fill.position.set(0, 3.1, 1.6);
       this.group.add(this.fill);
     } else if (!on && this.headlight) {
       this.group.remove(this.headlight, this.headlight.target);

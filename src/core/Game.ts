@@ -533,8 +533,10 @@ export class Game {
     this.paused = false;
     this.settings.open = false;
     if (phase === 'title' && this.gpMode) {
-      // Abandoning/finishing a cup → title always re-arms a fresh cup on
-      // its first circuit (the G-toggle state itself persists).
+      // Q-quit to title DISARMS the cup (critic10): it used to stay armed,
+      // so the title kept offering "GRAND PRIX leg 1/3" and Enter relaunched
+      // a cup the player believed they had left. G re-arms from the title.
+      this.gpMode = false;
       this.resetCup();
       this.buildWorld(0);
       return;
