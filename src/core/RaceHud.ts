@@ -206,11 +206,22 @@ export class RaceHud {
           : '';
       // Controls hint (children[4]) follows the live bindings — a remapped
       // drive key must not leave the title advertising WASD (critic4).
+      // Cleared bindings are omitted rather than rendered as "—AJD"
+      // cryptic glyphs (critic5 D7); arrows remain fixed alternates.
+      const driveKeys = [
+        bindings.throttle,
+        bindings.left,
+        bindings.brake,
+        bindings.right,
+      ]
+        .map((b) => keyName(b))
+        .filter((k) => k !== '—')
+        .join('');
+      const driveHint = driveKeys ? `${driveKeys} / arrows` : 'arrows';
       const hint =
-        `${keyName(bindings.throttle)}${keyName(bindings.left)}` +
-        `${keyName(bindings.brake)}${keyName(bindings.right)} / arrows — drive ` +
-        `&nbsp;·&nbsp; ${keyName(bindings.drift)} — drift &nbsp;·&nbsp; ` +
-        `${keyName(bindings.item)} — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; ` +
+        `${driveHint} — drive ` +
+        `&nbsp;·&nbsp; ${bindings.drift ? `${keyName(bindings.drift)} — drift` : 'drift unbound'} &nbsp;·&nbsp; ` +
+        `${bindings.item ? `${keyName(bindings.item)} — item` : 'item unbound'} &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; ` +
         `R — restart &nbsp;·&nbsp; Q — quit &nbsp;·&nbsp; ⌫ — respawn<br>` +
         `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track` +
         (padConnected()
@@ -235,9 +246,10 @@ export class RaceHud {
       this.recordEl.style.display = 'none';
       return;
     }
-    // PAUSED hides under the options panel — both translucent overlays
-    // stacked read untidy (critic4).
-    this.pauseEl.style.display = paused && !opts?.open ? 'block' : 'none';
+    // PAUSED hides under the options panel and under the results table —
+    // translucent overlays stacked read untidy (critic4 / critic5 D6).
+    this.pauseEl.style.display =
+      paused && !opts?.open && race.phase !== 'finished' ? 'block' : 'none';
     const justFinished =
       race.phase === 'finished' && simTime - race.player.finishTime < 1.5;
     this.center.textContent =

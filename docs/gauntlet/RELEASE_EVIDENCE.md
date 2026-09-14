@@ -241,3 +241,20 @@ crossing, results row shows `best 0:19.35 ★REC`
 (`lap-records-results.png`). Slower laps do not overwrite (a ~140 s
 wall-pinned lap left the 105 s record intact). PG smoke re-run:
 18.12 s best, 0 wall hits — identical baseline.
+
+**Critic5 (6/10) fix batch (this commit):** 7 defects fixed + verified.
+D1 HIGH — AI wall-beach deadlock: wedge escape is now a ladder
+(reverse ~3 s → forward ~3 s → lakitu respawn onto the racing line,
+the same recovery the player gets); wedge sampling runs before the
+recovery early-return so a misaligned+frozen kart still reaches it.
+Verified: a deliberately wall-pinned AI kart recovered and finished
+its race (all 3 AI finishers); SR smoke identical (26.42/22.46/21.62,
+0 hits). D2 — ★REC no longer leaks: recordSetThisRace clears in
+buildWorld (covers GP legs, cup abandon, T-switch) plus the existing
+restartRace reset. D3 — records load validates per-value (finite
+positive numbers): seeded {"0":"garbage","1":-5} shows no rec instead
+of NaN/bricked. D4 — player stuck hint is displacement-based
+(<2 cm/frame) — fires on a pinned kart reporting phantom ~1.6 m/s.
+D5 — M reduce-motion persists via saveSettings. D6 — PAUSED no
+longer stacks over RESULTS. D7 — unbound drive bindings render
+"arrows — drive · drift unbound" instead of "—AJD".

@@ -101,6 +101,7 @@ export class Game {
   private toggleMotion(): void {
     this.chaseCam.reducedMotion = !this.chaseCam.reducedMotion;
     this.settings.reducedMotion = this.chaseCam.reducedMotion;
+    this.saveSettings(); // same persistence as the options row (critic5 D5)
   }
 
   private menuKey(code: string): void {
@@ -130,7 +131,8 @@ export class Game {
     );
   }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
-  private stuckFor = 0; // seconds throttle-held below 1.5 m/s (D4 hint)
+  private stuckFor = 0;
+  private readonly stuckPrevPos = new THREE.Vector3(); // seconds throttle-held below 1.5 m/s (D4 hint)
   // Options key-rebind: while armed, the next keydown becomes the action's
   // code (Escape cancels). Meta/game-command keys are reserved so a drive
   // bind can never shadow pause/quit/menu.
@@ -211,10 +213,17 @@ export class Game {
       /* corrupt/absent storage — defaults stand */
     }
     try {
-      Object.assign(
-        this.records,
-        JSON.parse(localStorage.getItem('grok-kart-records') ?? '{}'),
+      const parsed = JSON.parse(
+        localStorage.getItem('grok-kart-records') ?? '{}',
       );
+      // Per-value validation (critic5 D3): well-formed JSON holding
+      // non-numbers ("garbage", -5, null) rendered `rec NaN:00NaN`
+      // and bricked the track — `bt < bad` is never true.
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+          this.records[+k] = v;
+        }
+      }
     } catch {
       /* corrupt/absent — no records yet */
     }
@@ -444,6 +453,9 @@ export class Game {
     this.scene.add(this.items.group);
     this.minimap = new Minimap(this.track);
     this.celebrated.length = 0;
+    // A rebuilt world is a new race context — the ★REC badge must not
+    // leak across GP legs / cup abandons (critic5 D2).
+    this.recordSetThisRace = false;
     this.saveSettings();
   }
 
@@ -501,10 +513,15 @@ export class Game {
     this.padPrev = padCodes;
     if (!this.paused) this.accumulator += frameDt;
     const canDrive = this.race.allowsDrive && !this.paused;
-    // Wall-pin discovery aid: throttle held but barely moving for ~2 s →
-    // the HUD points at ⌫/S recovery (critic D4: new players think they're
-    // hard-stuck when they never discover the respawn key).
-    if (canDrive && input.throttle > 0 && this.kart.speed < 1.5 && !this.kart.isSpinning) {
+    // Wall-pin discovery aid: throttle held but no real displacement for
+    // ~2 s → the HUD points at ⌫/S recovery (critic D4: new players think
+    // they're hard-stuck when they never discover the respawn key).
+    // Displacement-based (critic5 D4): a fully pinned kart can still
+    // *report* ~1.6 m/s against the wall scrub, so speed thresholds
+    // defeat the hint exactly when it's needed.
+    const moved = this.kart.position.distanceTo(this.stuckPrevPos);
+    this.stuckPrevPos.copy(this.kart.position);
+    if (canDrive && input.throttle > 0 && !this.kart.isSpinning && moved < 0.02) {
       this.stuckFor += frameDt;
     } else {
       this.stuckFor = 0;

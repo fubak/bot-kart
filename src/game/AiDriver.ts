@@ -78,6 +78,56 @@ export class AiDriver {
     );
     this.prevLateral = lateral;
 
+    // --- wedge detection: pressing a wall face with speed but no
+    // displacement (verified: a bot pinned ~2 s at a shortcut wall end).
+    // Displacement sampled every 0.5 s; fast-but-frozen = wedged.
+    // Runs BEFORE the recovery branch: a kart that is both misaligned
+    // and frozen must still reach the escape ladder below.
+    this.posTimer += dt;
+    if (this.posTimer > 0.5) {
+      this.posTimer = 0;
+      // Any wedge — nose-in-wall (low speed) or wall-pressed grind (high
+      // speed) — shows as ~zero displacement. Spin-outs excluded (they
+      // rotate in place legitimately for ~1 s).
+      if (!kart.isSpinning && kart.position.distanceTo(this.lastPos) < 0.5) {
+        this.stuckTime++;
+      } else {
+        this.stuckTime = 0;
+      }
+      this.lastPos.copy(kart.position);
+    }
+    if (this.stuckTime >= 2) {
+      // Escape ladder (critic5 D1: a fixed {brake} response deadlocks —
+      // steering has zero authority at ~0 speed, and braking digs a
+      // tail-to-wall kart deeper):
+      //   ~1-4 s frozen → reverse out steering toward the line.
+      //   ~4-6 s frozen → drive forward out (tail-to-wall case).
+      //   6+ s frozen → lakitu respawn onto the racing line — the same
+      //     recovery the player gets on Backspace; wedges the driver
+      //     can't solve (beached against a wall face) must not cost the
+      //     kart the whole race.
+      const desired = Math.atan2(-tanNow.x, -tanNow.z);
+      const err = wrapAngle(desired - kart.heading);
+      if (this.stuckTime >= 12) {
+        const i = track.nearestIndexNear(kart.position, kart.trackIdx);
+        const t = track.tangentAt(i);
+        kart.reset(track.pointAt(i), Math.atan2(-t.x, -t.z));
+        kart.trackIdx = -1;
+        this.stuckTime = 0;
+        this.recovering = false;
+        return idle;
+      }
+      if (kart.forwardSpeed < -1) {
+        // Reversed enough — drive off steering toward the line.
+        this.stuckTime = 0;
+        return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
+      }
+      if (this.stuckTime < 8) {
+        return { ...idle, brake: 1, steer: clampSteer(err * AI.steerGain) };
+      }
+      return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
+    }
+
     // --- recovery: nose pointing backward along the track ---
     // Post-wall-hit spins can leave the kart facing >160° off the travel
     // direction; pursuit alone would happily drive it the wrong way.
@@ -97,35 +147,6 @@ export class AiDriver {
         // rotates the nose back toward the travel direction while backing up.
         return { ...idle, brake: 1, steer: clampSteer(err * AI.steerGain) };
       }
-    }
-
-    // --- wedge detection: pressing a wall face with speed but no
-    // displacement (verified: a bot pinned ~2 s at a shortcut wall end).
-    // Displacement sampled every 0.5 s; fast-but-frozen = wedged.
-    this.posTimer += dt;
-    if (this.posTimer > 0.5) {
-      this.posTimer = 0;
-      // Any wedge — nose-in-wall (low speed) or wall-pressed grind (high
-      // speed) — shows as ~zero displacement. Spin-outs excluded (they
-      // rotate in place legitimately for ~1 s).
-      if (!kart.isSpinning && kart.position.distanceTo(this.lastPos) < 0.5) {
-        this.stuckTime++;
-      } else {
-        this.stuckTime = 0;
-      }
-      this.lastPos.copy(kart.position);
-    }
-    if (this.stuckTime >= 2) {
-      // Back out steering the nose toward the travel direction (reverse
-      // flips steer inside Kart — same trick as the spin recovery).
-      const desired = Math.atan2(-tanNow.x, -tanNow.z);
-      const err = wrapAngle(desired - kart.heading);
-      if (kart.forwardSpeed < -1) {
-        // Reversed enough — drive off steering toward the line.
-        this.stuckTime = 0;
-        return { ...idle, throttle: 1, steer: clampSteer(-err * AI.steerGain) };
-      }
-      return { ...idle, brake: 1, steer: clampSteer(err * AI.steerGain) };
     }
 
     // --- steering: pure pursuit to the centerline lookahead point ---
