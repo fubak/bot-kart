@@ -104,10 +104,16 @@ export class RaceHud {
       `PRESS ENTER</div>` +
       `<div style="font-size:16px;font-weight:800;margin-top:12px;color:#7be8ff"></div>` +
       `<div style="font-size:13px;color:#9fb4d0;margin-top:14px;line-height:1.8">` +
-      `WASD / arrows — drive &nbsp;·&nbsp; SHIFT — drift &nbsp;·&nbsp; ` +
-      `SPACE — item &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; R — restart &nbsp;·&nbsp; ` +
-      `Q — quit &nbsp;·&nbsp; ⌫ — respawn<br>` +
-      `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track</div>`;
+      `<span style="white-space:nowrap">WASD / arrows — drive</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">SHIFT — drift</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">SPACE — item</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">P — pause</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">R — restart</span><br>` +
+      `<span style="white-space:nowrap">Q — quit</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">⌫ — respawn</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">M — reduce motion</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">O — options</span> &nbsp;·&nbsp; ` +
+      `<span style="white-space:nowrap">T — track</span></div>`;
     this.pauseEl = mk(
       'top:50%;left:50%;transform:translate(-50%,-50%);font-size:42px;' +
       'font-weight:900;color:#fff;display:none;text-align:center',
@@ -120,14 +126,35 @@ export class RaceHud {
       'border-radius:10px;display:none;line-height:2.1;min-width:340px',
     );
     // Ink splat: fullscreen blobs while the player is inked — vision denial
-    // reads instantly without touching the renderer.
+    // reads instantly without touching the renderer. Organic splats, not
+    // flat discs (critic9): each blot is 2-3 overlapping ellipses with a
+    // hot core + feathered edge, plus droplet specks and two drip runs.
     this.inkEl = mk(
       'inset:0;display:none;background:' +
-        'radial-gradient(circle at 24% 30%, rgba(12,10,20,.88) 0 9%, transparent 12%),' +
-        'radial-gradient(circle at 68% 22%, rgba(12,10,20,.85) 0 12%, transparent 15%),' +
-        'radial-gradient(circle at 48% 62%, rgba(12,10,20,.9) 0 14%, transparent 17%),' +
-        'radial-gradient(circle at 82% 66%, rgba(12,10,20,.8) 0 8%, transparent 11%),' +
-        'radial-gradient(circle at 14% 74%, rgba(12,10,20,.82) 0 10%, transparent 13%);' +
+        // main blots — irregular overlapping ellipses, dark core → soft rim
+        'radial-gradient(ellipse 15% 11% at 24% 29%, rgba(9,7,15,.94) 0 55%, rgba(9,7,15,.6) 72%, transparent 95%),' +
+        'radial-gradient(ellipse 9% 13% at 17% 37%, rgba(9,7,15,.9) 0 58%, transparent 92%),' +
+        'radial-gradient(ellipse 7% 5% at 32% 23%, rgba(9,7,15,.85) 0 62%, transparent 94%),' +
+        'radial-gradient(ellipse 16% 12% at 67% 20%, rgba(9,7,15,.92) 0 55%, rgba(9,7,15,.55) 74%, transparent 96%),' +
+        'radial-gradient(ellipse 8% 9% at 76% 28%, rgba(9,7,15,.88) 0 60%, transparent 93%),' +
+        'radial-gradient(ellipse 18% 13% at 50% 60%, rgba(8,6,14,.94) 0 55%, rgba(8,6,14,.55) 75%, transparent 96%),' +
+        'radial-gradient(ellipse 9% 8% at 41% 69%, rgba(9,7,15,.88) 0 60%, transparent 93%),' +
+        'radial-gradient(ellipse 12% 9% at 84% 63%, rgba(9,7,15,.88) 0 58%, transparent 93%),' +
+        'radial-gradient(ellipse 6% 7% at 89% 55%, rgba(9,7,15,.8) 0 60%, transparent 92%),' +
+        'radial-gradient(ellipse 13% 10% at 13% 74%, rgba(9,7,15,.9) 0 58%, transparent 93%),' +
+        'radial-gradient(ellipse 5% 6% at 23% 82%, rgba(9,7,15,.8) 0 60%, transparent 92%),' +
+        // drips running off the two biggest blots
+        'radial-gradient(ellipse 2.2% 9% at 51% 74%, rgba(9,7,15,.7) 0 55%, transparent 95%),' +
+        'radial-gradient(ellipse 1.8% 7% at 68% 31%, rgba(9,7,15,.65) 0 55%, transparent 95%),' +
+        'radial-gradient(ellipse 1.6% 6% at 25% 41%, rgba(9,7,15,.6) 0 55%, transparent 95%),' +
+        // satellite droplets (ellipse, not circle — % radii aren't valid
+        // for circle and would drop the whole layer)
+        'radial-gradient(ellipse 1.5% 1.5% at 38% 33%, rgba(9,7,15,.85) 0 65%, transparent 97%),' +
+        'radial-gradient(ellipse 1.2% 1.2% at 59% 30%, rgba(9,7,15,.8) 0 65%, transparent 97%),' +
+        'radial-gradient(ellipse 1.4% 1.4% at 58% 75%, rgba(9,7,15,.8) 0 65%, transparent 97%),' +
+        'radial-gradient(ellipse 1.1% 1.1% at 30% 65%, rgba(9,7,15,.75) 0 65%, transparent 97%),' +
+        'radial-gradient(ellipse 1.3% 1.3% at 78% 45%, rgba(9,7,15,.75) 0 65%, transparent 97%),' +
+        'radial-gradient(ellipse 1% 1% at 45% 46%, rgba(9,7,15,.7) 0 65%, transparent 97%);' +
         'transition:opacity .3s',
     );
   }
@@ -219,21 +246,32 @@ export class RaceHud {
         .filter((k) => k !== '—')
         .join('');
       const driveHint = driveKeys ? `${driveKeys} / arrows` : 'arrows';
+      // Each "key — action" pair gets a nowrap span so the line can only
+      // break at a separator — pairs like "Q — quit" never split mid-item
+      // (critic9: "quit" orphaned onto its own line, "⌫ — respawn" split).
+      const pair = (s: string) => `<span style="white-space:nowrap">${s}</span>`;
+      const sep = ' &nbsp;·&nbsp; ';
       const hint =
-        `${driveHint} — drive ` +
-        `&nbsp;·&nbsp; ${bindings.drift ? `${keyName(bindings.drift)} — drift` : 'drift unbound'} &nbsp;·&nbsp; ` +
-        `${bindings.item ? `${keyName(bindings.item)} — item` : 'item unbound'} &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; ` +
-        `R — restart &nbsp;·&nbsp; Q — quit &nbsp;·&nbsp; ⌫ — respawn<br>` +
-        `M — reduce motion &nbsp;·&nbsp; O — options &nbsp;·&nbsp; T — track` +
+        [
+          pair(`${driveHint} — drive`),
+          pair(bindings.drift ? `${keyName(bindings.drift)} — drift` : 'drift unbound'),
+          pair(bindings.item ? `${keyName(bindings.item)} — item` : 'item unbound'),
+          pair('P — pause'),
+          pair('R — restart'),
+        ].join(sep) +
+        '<br>' +
+        [pair('Q — quit'), pair('⌫ — respawn'), pair('M — reduce motion'), pair('O — options'), pair('T — track')].join(sep) +
         (padConnected()
-          ? `<br>🎮 stick / RT·LT drive &nbsp;·&nbsp; A go &nbsp;·&nbsp; Y item &nbsp;·&nbsp; Start pause`
+          ? `<br>${pair('🎮 stick / RT·LT drive')}${sep}${pair('A go')}${sep}${pair('Y item')}${sep}${pair('Start pause')}`
           : '');
       const hintEl = this.titleEl.children[4] as HTMLElement;
       if (hintEl.innerHTML !== hint) hintEl.innerHTML = hint;
       // Gentle pulse on PRESS ENTER — cheap DOM animation, no rAF needed.
+      // Floor at 0.7 — the old 0.55+0.45 sin dipped near-illegible against
+      // bright title backgrounds (critic9).
       if (simTime - this.titlePulseAt > 0.06) {
         this.titlePulseAt = simTime;
-        const a = 0.55 + 0.45 * Math.sin(simTime * 3.2);
+        const a = 0.85 + 0.15 * Math.sin(simTime * 3.2); // floor 0.70
         const press = this.titleEl.children[2] as HTMLElement;
         press.style.opacity = a.toFixed(2);
       }
@@ -340,9 +378,11 @@ export class RaceHud {
               if (gp.done) {
                 pts = `   ${gp.points[r]} pts`;
               } else {
-                const earned = rr.finished
-                  ? (GP_PTS[race.positionOf(r) - 1] ?? 0)
-                  : 0;
+                // Game.ts awards position points to EVERY racer incl. DNFs
+                // (GP_POINTS[pos], P4 still gets +3) — the delta must match
+                // what the N-press will actually add (critic9: a DNF showed
+                // "+0 → 13" then totaled 16).
+                const earned = GP_PTS[race.positionOf(r) - 1] ?? 0;
                 pts = `   +${earned} → ${gp.points[r] + earned} pts`;
               }
             }

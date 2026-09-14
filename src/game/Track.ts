@@ -609,6 +609,11 @@ export class Track {
     this.group.add(road);
 
     // Curbs: alternating red/white boxes along both edges — readable boundary.
+    // Centered at hw-0.4 so the 0.8 m plank sits fully on the asphalt
+    // (outer face flush with the road edge) — at hw-0.15 the outer 0.25 m
+    // overhung the lower skirt and the slabs read as floating planks
+    // ringing every corner (critic9). Y sits 1 cm into the road so banked
+    // samples never open an air gap under the plank.
     const curbGeo = new THREE.BoxGeometry(0.8, 0.12, 2.4);
     const red = new THREE.MeshStandardMaterial({ color: 0xd8443c });
     const white = new THREE.MeshStandardMaterial({ color: 0xe8e8e8 });
@@ -626,7 +631,7 @@ export class Track {
         [curbsR, -1],
       ] as const) {
         m.compose(
-          s.point.clone().addScaledVector(s.left, side * (hw - 0.15)).setY(s.point.y + 0.06),
+          s.point.clone().addScaledVector(s.left, side * (hw - 0.4)).setY(s.point.y + 0.05),
           q,
           new THREE.Vector3(1, 1, 1),
         );
@@ -1354,7 +1359,9 @@ export class Track {
     const n = this.samples.length;
     const spots = [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95];
     const postMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.8 });
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x222833, roughness: 0.6 });
+    // Lifted off void-black — a barely-visible dark rim vs a light-swallowing
+    // slab where the poster back loses the depth test at range (critic9).
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x39434f, roughness: 0.6 });
     for (let i = 0; i < spots.length; i++) {
       const idx = Math.floor(spots[i] * n);
       const s = this.samples[idx];
@@ -1381,8 +1388,11 @@ export class Track {
       g.add(art);
       // Poster on the back face too — the looped track exposes the back
       // constantly, and a bare frame read as a black monolith (critic8).
+      // -0.18 not -0.14: the frame's back face sits at -0.125, and the old
+      // 15 mm gap z-fought at chase-cam distance — the poster lost in
+      // patches and the board read as a black slab again (critic9).
       const back = art.clone();
-      back.position.z = -0.14;
+      back.position.z = -0.18;
       back.rotation.y = Math.PI;
       g.add(back);
       const pos = s.point.clone().addScaledVector(s.left, side * (hw + 7));
@@ -1403,14 +1413,28 @@ export class Track {
     const flagMat = new THREE.MeshBasicMaterial({
       color: 0xff8a3a, side: THREE.DoubleSide,
     });
+    // Slim mast rising past the gantry post top — the old quads floated
+    // ~0.7 m above a nearly-invisible pole and read as loose orange
+    // rectangles in the title orbit (critic9 floating props).
+    const poleMat = new THREE.MeshStandardMaterial({
+      color: 0x565e6e, roughness: 0.55, metalness: 0.4,
+    });
+    const poleGeo = new THREE.CylinderGeometry(0.045, 0.055, 2.1, 6);
+    // Pivot at the flag's left edge so it streams off the mast like a real
+    // pennant; the flutter animation rotates around the pole axis.
+    const flagGeo = new THREE.PlaneGeometry(1.5, 0.9);
+    flagGeo.translate(0.72, 0, 0);
     for (const side of [1, -1]) {
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.9), flagMat.clone());
-      flag.position
-        .copy(s0.point)
-        .addScaledVector(s0.left, side * (hw + 1.2))
-        .setY(s0.point.y + 6.2);
+      const base = s0.point
+        .clone()
+        .addScaledVector(s0.left, side * (hw + 1.2));
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.copy(base).setY(s0.point.y + 6.25); // 5.2..7.3 — overlaps the post top
+      this.group.add(pole);
+      const flag = new THREE.Mesh(flagGeo, flagMat.clone());
+      flag.position.copy(base).setY(s0.point.y + 6.85);
       this.group.add(flag);
-      this.animated.push({ obj: flag, kind: 'flag', phase: side * 2.1, baseY: s0.point.y + 6.2 });
+      this.animated.push({ obj: flag, kind: 'flag', phase: side * 2.1, baseY: s0.point.y + 6.85 });
     }
   }
 
@@ -1444,8 +1468,18 @@ export class Track {
         new THREE.BoxGeometry(1.4, 1.0, 1.4),
         new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 1 }),
       );
-      basket.position.y = -5.6;
+      // Tucked up into the envelope's underside + a tether line — the old
+      // 1 m gap left the tan crate dangling alone and it read as a
+      // floating slab in the sky (critic9: "strata wedge" over SR, "tan
+      // slab" atop the NN title).
+      basket.position.y = -5.0;
       g.add(basket);
+      const tether = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.05, 1.3, 5),
+        basket.material,
+      );
+      tether.position.y = -4.9;
+      g.add(tether);
       const a = rng() * Math.PI * 2;
       const r = 120 + rng() * 160;
       g.position.set(Math.cos(a) * r, 55 + rng() * 45, Math.sin(a) * r);

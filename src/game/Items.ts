@@ -56,10 +56,11 @@ interface Slick {
 const boxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
 const boxMat = new THREE.MeshStandardMaterial({
   color: 0x7be8ff,
-  // Brighter emissive pushed over the bloom gate (~linear 1.0): item boxes
-  // read as glowing pickups on every track (WS-POST).
+  // Emissive stays over the bloom gate (~linear 1.0) so boxes read as
+  // glowing pickups — but 2.2 clipped them to solid white cubes at night
+  // (critic9). 1.55 keeps the glow without blowing out.
   emissive: 0x3fd0ff,
-  emissiveIntensity: 2.2,
+  emissiveIntensity: 1.55,
   transparent: true,
   opacity: 0.85,
   flatShading: true,
@@ -171,7 +172,7 @@ export class Items {
           track.leftAt(idx),
           spreads[(s + row) % 3],
         );
-        pos.y += 0.55;
+        pos.y += 0.46; // low hover — 0.55 read as a floating white cube (critic9)
         const mesh = new THREE.Mesh(boxGeo, boxMat);
         mesh.position.copy(pos);
         mesh.rotation.set(0.5, (row + s) * 0.7, 0.4);
@@ -364,7 +365,7 @@ export class Items {
       b.mesh.visible = active;
       if (active) {
         b.mesh.rotation.y += dt * 1.5;
-        b.mesh.position.y = b.pos.y + Math.sin(simTime * 2.4 + b.phase) * 0.16;
+        b.mesh.position.y = b.pos.y + Math.sin(simTime * 2.4 + b.phase) * 0.11;
       }
       if (!active) continue;
       for (let k = 0; k < this.karts.length; k++) {

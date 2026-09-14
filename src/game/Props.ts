@@ -423,7 +423,10 @@ export function dressRidge(ctx: ScatterCtx): DressResult {
       new THREE.Quaternion().setFromAxisAngle(X_AXIS, (rand() - 0.5) * 0.5),
     );
     M.compose(
-      p.clone().setY(gy + 0.1 * sc),
+      // Base buried ~0.3 of the slab height — the tilt otherwise left the
+      // high corner hovering over the dirt, reading as a floating wedge
+      // against the sky (critic9 floating-prop fix).
+      p.clone().setY(gy - 0.06 * sc),
       Q,
       new THREE.Vector3(sc, sc * (0.7 + rand() * 0.5), sc),
     );
@@ -571,11 +574,11 @@ export function dressRidge(ctx: ScatterCtx): DressResult {
       const gy = ctx.fieldY(base);
       const lower = new THREE.Mesh(pillarGeo, archMat);
       lower.position.set(side * (hw + 2.6), gy - s.point.y + 1.6, 0);
-      lower.scale.set(1, 1.5, 1);
+      lower.scale.set(1.3, 1.5, 1.3); // wide enough to read as a pillar at range
       lower.rotation.y = rand() * Math.PI;
       const upper = new THREE.Mesh(pillarGeo, archMat);
       upper.position.set(side * (hw + 2.6), gy - s.point.y + 3.9, 0);
-      upper.scale.set(0.72, 0.9, 0.72);
+      upper.scale.set(0.95, 0.95, 0.95); // meets the lintel — no floating slab
       upper.rotation.y = rand() * Math.PI;
       lower.castShadow = upper.castShadow = true;
       arch.add(lower, upper);
@@ -622,7 +625,10 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
       new THREE.MeshStandardMaterial({
         color: 0x101418,
         emissive: e,
-        emissiveIntensity: 2.1, // over the ~1.0 linear bloom gate
+        // 1.45 (was 2.1): still over the ~1.0 linear bloom gate at the
+        // pulse peak, but the road-spanning bars no longer bloom into
+        // giant sabers slashing the sky at raking angles (critic9).
+        emissiveIntensity: 1.45,
         roughness: 0.4,
       }),
   );
@@ -653,7 +659,10 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
     darkMat,
     gateSpots.length * 2,
   );
-  const barGeo = new THREE.BoxGeometry(2 * (hw + 1.0) + 0.6, 0.55, 0.6);
+  // Slimmer, shorter crossbar (was 0.55 h × 0.6 d spanning hw+1.6): the
+  // long hot bar read as a light saber from low chase angles. Still spans
+  // the full road — the overhang past the posts is what made it giant.
+  const barGeo = new THREE.BoxGeometry(2 * (hw + 0.7), 0.4, 0.45);
   const gateBars = neonMats.map(
     (mm) => new THREE.InstancedMesh(barGeo, mm, Math.ceil(gateSpots.length / 2)),
   );
@@ -684,9 +693,11 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
   gatePosts.count = pi;
   gateBars.forEach((b, k) => (b.count = barCounts[k]));
   objects.push(gatePosts, ...gateBars);
+  // baseY = resting emissiveIntensity for the tick pulse — must match
+  // neonMats (1.45) or the breathing animation restores the saber-hot 2.1.
   animated.push(
-    { obj: gateBars[0], kind: 'gate', phase: 0, baseY: 2.1 },
-    { obj: gateBars[1], kind: 'gate', phase: 2.1, baseY: 2.1 },
+    { obj: gateBars[0], kind: 'gate', phase: 0, baseY: 1.45 },
+    { obj: gateBars[1], kind: 'gate', phase: 2.1, baseY: 1.45 },
   );
 
   // Glow sign boards — post + emissive panel facing the road, scattered on
@@ -729,7 +740,7 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
   panels.forEach((pl, k) => (pl.count = panelCounts[k]));
   objects.push(signPosts, ...panels);
   panels.forEach((pl, k) =>
-    animated.push({ obj: pl, kind: 'sign', phase: k * 2.4, baseY: 2.1 }),
+    animated.push({ obj: pl, kind: 'sign', phase: k * 2.4, baseY: 1.45 }),
   );
 
   // Holo-strip light columns — thin emissive bars weighted into the infield

@@ -20,7 +20,9 @@ export class Minimap {
     this.canvas.width = SIZE;
     this.canvas.height = SIZE;
     this.canvas.style.cssText =
-      'position:fixed;left:16px;bottom:16px;z-index:11;background:rgba(8,14,24,.55);' +
+      // .88 alpha (was .55): the translucent panel let bright world elements
+      // (red wall rails, boost flame) smear through its corner (critic9).
+      'position:fixed;left:16px;bottom:16px;z-index:11;background:rgba(8,14,24,.88);' +
       'border-radius:10px;border:1px solid rgba(140,190,255,.25)';
     document.body.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d')!;

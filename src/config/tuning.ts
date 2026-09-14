@@ -176,8 +176,10 @@ export const POSTFX = {
   speedFx: {
     // Chromatic edge at top speed: ramps in past `start` fraction of
     // KART.maxSpeed; uAberration is the max UV shift at screen corners.
-    start: 0.72,
-    aberration: 0.0045,
+    // critic9: 0.0045 @ 0.72 read as anaglyph-3D fringing well inside the
+    // frame — halved and pushed to the top ~18% of the speed range.
+    start: 0.82,
+    aberration: 0.002,
     ease: 5, // per-second approach rate — smooth engage/disengage
   },
 } as const;

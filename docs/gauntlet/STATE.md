@@ -17,17 +17,17 @@ ring around the spawn orbit + checkered gantry banner (commit cfda739,
 evidence `wave7/fix-title-*.png`).
 
 Workstreams (serial sub-gauntlets, file-owned):
-1. WS-POST post-processing (bloom/vignette/speed-blur) — Game.ts render
-   path + new PostFX + tuning
-2. WS-DRESS set-dressing density per theme — Track.ts scenery
-3. WS-ANIM world animation (crowd/flags/signs/billboards/props) — Track.ts
-   animated registry + tick
-4. WS-MAT material richness (kart gloss, road specular, emissives) —
-   Kart.ts/Track.ts/Sky.ts materials
-5. WS-CHAR kart/character life (look-around, hit reactions, lean,
-   squash/stretch) — Kart.ts rig
-6. WS-AUDIO audio/music depth (ambience, jingles, per-track music) —
-   Audio.ts/Music.ts + Game.ts hooks
+1. WS-POST post-processing — INTEGRATED (3417943, POST-001)
+2. WS-DRESS set-dressing density — INTEGRATED (b981dea, DRESS-001)
+3. Critic 9: 7.0/10 (0H/4M/8L) — `wave7/CRITIC9_REPORT.md`
+4. FIX-001 critic-9 batch — INTEGRATED (this wave): kerbs grounded,
+   AI progress watchdog + 5 s wedge rung (16/16 finishes), NN gate
+   sabers tamed, speed CA halved, organic ink splats, title hints,
+   PRESS ENTER floor, headlight/item-box bloom, GP delta, flag masts,
+   billboard z-fight, minimap alpha. Smoke identical ×3; NN live
+   67.7 fps p95 15.3 ms.
+5. Next: WS-ANIM world animation → WS-MAT materials → critic 10 →
+   WS-CHAR / WS-AUDIO → final gate.
 Critic after every 1–2 integrated streams; final critic ≥8.5/10 or two
 consecutive clean passes to ship.
 

@@ -710,3 +710,59 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   player fill light for readability. 68 fps @ ~600–790 draws.
 - **Largest Gap:** shadow box only follows the player (rivals off-box
   lose shadows); no cascade, distant scenery unshadowed.
+
+### POST-001 — Post-processing pipeline (wave 7)
+
+- **Domain:** Core/Render
+- **Status:** Integrated (3417943)
+- **Evidence:** `wave7/post-*.png` — EffectComposer chain: MSAA HDR
+  render target → UnrealBloomPass → OutputPass (ACES/sRGB) → grade
+  pass (vignette, saturation/contrast, speed-gated chromatic edge,
+  eased; gated on reducedMotion). Sky silhouette colors
+  grade-compensated (partial, not squared) so mountains seat as soft
+  horizon shapes.
+- **Verified:** NN bloom on pylons/rails/chevrons; PG 68.1 fps p95
+  15.7 ms; smoke baselines identical ×3.
+- **Largest Gap:** single bloom pass (no mip chain tuning); grade
+  params fixed per-build not per-track.
+
+### DRESS-001 — Set-dressing density (wave 7)
+
+- **Domain:** Track/Props
+- **Status:** Integrated (b981dea)
+- **Evidence:** `wave7/dress-*.png` — per-theme prop vocabulary
+  ~2.2–3.2× denser: PG orchard/hay/fence/shrubs, SR strata outcrops +
+  cairns + arch, NN pylons/gates/signage. ScatterCtx nearest-leg
+  clearance (folded-layout safe). Only ~+10–20 draws.
+- **Verified live:** all 3 tracks; SR dark-blob regression caught +
+  fixed before accept (instance tint × material = rock² darkening —
+  bases lifted + controlled emissive floors; near-black sky pixels
+  30.3%→~5%).
+- **Largest Gap:** props are static (no idle motion); still
+  MeshStandardMaterial flat-shaded throughout.
+
+### FIX-001 — Critic-9 defect batch (wave 7)
+
+- **Domain:** Whole-game
+- **Status:** Integrated
+- **Evidence:** `wave7/CRITIC9_REPORT.md` (7.0/10, 0H/4M/8L) +
+  `wave7/fix9-*.png`, `int-fix9-*.png`.
+- **Fixed + verified:** kerb slabs recentered hw-0.4/Y+0.05 seated on
+  asphalt all tracks; AI progress watchdog (net centerline-index gain
+  per 8 s window <24 → lakitu; teleports skipped) + wedge ladder
+  6 s→5 s — 16/16 finishes in subagent torture, all-finishers GP
+  leg 3/3 confirmed live; NN gate bars shortened/thinned/moved +
+  emissive 2.1→1.45 (saber bloom gone); speed CA 0.0045→0.002 gated
+  at 0.82 top-speed frac; ink overlay organic multi-ellipse splats +
+  drips; title hint spans non-breaking; PRESS ENTER opacity floor
+  0.15→0.70; headlight/item-box bloom reduced; GP delta uses position
+  points for unfinished racers; flags get masts + pennant pivots;
+  balloon tethers, strata grounding, arch pillars, billboard back
+  z-fight (poster -0.14→-0.18, frame #39434f), minimap alpha
+  0.55→0.88.
+- **Verified:** build clean; smoke identical ×3 (PG 22.69/19.22/18.12,
+  SR 26.42/22.46/21.62, NN 25.54/21.61/20.90, 0 hits, stalled 0);
+  NN live 67.7 fps p50 14.6 / p95 15.3 / p99 15.6 @ 619 draws; 0
+  console errors/warnings.
+- **Largest Gap:** kerbs on banked NN sections still read slightly
+  proud from behind (inherent to box-on-banked-edge).

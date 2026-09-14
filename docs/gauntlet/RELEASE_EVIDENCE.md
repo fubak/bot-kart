@@ -325,3 +325,19 @@ grounding posts; billboards + grandstand used road height → float on
 elevated sections, now grounded at field level (y=0); texture
 anisotropy 4→8 for oblique-view tiling. Verified live
 (`fix8-low-*.png`).
+
+**Wave-7 meta-gauntlet (this commit):** coordinator title/menu fixes
+(25 m spawn prop-exclusion ring, orbit reframe, checkered gantry
+banner — cfda739) + WS-POST post chain (MSAA HDR target → bloom →
+ACES output → grade/vignette/speed-CA — 3417943) + WS-DRESS density
+2.2–3.2× per theme with ScatterCtx foldback-safe clearance (b981dea;
+SR dark-blob regression root-caused to instance-tint×material and
+fixed before accept). Critic9 7.0/10 (`wave7/CRITIC9_REPORT.md`) →
+FIX-001 batch: kerbs seated (hw-0.4), AI progress watchdog +
+wedge 5 s (16/16 torture finishes, all-finishers GP live), NN gate
+sabers/bloom tamed, speed CA 0.0045→0.002, organic ink splats,
+title hints + PRESS ENTER floor, GP delta fix, flag masts, billboard
+back z-fight, minimap 0.88. Verified independently: typecheck+build
+clean; smoke identical ×3; NN 67.7 fps p50 14.6/p95 15.3/p99 15.6
+@ 619 draws; 0 console errors/warnings. Evidence `wave7/fix9-*` +
+`int-fix9-*`.

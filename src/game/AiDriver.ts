@@ -33,6 +33,18 @@ export class AiDriver {
   private lastPos = new THREE.Vector3();
   private posTimer = 0;
   private stuckTime = 0;
+  // Progress watchdog (critic9 D3 — AI DNFs): the wedge/grind probes only
+  // see position displacement and wall contact, so a kart that keeps
+  // *some* motion while never gaining on the centerline — spin-pin cycles
+  // at foldbacks, creeping with just enough slide to reset the 0.5 m
+  // displacement counter, circling between parallel legs — used to grind
+  // whole laps at 90 s+ or never finish. Track the kart's own unwrapped
+  // centerline index instead: ~zero net forward index over a window means
+  // the kart is functionally lost → lakitu onto the racing line.
+  private lastRawIdx = -1;
+  private progAccum = 0; // net forward index travel (teleports skipped)
+  private progMark = 0; // accum value at the last window boundary
+  private progWindow = 0; // seconds into the current window
   // Wedge state: anchored once stuckTime trips; wedgeTime then runs on
   // wall-clock (not the displacement counter) so the reverse→forward
   // limit cycle can't reset the ladder — it only clears on a real
@@ -70,6 +82,10 @@ export class AiDriver {
     this.stuckTime = 0;
     this.wedgeTime = -1;
     this.grindTime = 0;
+    this.lastRawIdx = -1;
+    this.progAccum = 0;
+    this.progMark = 0;
+    this.progWindow = 0;
   }
 
   update(kart: Kart, track: Track, dt: number, traffic?: Kart[]): ControlState {
@@ -78,6 +94,36 @@ export class AiDriver {
 
     // Local track frame: lateral offset + travel-direction tangent.
     const { lateral, tangent: tanNow } = track.query(kart.position, kart.trackIdx);
+
+    // --- progress watchdog: net forward centerline-index gain per ~8 s
+    // window. Jumps ≥90 samples are teleports (lakitu/swap), not progress —
+    // skip them so a respawn can't spoof the meter. A kart that can't net
+    // ~13 m of index in a window is lost in a mode the displacement/wall
+    // probes miss → lakitu onto the nearest line point (global lookup —
+    // the kart's own leg may be the wrong one at a foldback).
+    {
+      const n = track.sampleCount;
+      const raw = kart.trackIdx;
+      if (raw >= 0 && this.lastRawIdx >= 0) {
+        const d = (raw - this.lastRawIdx + n) % n;
+        if (d > 0 && d < 90) this.progAccum += d;
+        else if (d > n / 2 && n - d < 90) this.progAccum -= n - d;
+      }
+      this.lastRawIdx = raw >= 0 ? raw : -1;
+      this.progWindow += dt;
+      if (this.progWindow >= 8) {
+        const gained = this.progAccum - this.progMark;
+        this.progMark = this.progAccum;
+        this.progWindow = 0;
+        if (gained < 24 && !kart.celebrating) {
+          const i = track.nearestIndex(kart.position);
+          const t = track.tangentAt(i);
+          kart.reset(track.pointAt(i), Math.atan2(-t.x, -t.z));
+          this.reset();
+          return idle;
+        }
+      }
+    }
     // Lateral velocity (m/s, signed) — how fast the slide is carrying the
     // kart toward a wall. Clamped: centerline index jumps can spike it.
     const latVel = THREE.MathUtils.clamp(
@@ -129,11 +175,12 @@ export class AiDriver {
       // tail-to-wall kart deeper. critic6 D1: the reverse-exit reset
       // created a limit cycle that never reached the upper rungs):
       //   0-3 s wedged → reverse out steering toward the line.
-      //   3-6 s wedged → drive forward out (tail-to-wall case).
-      //   6+ s wedged → lakitu respawn onto the racing line — the same
+      //   3-5 s wedged → drive forward out (tail-to-wall case).
+      //   5+ s wedged → lakitu respawn onto the racing line — the same
       //     recovery the player gets on Backspace; wedges the driver
       //     can't solve (beached against a wall face) must not cost the
-      //     kart the whole race.
+      //     kart the whole race (critic9 D3: rung at 6 s left too much
+      //     dead time on top of the detection delay).
       // The ladder only clears on real displacement from the anchor —
       // an attempt that rocks the kart but re-wedges keeps climbing.
       this.wedgeTime += dt;
@@ -148,7 +195,7 @@ export class AiDriver {
       } else {
         const desired = Math.atan2(-tanNow.x, -tanNow.z);
         const err = wrapAngle(desired - kart.heading);
-        if (this.wedgeTime > 6) {
+        if (this.wedgeTime > 5) {
           const i = track.nearestIndexNear(kart.position, kart.trackIdx);
           const t = track.tangentAt(i);
           kart.reset(track.pointAt(i), Math.atan2(-t.x, -t.z));

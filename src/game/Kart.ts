@@ -130,9 +130,10 @@ export class Kart {
     this.placeholderDriver.push(head, eyeL, eyeR);
     this.group.add(this.body);
     // Headlight lamp quads — hidden until setNight(true). Parented to the
-    // body so they yaw/lean with the kart.
-    const lampGeo = new THREE.CircleGeometry(0.14, 10);
-    const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
+    // body so they yaw/lean with the kart. 0.11 not 0.14: the lamp dots
+    // bloom into a white ball at night otherwise (critic9).
+    const lampGeo = new THREE.CircleGeometry(0.11, 10);
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xffe9c2 });
     for (const x of [-0.42, 0.42]) {
       const lamp = new THREE.Mesh(lampGeo, lampMat);
       lamp.position.set(x, 0.34, -KART.length / 2 - 0.56);
@@ -266,13 +267,15 @@ export class Kart {
   setNight(on: boolean, beam = false): void {
     for (const l of this.headlamps) l.visible = on;
     if (on && beam && !this.headlight) {
-      this.headlight = new THREE.SpotLight(0xffeecc, 60, 55, 0.5, 0.5, 1.6);
+      // 60→34: the full-power beam + fill blew the driver head out to a
+      // pure-white ball at night (critic9). Still a real throw ahead.
+      this.headlight = new THREE.SpotLight(0xffeecc, 34, 55, 0.5, 0.5, 1.6);
       this.headlight.position.set(0, 1.4, -1.2);
       this.headlight.target.position.set(0, 0, -14);
       this.group.add(this.headlight, this.headlight.target);
       // Soft warm fill so the player's kart doesn't vanish into the dark —
       // one extra light, same budget discipline as the beam.
-      this.fill = new THREE.PointLight(0xffd8b0, 14, 9, 1.8);
+      this.fill = new THREE.PointLight(0xffd8b0, 7.5, 9, 1.8);
       this.fill.position.set(0, 2.6, 0.8);
       this.group.add(this.fill);
     } else if (!on && this.headlight) {
