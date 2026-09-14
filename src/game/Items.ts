@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { Kart } from './Kart';
 import type { Track } from './Track';
+import type { Fx } from './Fx';
 import { AI, KART } from '../config/tuning';
+import { chevronTexture, glowTexture } from '../core/Textures';
 
 // Item system: floating pickup boxes on the racing line + usable items.
 // Wave-2 unit ITEM-001. Boxes respawn after collection; a kart holds one
@@ -25,6 +27,7 @@ interface Box {
   idx: number;
   pos: THREE.Vector3;
   respawnAt: number; // sim-time; active when < simTime
+  phase: number; // bob offset — desyncs the row's hover
 }
 
 interface Pad {
@@ -34,7 +37,7 @@ interface Pad {
 }
 
 interface Missile {
-  mesh: THREE.Mesh;
+  mesh: THREE.Group; // body + nose + fins + exhaust glow
   progressIdx: number; // unwrapped centerline index — travels the racing line
   speed: number;
   travelled: number;
@@ -58,12 +61,47 @@ const boxMat = new THREE.MeshStandardMaterial({
   opacity: 0.85,
   flatShading: true,
 });
-const missileGeo = new THREE.ConeGeometry(0.32, 1.3, 8);
-const missileMat = new THREE.MeshStandardMaterial({
+const missileBodyGeo = new THREE.CylinderGeometry(0.22, 0.26, 0.9, 10);
+const missileNoseGeo = new THREE.ConeGeometry(0.22, 0.5, 10);
+const missileFinGeo = new THREE.BoxGeometry(0.5, 0.3, 0.06);
+const missileBodyMat = new THREE.MeshStandardMaterial({
+  color: 0xe8ecf2,
+  roughness: 0.35,
+  metalness: 0.4,
+});
+const missileNoseMat = new THREE.MeshStandardMaterial({
   color: 0xff5040,
   emissive: 0xa02010,
-  flatShading: true,
+  roughness: 0.4,
 });
+const missileFinMat = new THREE.MeshStandardMaterial({
+  color: 0xd84030,
+  roughness: 0.5,
+});
+const missileGlowMat = new THREE.SpriteMaterial({
+  map: glowTexture(),
+  color: 0xffa030,
+  transparent: true,
+  opacity: 0.9,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+function buildMissile(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(missileBodyGeo, missileBodyMat);
+  body.castShadow = true;
+  const nose = new THREE.Mesh(missileNoseGeo, missileNoseMat);
+  nose.position.y = 0.7;
+  const finL = new THREE.Mesh(missileFinGeo, missileFinMat);
+  finL.position.set(0, -0.35, 0);
+  const finR = finL.clone();
+  finR.rotation.y = Math.PI / 2;
+  const glow = new THREE.Sprite(missileGlowMat);
+  glow.position.y = -0.65;
+  glow.scale.setScalar(0.9);
+  g.add(body, nose, finL, finR, glow);
+  return g;
+}
 const slickGeo = new THREE.CylinderGeometry(0.7, 0.9, 0.22, 10);
 const slickMat = new THREE.MeshStandardMaterial({
   color: 0xf7d020,
@@ -80,6 +118,7 @@ const shieldMat = new THREE.MeshStandardMaterial({
 });
 const padGeo = new THREE.PlaneGeometry(2.2, 3.2);
 const padMat = new THREE.MeshStandardMaterial({
+  map: chevronTexture(),
   color: 0x30e8a0,
   emissive: 0x12a060,
   transparent: true,
@@ -103,7 +142,11 @@ export class Items {
   readonly shieldUntil: number[] = [];
   private readonly shieldMeshes: THREE.Mesh[] = [];
 
-  constructor(private readonly track: Track, karts: Kart[]) {
+  constructor(
+    private readonly track: Track,
+    karts: Kart[],
+    private readonly fx?: Fx,
+  ) {
     this.karts = karts;
     this.held = karts.map(() => null);
     for (let i = 0; i < karts.length; i++) {
@@ -123,12 +166,13 @@ export class Items {
           track.leftAt(idx),
           spreads[(s + row) % 3],
         );
-        pos.y += 0.7;
+        pos.y += 0.55;
         const mesh = new THREE.Mesh(boxGeo, boxMat);
         mesh.position.copy(pos);
         mesh.rotation.set(0.5, (row + s) * 0.7, 0.4);
+        mesh.castShadow = true;
         this.group.add(mesh);
-        this.boxes.push({ mesh, idx, pos, respawnAt: 0 });
+        this.boxes.push({ mesh, idx, pos, respawnAt: 0, phase: (row + s) * 1.3 });
       }
     }
     // Boost pads: glowing arrows placed OFF the ideal line — a route decision
@@ -226,6 +270,8 @@ export class Items {
       // the ±48-sample continuity window walks a phantom path (critic6 D8).
       racers?.[kartIdx].resync(kart.position, kart.trackIdx);
       racers?.[target].resync(other.position, other.trackIdx);
+      this.fx?.pickupSparkle(kart.position.clone().setY(kart.position.y + 0.8));
+      this.fx?.pickupSparkle(other.position.clone().setY(other.position.y + 0.8));
       return item;
     }
     if (item === 'ink') {
@@ -270,7 +316,7 @@ export class Items {
       return item;
     }
     // Missile: spawn at kart nose, travels the centerline forward.
-    const mesh = new THREE.Mesh(missileGeo, missileMat);
+    const mesh = buildMissile();
     mesh.position.copy(kart.position).setY(0.5);
     this.group.add(mesh);
     this.missiles.push({
@@ -307,11 +353,14 @@ export class Items {
 
   update(simTime: number, dt: number, scores?: number[]): void {
     if (scores) this.scores = scores;
-    // Pickup checks
+    // Pickup checks — boxes hover-bob + spin while active.
     for (const b of this.boxes) {
       const active = simTime >= b.respawnAt;
       b.mesh.visible = active;
-      if (active) b.mesh.rotation.y += dt * 1.5;
+      if (active) {
+        b.mesh.rotation.y += dt * 1.5;
+        b.mesh.position.y = b.pos.y + Math.sin(simTime * 2.4 + b.phase) * 0.16;
+      }
       if (!active) continue;
       for (let k = 0; k < this.karts.length; k++) {
         if (this.held[k]) continue; // one item at a time
@@ -322,11 +371,13 @@ export class Items {
           this.held[k] = this.roll(k);
           b.respawnAt = simTime + RESPAWN_S;
           b.mesh.visible = false;
+          this.fx?.pickupSparkle(b.pos);
           break;
         }
       }
     }
-    // Boost pads: drive over for a free mini-turbo (1 s cooldown per kart)
+    // Boost pads pulse — the arrows throb to read "drive over me".
+    padMat.emissiveIntensity = 1.1 + Math.sin(simTime * 4.2) * 0.5;
     for (const p of this.pads) {
       if (simTime < p.cooldownUntil) continue;
       for (const kart of this.karts) {
@@ -346,13 +397,15 @@ export class Items {
       m.progressIdx += step;
       m.travelled += m.speed * dt;
       const wp = this.track.pointAt(Math.floor(m.progressIdx));
-      wp.y += 0.5;
+      wp.y += 0.55 + Math.sin(simTime * 9 + m.travelled) * 0.06; // hover wobble
       m.mesh.position.copy(wp);
       const t = this.track.tangentAt(Math.floor(m.progressIdx));
       m.mesh.quaternion.setFromUnitVectors(
         new THREE.Vector3(0, 1, 0),
-        t.clone().negate(), // cone +Y tip faces -tangent? keep nose forward
+        t.clone(), // missile +Y nose points along travel
       );
+      m.mesh.rotateY(simTime * 14); // barrel roll on its own axis
+      this.fx?.missileTrail(m.mesh.position, t.clone().multiplyScalar(m.speed * 0.4));
       let hit = false;
       for (let k = 0; k < this.karts.length; k++) {
         const kart = this.karts[k];
@@ -385,6 +438,7 @@ export class Items {
         continue;
       }
       s.mesh.rotation.y += dt * 0.8;
+      s.mesh.scale.setScalar(1 + Math.sin(simTime * 3 + i) * 0.06);
       for (let k = 0; k < this.karts.length; k++) {
         const kart = this.karts[k];
         if (kart === s.owner && simTime < s.spawnedAt + 1.2) continue;
@@ -393,11 +447,13 @@ export class Items {
         if (dx * dx + dz * dz < 1.2) {
           if (simTime < this.shieldUntil[k]) {
             this.shieldUntil[k] = 0; // shield absorbs the hit, consumed
+            this.fx?.splat(kart.position.clone().setY(kart.position.y + 0.8), 0x60d0ff);
           } else {
             kart.velocity.multiplyScalar(0.3);
             kart.lastWallHit = simTime;
             kart.lastWallImpact = 0.55;
             kart.spinUntil = simTime + 1.1;
+            this.fx?.splat(kart.position.clone().setY(kart.position.y + 0.5));
           }
           this.group.remove(s.mesh);
           this.slicks.splice(i, 1);

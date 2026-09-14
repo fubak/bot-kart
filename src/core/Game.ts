@@ -20,6 +20,8 @@ import { RaceHud } from './RaceHud';
 import { Audio } from './Audio';
 import { AiDriver } from '../game/AiDriver';
 import { Items } from '../game/Items';
+import { Fx } from '../game/Fx';
+import { Sky } from '../game/Sky';
 import { Minimap } from './Minimap';
 import { TRACKS } from '../game/Track';
 import botBUrl from '../../assets/exported/characters/grokbot-b-seated.glb?url';
@@ -43,7 +45,12 @@ export class Game {
   private readonly chaseCam: ChaseCamera;
   private readonly hud: DebugHud;
   private track!: Track;
-  private readonly kart = new Kart();
+  // Shared world systems — one particle pool set + one sky, themed per
+  // track in buildWorld. Karts/items emit into fx (replaces per-kart VFX).
+  private readonly fx = new Fx();
+  private readonly sky = new Sky();
+  private readonly sunDir = new THREE.Vector3(60, 90, 40).normalize();
+  private readonly kart = new Kart(undefined, undefined, undefined, this.fx);
   private readonly aiKarts: Kart[] = [];
   private readonly aiDrivers: AiDriver[] = [];
   private items!: Items;
@@ -176,6 +183,11 @@ export class Game {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Filmic grade + shadow-mapped sun — the production-lighting pass.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft deprecated in r185+
     document.body.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(0x87b7e8);
@@ -185,22 +197,31 @@ export class Game {
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff3dd, 1.6);
     this.sun.position.set(60, 90, 40);
-    this.scene.add(this.sun);
+    // Player-following shadow box: the sun hovers 160 m along the theme's
+    // light direction so casters stay inside a tight ~140 m ortho window.
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    const sc = this.sun.shadow.camera;
+    sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70;
+    sc.near = 40; sc.far = 300;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.03;
+    this.scene.add(this.sun, this.sun.target);
 
     // Build the kart field once (karts persist across track swaps — only
     // the world geometry/race/items/minimap are rebuilt by buildWorld).
-    this.scene.add(this.kart.group, this.kart.vfx.object);
+    this.scene.add(this.kart.group, this.fx.object, this.sky.group);
     const tints = [0xff9040, 0xc070ff, 0xffd454]; // orange / violet / yellow rivals
     const bots = [botBUrl, botCUrl, undefined]; // Bot B heavy, Bot C speed, Bot A
     const karts = [kartBUrl, kartCUrl, undefined]; // matching chassis
     const lines = [-1.8, 0.8, 2.2]; // each bot takes its own line
     for (let i = 0; i < AI_COUNT; i++) {
-      const aiKart = new Kart(tints[i], bots[i], karts[i]);
+      const aiKart = new Kart(tints[i], bots[i], karts[i], this.fx);
       this.aiKarts.push(aiKart);
       // Bot C (index 1, speed archetype) is the shortcut-taker — it dives
       // onto the gravel aprons through the cut zones every lap.
       this.aiDrivers.push(new AiDriver(this.baseSkills[i], lines[i], i === 1));
-      this.scene.add(aiKart.group, aiKart.vfx.object);
+      this.scene.add(aiKart.group);
     }
     // Restore persisted settings + last-played track.
     try {
@@ -427,12 +448,13 @@ export class Game {
     }
     this.track = new Track(TRACKS[idx]);
     this.scene.add(this.track.group);
-    // Per-track ambience: sky/fog + lighting rig recolor per theme.
+    // Per-track ambience: sky dome/fog + lighting rig recolor per theme.
     const th = this.track.theme;
+    this.sky.applyTheme(th);
     (this.scene.background as THREE.Color).set(th.sky);
     (this.scene.fog as THREE.Fog).color.set(th.sky);
-    if (th.sunPos) this.sun.position.set(...th.sunPos);
-    else this.sun.position.set(60, 90, 40);
+    if (th.sunPos) this.sunDir.set(...th.sunPos).normalize();
+    else this.sunDir.set(60, 90, 40).normalize();
     this.sun.color.set(th.sunColor ?? 0xfff3dd);
     this.sun.intensity = th.sunIntensity ?? 1.6;
     this.hemi.color.set(th.hemiSky ?? 0xbfd9ff);
@@ -454,7 +476,7 @@ export class Game {
     }
     this.race = new Race(this.track, undefined, 1 + AI_COUNT);
     this.race.restart(spawnPositions, 0, 'title');
-    this.items = new Items(this.track, [this.kart, ...this.aiKarts]);
+    this.items = new Items(this.track, [this.kart, ...this.aiKarts], this.fx);
     this.scene.add(this.items.group);
     this.minimap = new Minimap(this.track);
     this.celebrated.length = 0;
@@ -579,6 +601,24 @@ export class Game {
       this.simTime += SIM.fixedDt;
       this.accumulator -= SIM.fixedDt;
     }
+
+    // World ambience + feedback: particles/clouds tick on render time,
+    // countdown engine revs puff exhaust, the shadow box tracks the player.
+    this.fx.update(frameDt);
+    this.sky.update(frameDt);
+    this.track.tick(this.simTime);
+    if (this.race.phase === 'countdown' && Math.random() < 26 * frameDt) {
+      const k = [this.kart, ...this.aiKarts][Math.floor(Math.random() * 4)];
+      const rear = k.position
+        .clone()
+        .addScaledVector(k.forward(), -1.4)
+        .setY(k.position.y + 0.45);
+      this.fx.exhaustPuff(rear, k.velocity);
+    }
+    this.sun.position
+      .copy(this.kart.position)
+      .addScaledVector(this.sunDir, 160);
+    this.sun.target.position.copy(this.kart.position);
 
     this.chaseCam.update(frameDt, this.kart, this.race);
     this.hud.tick(frameDt * 1000);

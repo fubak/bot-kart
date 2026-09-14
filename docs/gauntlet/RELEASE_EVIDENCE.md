@@ -283,3 +283,20 @@ RacerProgress: added resync() re-anchoring lastIdx/progressIdx/
 gates to the landing position (verified: progressIdx 45→501, score
 followed, no wrongWay flap). SR smoke identical + stall probe
 stalled:0.
+
+**Wave-6 visual production pass (this commit):** Mario-Kart-grade
+visual overhaul — generated texture batch (grass/asphalt/gravel tiles,
+cloud+smoke sprites, crowd, 3 sponsor billboards → `assets/textures/`),
+gradient-sky dome + sun/stars + drifting clouds + silhouette mountain
+rings (`Sky.ts`), shared instanced particle system replacing per-kart
+KartVfx (`Fx.ts` — drift sparks, boost flames, tire smoke, gravel
+dust, landing puffs, wall chips, spin stars, pickup sparkle, missile
+trail+explosion), textured road/grass/gravel + checker start line,
+grandstand+crowd, 7 sponsor billboards, balloons, flags, ACES tone
+mapping + PCF shadow-mapped sun + per-theme lighting + night fill
+light, rebuilt missile/box/slick/pad visuals. Verified in-game on all
+3 tracks (`evidence/wave6/`); AI smoke identical to baseline
+(PG 22.69/19.22/18.12 · SR 26.42/22.46/21.62 · NN 25.54/21.61/20.90,
+0 wall hits, stalled 0 ×3); 68.3 fps p50 14.7 / p95 15.2 / worst
+15.7 ms @ 599 draws / 98.7k tris. Media registered in
+MEDIA_REGISTRY (tex-*/bb-* entries).

@@ -93,3 +93,113 @@ into the game/marketing.
 - **Downstream Use:** Blender modeling reference for a speed-class Grok
   Bot; seed for `image_edit` consistency pass if selected.
 - **Critic Result:** pending
+
+### tex-grass — Grass Field Tile
+
+- **Category:** textures
+- **Status:** Integrated
+- **Owner:** Coordinator Devin (wave-6 visual pass, 2026-09-14)
+- **Critic:** Coordinator (in-game review — `wave6/vis-*.png`)
+- **Model/Tool:** image_gen (grok CLI 1.0.31, headless `-p`)
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Reference Media:** none
+- **Output:** `assets/media/textures/grass_tile.png` → `assets/textures/grass_tile.png` (512²)
+- **Quality Unit:** ENV-004 (surface textures)
+- **Generation Parameters:** aspect_ratio 1:1, 1024² → resized 512²
+- **Selection Rationale:** clean tileable painterly grass; tint-multiplies
+  per-track theme so one tile serves all three circuits.
+- **Downstream Use:** ground plane + embankment skirt `map` (Track.ts).
+- **Critic Result:** accepted — reads crisp at speed, no visible seams.
+
+### tex-asphalt — Asphalt Road Tile
+
+- **Category:** textures
+- **Status:** Integrated
+- **Owner:** Coordinator Devin
+- **Critic:** Coordinator
+- **Model/Tool:** image_gen
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Output:** `assets/media/textures/asphalt_tile.png` → `assets/textures/asphalt_tile.png` (512²)
+- **Quality Unit:** ENV-004
+- **Generation Parameters:** 1:1, 1024² → 512²
+- **Selection Rationale:** dark slate-blue speckle; road ribbon UV'd
+  ~6 m/tile gives optical flow without busy noise.
+- **Downstream Use:** racing-surface `map` (Track.ts).
+- **Critic Result:** accepted.
+
+### tex-gravel — Gravel Apron Tile
+
+- **Category:** textures
+- **Status:** Integrated
+- **Owner:** Coordinator Devin
+- **Critic:** Coordinator
+- **Model/Tool:** image_gen
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Output:** `assets/media/textures/gravel_tile.png` → `assets/textures/gravel_tile.png` (512²)
+- **Quality Unit:** ENV-004
+- **Generation Parameters:** 1:1, 1024² → 512²
+- **Downstream Use:** shortcut-apron `map` (Track.ts).
+- **Critic Result:** accepted — apron reads as loose dirt vs asphalt.
+
+### tex-cloud — Cloud Billboard Sprite
+
+- **Category:** sprites
+- **Status:** Integrated
+- **Owner:** Coordinator Devin
+- **Critic:** Coordinator
+- **Model/Tool:** image_gen
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Output:** `assets/media/textures/cloud_sprite.png` → `assets/textures/cloud_sprite.png` (512²)
+- **Quality Unit:** ENV-003 (sky system)
+- **Generation Parameters:** 1:1, white-on-black → luminance = `alphaMap`.
+- **Downstream Use:** 14 drifting `THREE.Sprite` clouds, per-theme tint (Sky.ts).
+- **Critic Result:** accepted — clean silhouette, no halo artifacts.
+
+### tex-smoke — Smoke Puff Sprite
+
+- **Category:** sprites / vfx
+- **Status:** Integrated
+- **Owner:** Coordinator Devin
+- **Critic:** Coordinator
+- **Model/Tool:** image_gen
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Output:** `assets/media/textures/smoke_puff.png` → `assets/textures/smoke_puff.png` (512²)
+- **Quality Unit:** VFX-001 (particle system)
+- **Generation Parameters:** 1:1, white-on-black → luminance-as-alpha in
+  the Fx shader (`lumaAlpha` path).
+- **Downstream Use:** smoke pool texture — tire smoke, gravel dust,
+  exhaust, explosion puffs (Fx.ts).
+- **Critic Result:** accepted — soft edges, no box outline.
+
+### tex-crowd — Grandstand Crowd
+
+- **Category:** textures
+- **Status:** Integrated
+- **Owner:** Coordinator Devin
+- **Critic:** Coordinator
+- **Model/Tool:** image_gen
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Output:** `assets/media/textures/crowd.png` → `assets/textures/crowd.png` (1024×288)
+- **Quality Unit:** ENV-005 (scenery)
+- **Generation Parameters:** 16:9 → center-band crop 1024×288.
+- **Selection Rationale:** dense colorful blob-robot rows on navy;
+  unlit material doubles as lit grandstand at night.
+- **Downstream Use:** 3 grandstand tier faces (Track.ts buildGrandstand).
+- **Critic Result:** accepted — reads as packed crowd at race distance.
+
+### bb-grokkart / bb-turbo / bb-botpower — Sponsor Billboards
+
+- **Category:** decals / backgrounds
+- **Status:** Integrated
+- **Owner:** Coordinator Devin
+- **Critic:** Coordinator
+- **Model/Tool:** image_gen
+- **Prompt File:** `assets/media/prompts/2026-09-14_wave6-texture-batch_v1.md`
+- **Output:** `assets/media/textures/billboard_*.png` → `assets/textures/billboard_*.png` (1024×576)
+- **Quality Unit:** ENV-005
+- **Generation Parameters:** 16:9, three poster variants (GROK KART /
+  TURBO ZONE / BOT POWER) cycling across 7 trackside boards.
+- **Selection Rationale:** bold retro-poster read at speed; original
+  robot mascot + text rendered cleanly.
+- **Downstream Use:** billboard panels along each circuit (Track.ts).
+- **Critic Result:** accepted — legible, on-brand, no IP issues.

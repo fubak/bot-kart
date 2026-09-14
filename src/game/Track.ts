@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TRACK } from '../config/tuning';
+import { TEX, checkerTexture } from '../core/Textures';
 
 // Test track: a closed Catmull-Rom circuit ("Proving Grounds").
 // Provides the road/barrier meshes plus a sampled centerline lookup used for
@@ -27,6 +28,13 @@ export interface TrackLayout {
     hemiSky?: number;
     hemiGround?: number;
     hemiIntensity?: number;
+    /** Sky dome: gradient top/horizon, cloud tint, mountain silhouette
+     *  base color, star density (0 = day sky). */
+    skyTop?: number;
+    skyHorizon?: number;
+    cloud?: number;
+    mountain?: number;
+    stars?: number;
     /** Night circuits: karts run headlights (emissive lamps + beam). */
     night?: boolean;
   };
@@ -108,6 +116,12 @@ export const TRACKS: readonly TrackLayout[] = [
       sunColor: 0xffc890,
       hemiSky: 0xf0c8a0,
       hemiGround: 0x5a6a3a,
+      // Golden-hour sky: dusky violet top, hot peach horizon, warm clouds.
+      skyTop: 0x5a5488,
+      skyHorizon: 0xffb070,
+      cloud: 0xffd8c0,
+      mountain: 0x6a5468,
+      stars: 0.12,
     },
   },
   {
@@ -155,6 +169,12 @@ export const TRACKS: readonly TrackLayout[] = [
       hemiSky: 0x4a5e92,
       hemiGround: 0x2a3828,
       hemiIntensity: 1.35,
+      // Night sky: near-black zenith, teal glow at the horizon, full stars.
+      skyTop: 0x060a18,
+      skyHorizon: 0x1e3450,
+      cloud: 0x2e3c58,
+      mountain: 0x101828,
+      stars: 1,
       night: true,
     },
   },
@@ -503,23 +523,35 @@ export class Track {
   private buildMeshes(): void {
     const n = this.samples.length;
     const hw = TRACK.roadHalfWidth;
+    const grassTex = TEX.grass();
+    grassTex.repeat.set(90, 90);
+    // Tint 55% toward white — the theme color still grades the generated
+    // texture per circuit without crushing it to monochrome.
+    const grassTint = new THREE.Color(this.theme.grass).lerp(new THREE.Color(0xffffff), 0.55);
     const grass = new THREE.Mesh(
-      new THREE.PlaneGeometry(600, 600),
-      new THREE.MeshStandardMaterial({ color: this.theme.grass, roughness: 1 }),
+      new THREE.PlaneGeometry(1100, 1100),
+      new THREE.MeshStandardMaterial({ map: grassTex, color: grassTint, roughness: 1 }),
     );
     grass.rotation.x = -Math.PI / 2;
     grass.position.y = -0.1; // clear of the road plane — avoids z-fighting
+    grass.receiveShadow = true;
     this.group.add(grass);
 
-    // Road ribbon: triangle strip between left/right road edges.
+    // Road ribbon: triangle strip between left/right road edges, UV'd so
+    // the asphalt tile flows along the racing surface (~6 m per tile).
+    const spacing = this.curve.getLength() / n;
     const roadPos: number[] = [];
+    const roadUv: number[] = [];
     const roadIdx: number[] = [];
+    const vTile = 6;
     for (let i = 0; i <= n; i++) {
       const s = this.samples[i % n];
       roadPos.push(
         s.point.x + s.left.x * hw, s.point.y, s.point.z + s.left.z * hw,
         s.point.x - s.left.x * hw, s.point.y, s.point.z - s.left.z * hw,
       );
+      const v = (i * spacing) / vTile;
+      roadUv.push(0, v, 1, v);
       if (i < n) {
         const a = i * 2;
         // CCW seen from +Y so normals face up (left edge = even verts).
@@ -528,12 +560,20 @@ export class Track {
     }
     const roadGeo = new THREE.BufferGeometry();
     roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(roadPos, 3));
+    roadGeo.setAttribute('uv', new THREE.Float32BufferAttribute(roadUv, 2));
     roadGeo.setIndex(roadIdx);
     roadGeo.computeVertexNormals();
+    const asphalt = TEX.asphalt();
+    asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
     const road = new THREE.Mesh(
       roadGeo,
-      new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.9 }),
+      new THREE.MeshStandardMaterial({
+        map: asphalt,
+        color: new THREE.Color(0x8a92a0).lerp(new THREE.Color(0xffffff), 0.35),
+        roughness: 0.85,
+      }),
     );
+    road.receiveShadow = true;
     this.group.add(road);
 
     // Curbs: alternating red/white boxes along both edges — readable boundary.
@@ -571,6 +611,13 @@ export class Track {
       roughness: 0.7,
       side: THREE.DoubleSide,
     });
+    // Bright accent rail along the wall top — reads as a continuous
+    // painted lip, ties the circuit into the classic kart-racer look.
+    const railMat = new THREE.MeshStandardMaterial({
+      color: this.theme.night ? 0x35f0c8 : 0xe04a3a,
+      emissive: this.theme.night ? 0x18b89a : 0x481410,
+      side: THREE.DoubleSide,
+    });
     for (const side of [1, -1]) {
       const wallPos: number[] = [];
       const wallIdx: number[] = [];
@@ -579,6 +626,8 @@ export class Track {
       const h = TRACK.wallHeight;
       // Skip samples inside this side's gravel zone → a visible gap where
       // the shortcut apron opens (karts drive onto dirt, not through wall).
+      const railPos: number[] = [];
+      const railIdx: number[] = [];
       for (let i = 0; i <= n; i++) {
         const s = this.samples[i % n];
         const z = this.zoneAt(i % n);
@@ -587,6 +636,7 @@ export class Track {
         const bz = s.point.z + s.left.z * side * off;
         const base = wallPos.length / 3;
         wallPos.push(bx, s.point.y, bz, bx, s.point.y + h, bz);
+        railPos.push(bx, s.point.y + h - 0.16, bz, bx, s.point.y + h, bz);
         // Emit quads only when this AND the next sample are both ungapped.
         if (i < n) {
           const zNext = this.zoneAt((i + 1) % n);
@@ -595,6 +645,8 @@ export class Track {
             const a = base;
             if (side > 0) wallIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
             else wallIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+            if (side > 0) railIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+            else railIdx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
           }
         }
       }
@@ -602,18 +654,30 @@ export class Track {
       wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallPos, 3));
       wallGeo.setIndex(wallIdx);
       wallGeo.computeVertexNormals();
-      this.group.add(new THREE.Mesh(wallGeo, wallMat));
+      const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+      wallMesh.castShadow = true;
+      wallMesh.receiveShadow = true;
+      this.group.add(wallMesh);
+      const railGeo = new THREE.BufferGeometry();
+      railGeo.setAttribute('position', new THREE.Float32BufferAttribute(railPos, 3));
+      railGeo.setIndex(railIdx);
+      railGeo.computeVertexNormals();
+      this.group.add(new THREE.Mesh(railGeo, railMat));
     }
 
     // Gravel aprons: dirt ribbon from the road edge outward, plus a low berm
     // at the far edge (the new wall line). Reads as a rough cut-through.
+    const gravelTex = TEX.gravel();
+    gravelTex.wrapS = gravelTex.wrapT = THREE.RepeatWrapping;
     const gravelMat = new THREE.MeshStandardMaterial({
-      color: 0xa08658,
+      map: gravelTex,
+      color: 0xc8b090,
       roughness: 1,
       side: THREE.DoubleSide,
     });
     for (const z of this.gravelZones) {
       const gPos: number[] = [];
+      const gUv: number[] = [];
       const gIdx: number[] = [];
       const inner = hw - 0.6;
       const outer = hw + TRACK.gravelWidth + 0.9;
@@ -626,15 +690,20 @@ export class Track {
           s.point.x + s.left.x * z.side * inner, s.point.y - 0.015, s.point.z + s.left.z * z.side * inner,
           s.point.x + s.left.x * z.side * outer, s.point.y - 0.015, s.point.z + s.left.z * z.side * outer,
         );
+        const v = (i * spacing) / 3;
+        gUv.push(0, v, 1.4, v);
         if (i < i1) {
           gIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
         }
       }
       const gGeo = new THREE.BufferGeometry();
       gGeo.setAttribute('position', new THREE.Float32BufferAttribute(gPos, 3));
+      gGeo.setAttribute('uv', new THREE.Float32BufferAttribute(gUv, 2));
       gGeo.setIndex(gIdx);
       gGeo.computeVertexNormals();
-      this.group.add(new THREE.Mesh(gGeo, gravelMat));
+      const gravelMesh = new THREE.Mesh(gGeo, gravelMat);
+      gravelMesh.receiveShadow = true;
+      this.group.add(gravelMesh);
       // Dirt berm at the gravel's outer edge — low soft mounds marking the
       // new boundary (reads as piled earth, not barriers).
       const bermGeo = new THREE.CylinderGeometry(1.6, 2.0, 0.34, 8);
@@ -659,13 +728,18 @@ export class Track {
 
     // Embankment skirts: grass ribbon from each road edge outward+down to
     // ground, so elevated sections read as mounds instead of floating ribbon.
+    const skirtTint = new THREE.Color(this.theme.skirt).lerp(new THREE.Color(0xffffff), 0.5);
+    const skirtTex = TEX.grass();
+    skirtTex.wrapS = skirtTex.wrapT = THREE.RepeatWrapping;
     const skirtMat = new THREE.MeshStandardMaterial({
-      color: this.theme.skirt,
+      map: skirtTex,
+      color: skirtTint,
       roughness: 1,
       side: THREE.DoubleSide,
     });
     for (const side of [1, -1]) {
       const skPos: number[] = [];
+      const skUv: number[] = [];
       const skIdx: number[] = [];
       const inner = hw - 0.1;
       const outer = hw + 6;
@@ -675,6 +749,8 @@ export class Track {
           s.point.x + s.left.x * side * inner, s.point.y, s.point.z + s.left.z * side * inner,
           s.point.x + s.left.x * side * outer, -0.35, s.point.z + s.left.z * side * outer,
         );
+        const v = (i * spacing) / 5;
+        skUv.push(0, v, 1.2, v);
         if (i < n) {
           const a = i * 2;
           if (side > 0) skIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
@@ -683,16 +759,21 @@ export class Track {
       }
       const skGeo = new THREE.BufferGeometry();
       skGeo.setAttribute('position', new THREE.Float32BufferAttribute(skPos, 3));
+      skGeo.setAttribute('uv', new THREE.Float32BufferAttribute(skUv, 2));
       skGeo.setIndex(skIdx);
       skGeo.computeVertexNormals();
-      this.group.add(new THREE.Mesh(skGeo, skirtMat));
+      const skirtMesh = new THREE.Mesh(skGeo, skirtMat);
+      skirtMesh.receiveShadow = true;
+      this.group.add(skirtMesh);
     }
 
-    // Start/finish stripe.
+    // Start/finish stripe — checkered racing line.
     const s0 = this.samples[0];
+    const checker = checkerTexture();
+    checker.repeat.set(4, 1);
     const stripe = new THREE.Mesh(
       new THREE.PlaneGeometry(hw * 2, 2),
-      new THREE.MeshStandardMaterial({ color: 0xf5f5f5 }),
+      new THREE.MeshStandardMaterial({ map: checker, roughness: 0.7 }),
     );
     stripe.rotation.x = -Math.PI / 2;
     stripe.rotation.z = -Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
@@ -821,6 +902,10 @@ export class Track {
       trunks.setMatrixAt(placed, m);
       m.compose(p.clone().setY(gy + (1.6 + 1.6) * sc), rot, new THREE.Vector3(sc, sc, sc));
       canopies.setMatrixAt(placed, m);
+      // Per-tree canopy hue shift — breaks the cloned-forest look.
+      const tint = new THREE.Color(this.theme.canopy)
+        .offsetHSL((rand() - 0.5) * 0.06, (rand() - 0.5) * 0.15, (rand() - 0.5) * 0.1);
+      canopies.setColorAt(placed, tint);
       placed++;
     }
     for (let c = 0; c < 40; c++) {
@@ -836,6 +921,173 @@ export class Track {
       );
       rocks.setMatrixAt(c, m);
     }
+    trunks.castShadow = true;
+    canopies.castShadow = true;
+    rocks.castShadow = true;
     this.group.add(trunks, canopies, rocks);
+
+    this.buildGrandstand(s0, hw);
+    this.buildBillboards();
+    this.buildFlags(s0, hw);
+    this.buildBalloons();
+  }
+
+  // ---------- production scenery (wave 6) ----------
+  // Animated props register here; tick(simTime) advances them.
+  private readonly animated: {
+    obj: THREE.Object3D;
+    kind: 'flag' | 'balloon';
+    phase: number;
+    baseY: number;
+  }[] = [];
+
+  /** Stepped grandstand + crowd + flags beside the start line. */
+  private buildGrandstand(s0: Sample, hw: number): void {
+    const g = new THREE.Group();
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x8a93a2, roughness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xd8443c, roughness: 0.7 });
+    const crowdMat = new THREE.MeshBasicMaterial({
+      map: TEX.crowd(),
+      side: THREE.DoubleSide,
+    });
+    // Three stepped tiers rising away from the track.
+    for (let i = 0; i < 3; i++) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(22, 1.2, 2.6), standMat);
+      step.position.set(0, 0.6 + i * 1.5, i * 2.4);
+      step.castShadow = true;
+      g.add(step);
+      const crowd = new THREE.Mesh(new THREE.PlaneGeometry(21, 1.3), crowdMat);
+      crowd.position.set(0, 1.65 + i * 1.5, i * 2.4 - 1.28);
+      crowd.rotation.x = -0.12;
+      g.add(crowd);
+    }
+    // Canopy roof on slim posts.
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(23, 0.3, 7.5), roofMat);
+    roof.position.set(0, 6.4, 2.4);
+    roof.castShadow = true;
+    g.add(roof);
+    for (const px of [-10.5, 10.5]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.35, 5.8, 0.35), standMat);
+      post.position.set(px, 3.2, 2.4);
+      g.add(post);
+      const flag = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.3, 0.8),
+        new THREE.MeshBasicMaterial({ color: 0xffd54a, side: THREE.DoubleSide }),
+      );
+      flag.position.set(px, 6.9, 2.4);
+      g.add(flag);
+      this.animated.push({ obj: flag, kind: 'flag', phase: px, baseY: 6.9 });
+    }
+    // Anchor: well outside the left wall at the start line — a backdrop
+    // landmark, not a roadside object (was hw+9 and loomed over the track).
+    const anchor = s0.point.clone().addScaledVector(s0.left, hw + 20);
+    g.position.set(anchor.x, s0.point.y, anchor.z);
+    g.rotation.y = Math.atan2(s0.left.x, s0.left.z) + Math.PI / 2;
+    // Face the crowd toward the track.
+    g.rotateY(Math.PI);
+    this.group.add(g);
+  }
+
+  /** Sponsor billboards around the circuit — generated poster art. */
+  private buildBillboards(): void {
+    const n = this.samples.length;
+    const spots = [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95];
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.8 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x222833, roughness: 0.6 });
+    for (let i = 0; i < spots.length; i++) {
+      const idx = Math.floor(spots[i] * n);
+      const s = this.samples[idx];
+      const side = i % 2 === 0 ? 1 : -1;
+      const g = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 0.5), postMat);
+      post.position.y = 2.2;
+      g.add(post);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(7.2, 3.4, 0.25), frameMat);
+      frame.position.y = 5.6;
+      frame.castShadow = true;
+      g.add(frame);
+      const art = new THREE.Mesh(
+        new THREE.PlaneGeometry(6.8, 3.0),
+        new THREE.MeshBasicMaterial({ map: TEX.billboards[i % TEX.billboards.length]() }),
+      );
+      art.position.set(0, 5.6, 0.14);
+      g.add(art);
+      const pos = s.point.clone().addScaledVector(s.left, side * (hw() + 7));
+      g.position.set(pos.x, s.point.y, pos.z);
+      // Face back along the travel direction so drivers see it on approach.
+      g.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z) + (side > 0 ? 0.35 : -0.35);
+      this.group.add(g);
+    }
+    function hw() { return TRACK.roadHalfWidth; }
+  }
+
+  /** Waving pennant flags on the start gantry posts. */
+  private buildFlags(s0: Sample, hw: number): void {
+    const flagMat = new THREE.MeshBasicMaterial({
+      color: 0xff8a3a, side: THREE.DoubleSide,
+    });
+    for (const side of [1, -1]) {
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.9), flagMat.clone());
+      flag.position
+        .copy(s0.point)
+        .addScaledVector(s0.left, side * (hw + 1.2))
+        .setY(s0.point.y + 6.2);
+      this.group.add(flag);
+      this.animated.push({ obj: flag, kind: 'flag', phase: side * 2.1, baseY: s0.point.y + 6.2 });
+    }
+  }
+
+  /** Hot-air balloons drifting far overhead — pure kart-racer dressing. */
+  private buildBalloons(): void {
+    const stripe = (a: string, b: string) => {
+      const cv = document.createElement('canvas');
+      cv.width = 64; cv.height = 32;
+      const g = cv.getContext('2d')!;
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = i % 2 ? a : b;
+        g.fillRect(i * 8, 0, 8, 32);
+      }
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    };
+    const palettes: [string, string][] = [
+      ['#ff5a4a', '#f4f0e8'], ['#3fd8ff', '#f4f0e8'], ['#ffd54a', '#7a4ad8'],
+    ];
+    const rng = (() => { let s = 9001; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff); })();
+    for (let i = 0; i < 4; i++) {
+      const g = new THREE.Group();
+      const env = new THREE.Mesh(
+        new THREE.SphereGeometry(4, 14, 12),
+        new THREE.MeshStandardMaterial({ map: stripe(...palettes[i % 3]), roughness: 0.8 }),
+      );
+      env.scale.y = 1.15;
+      g.add(env);
+      const basket = new THREE.Mesh(
+        new THREE.BoxGeometry(1.4, 1.0, 1.4),
+        new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 1 }),
+      );
+      basket.position.y = -5.6;
+      g.add(basket);
+      const a = rng() * Math.PI * 2;
+      const r = 120 + rng() * 160;
+      g.position.set(Math.cos(a) * r, 55 + rng() * 45, Math.sin(a) * r);
+      this.group.add(g);
+      this.animated.push({ obj: g, kind: 'balloon', phase: rng() * 6.28, baseY: g.position.y });
+    }
+  }
+
+  /** Advance ambient animations (flag flutter, balloon bob/drift). */
+  tick(simTime: number): void {
+    for (const a of this.animated) {
+      if (a.kind === 'flag') {
+        a.obj.rotation.y = Math.sin(simTime * 3.1 + a.phase) * 0.45;
+        a.obj.rotation.z = Math.sin(simTime * 5.3 + a.phase * 2) * 0.12;
+      } else {
+        a.obj.position.y = a.baseY + Math.sin(simTime * 0.4 + a.phase) * 3;
+        a.obj.position.x += Math.sin(simTime * 0.05 + a.phase) * 0.004;
+        a.obj.rotation.y = simTime * 0.03 + a.phase;
+      }
+    }
   }
 }

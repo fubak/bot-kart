@@ -132,13 +132,15 @@
     "largestGap": "key remapping, leg animation, cup variety"
   },
   "performance": {
-    "fps": 68.9,
+    "fps": 68.3,
     "frameTimeMs": 14.6,
     "p95Ms": 15.1,
-    "worstMs": 15.6,
-    "drawCalls": 494,
-    "triangles": 67134,
-    "status": "mid_race_measured_2026-09-13 (busiest scene; baseline was 75fps/13.3ms on the empty shell)"
+    "worstMs": 15.7,
+    "drawCalls": 599,
+    "triangles": 98668,
+    "status": "mid_race_measured_2026-09-13 (busiest scene; baseline was 75fps/13.3ms on the empty shell)",
+    "p50ms": 14.7,
+    "p95ms": 15.2
   },
   "tests": {
     "status": "not_run",
@@ -156,6 +158,7 @@
     "integrated": 0
   },
   "recentChanges": [
+    "wave6 visual production: generated textures (9), Sky.ts dome+clouds+mountains, Fx.ts shared particles, textured road/grass/gravel, grandstand+crowd+billboards+balloons+flags, ACES+PCF shadows+per-theme lighting+night fill, missile/box/slick/pad visuals; smoke identical x3, 68fps",
     "2026-09-13: repository initialized (Vite+TS+Three shell, docs, skills, toolchain)",
     "2026-09-13: Game Director specification installed in DEVIN_GAME_DIRECTOR.md",
     "2026-09-13: Grok Imagine capability verified via live image_gen test",
@@ -166,17 +169,7 @@
     "2026-09-13: Wave 1 slice built \u00e2\u20ac\u201d fixed-step loop, input, arcade kart (drift+boost), track, chase cam, HUD, __game hooks",
     "2026-09-13: baseline perf 75fps avg13.3ms p99 18.1ms 14 draws 5.6k tris (measured while driving)",
     "2026-09-13: art direction set \u00e2\u20ac\u201d 3 Grok concepts Selected (A rounded canonical / B square heavy / C wedge fast)",
-    "2026-09-13: slice critic FAIL 4/10 \u00e2\u2020\u2019 fix pass: visible walls, wall contact-episode, steer ramp, boost bleed, cam shake",
-    "2026-09-13: wall slide verified live (impact 15.5 \u00e2\u2020\u2019 slide 24.3 \u00e2\u2020\u2019 release 28 m/s); road winding + z-fight fixed",
-    "2026-09-13: wave4 critic3 PASS 8/10 — all HIGH/LOW defects fixed + committed (ee3770f)",
-    "2026-09-13: NN wall-clip resolved — V-kink (R≈6/110°) softened to ~55° lean, AI braking horizon 1.3s/6 probes; 0 hits all tracks (3aaabcd)",
-    "2026-09-13: final regression sweep — full GP autopilot (standings ★BOT-A2 24pts, clean title re-arm), 68.9fps p95 15.1ms, 0 console errors, build clean",
-    "2026-09-13: key remapping shipped (21fdfad) — 6 bind rows + RESET in options, persisted, conflict-safe; all documented feature gaps closed; critic4 playtest launched on the build",
-    "2026-09-13: wave4 critic4 7.5/10 — HIGH nose-in wall velocity runaway fixed (frame-derived normal; parked kart read 28m/s → now 0.03, stuck hint fires), MED alternate-bind footgun + stale key hints fixed, LOW ×5 fixed (bd09ab8)",
-    "2026-09-13: leg animation shipped (a23641e) — pedal work + spin/celebration kicks; all documented quality gaps closed",
-    "2026-09-13: gamepad support shipped (abab038) — pad axes merge into ControlState, buttons dispatch through the key pipeline; mock-verified",
-    "2026-09-13: per-track lap records — grok-kart-records persistence, title rec line, NEW LAP RECORD toast, results ★REC; live-verified incl. no-overwrite; PG smoke identical (18.12s, 0 hits)",
-    "2026-09-14: wave4 critic5 6/10 — D1 HIGH AI wall-beach deadlock fixed (reverse→forward→lakitu-respawn ladder), D2 ★REC buildWorld leak, D3 corrupt-record bricking, D4 displacement-based stuck hint, D5 M persist, D6 overlay stack, D7 unbound hint — all verified (61c433b)"
+    "2026-09-13: slice critic FAIL 4/10 \u00e2\u2020\u2019 fix pass: visible walls, wall contact-episode, steer ramp, boost bleed, cam shake"
   ],
   "blockers": [],
   "milestones": [
@@ -192,22 +185,9 @@
     }
   ],
   "phase": "executing",
-  "lastUpdated": "2026-09-14T00:00:00.000Z",
-  "wave": "4 — release candidate (critic5 in flight)",
-  "latestBuild": {
-    "typecheck": "clean",
-    "build": "clean",
-    "perf": {
-      "fps": 68.9,
-      "avgMs": 14.6,
-      "p95Ms": 15.1,
-      "draws": 494,
-      "tris": 67134
-    },
-    "console": "0 errors / 0 warnings across full GP session",
-    "aiSmoke": "all 3 tracks, all skills, 3 laps, 0 wall hits (PG 22.69/19.22/18.12, SR 26.42/22.46/21.62, NN 25.54/21.61/20.90)",
-    "grandPrix": "full 3-leg autopilot pass verified — points accumulate, final standings sorted, champion starred, title re-arms fresh cup"
-  },
+  "lastUpdated": "2026-09-14",
+  "wave": 6,
+  "latestBuild": "vite 8.2.2 \u00b7 game 92.48 kB (gzip 32.00) + three vendor 612.00 kB (gzip 155.38) + 9 generated texture assets",
   "completedUnits": [
     "AI-001-integration",
     "kart-collision",
@@ -221,11 +201,11 @@
     "verdict": "defects fixed post-report",
     "report": "docs/gauntlet/evidence/wave4/CRITIC6_REPORT.md",
     "fixed": [
-      "D1 residual AI wedge limit-cycle deadlock (HIGH — anchor-based wedge state, guaranteed lakitu respawn at 6s)",
-      "D8 swap teleport desyncs RacerProgress (MED — resync() re-anchors tracker to landing leg, mask reset prevents gate-skip)"
+      "D1 residual AI wedge limit-cycle deadlock (HIGH \u00e2\u20ac\u201d anchor-based wedge state, guaranteed lakitu respawn at 6s)",
+      "D8 swap teleport desyncs RacerProgress (MED \u00e2\u20ac\u201d resync() re-anchors tracker to landing leg, mask reset prevents gate-skip)"
     ],
     "reverified": [
-      "D2 ★REC scoping",
+      "D2 \u00e2\u02dc\u2026REC scoping",
       "D3 record validation (all corrupt shapes)",
       "D4 displacement stuck hint",
       "D5 M persistence",

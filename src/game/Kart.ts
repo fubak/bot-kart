@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KART } from '../config/tuning';
 import type { ControlState } from '../core/Input';
 import type { Track } from './Track';
-import { KartVfx } from './KartVfx';
+import { Fx } from './Fx';
 import kartGlbUrl from '../../assets/exported/karts/kart-a.glb?url';
 import botGlbUrl from '../../assets/exported/characters/grokbot-a.glb?url';
 
@@ -18,7 +18,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 export class Kart {
   readonly group = new THREE.Group();
-  readonly vfx = new KartVfx();
+  readonly vfx: Fx;
 
   position = new THREE.Vector3();
   heading = 0; // rad; 0 faces -Z (ADR-002)
@@ -94,7 +94,8 @@ export class Kart {
 
   /** tint multiplies the GLB materials — cheap rival differentiation until
    *  distinct Bot B/C assets land. */
-  constructor(tint?: THREE.ColorRepresentation, botUrl?: string, kartUrl?: string) {
+  constructor(tint?: THREE.ColorRepresentation, botUrl?: string, kartUrl?: string, fx?: Fx) {
+    this.vfx = fx ?? new Fx();
     this.tint = tint === undefined ? null : new THREE.Color(tint);
     this.botUrl = botUrl ?? botGlbUrl;
     this.kartUrl = kartUrl ?? kartGlbUrl;
@@ -157,6 +158,11 @@ export class Kart {
     this.frontAxle.add(frontL, frontR);
     this.wheels.push(rearL, rearR, frontL, frontR);
     this.group.add(rearL, rearR, this.frontAxle);
+    // Shadow casting — GLB assets set their own on load; procedural
+    // fallback parts cast too.
+    this.group.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.castShadow = true;
+    });
   }
 
   /**
@@ -196,6 +202,7 @@ export class Kart {
     // would double-spin them).
     model.traverse((o) => {
       if (/^wheel_(fl|fr|rl|rr)$/.test(o.name)) this.glbWheels.push(o);
+      if (o instanceof THREE.Mesh) o.castShadow = true;
     });
     for (const o of this.proceduralBody) o.visible = false;
     for (const w of this.wheels) w.visible = false;
@@ -230,6 +237,9 @@ export class Kart {
         void size;
         // Seat-base origin → place at cockpit floor, slightly behind center.
         bot.position.set(0, 0.62, 0.28);
+        bot.traverse((o) => {
+          if (o instanceof THREE.Mesh) o.castShadow = true;
+        });
         for (const o of this.placeholderDriver) o.visible = false;
         for (const name of ['arm_l', 'arm_r', 'head', 'leg_l', 'leg_r']) {
           const node = bot.getObjectByName(name);
@@ -256,12 +266,21 @@ export class Kart {
       this.headlight.position.set(0, 1.4, -1.2);
       this.headlight.target.position.set(0, 0, -14);
       this.group.add(this.headlight, this.headlight.target);
+      // Soft warm fill so the player's kart doesn't vanish into the dark —
+      // one extra light, same budget discipline as the beam.
+      this.fill = new THREE.PointLight(0xffd8b0, 14, 9, 1.8);
+      this.fill.position.set(0, 2.6, 0.8);
+      this.group.add(this.fill);
     } else if (!on && this.headlight) {
       this.group.remove(this.headlight, this.headlight.target);
       this.headlight.dispose();
       this.headlight = undefined;
+      this.group.remove(this.fill!);
+      this.fill!.dispose();
+      this.fill = undefined;
     }
   }
+  private fill?: THREE.PointLight;
 
   get speed(): number {
     return this.velocity.length();
@@ -489,7 +508,7 @@ export class Kart {
         this.impactSquash = Math.min(0.55, this.airTime * 0.45);
         this.lastWallHit = simTime;
         this.lastWallImpact = Math.min(1, this.airTime * 0.5);
-        this.vfx.wallChips(this.position.clone().setY(groundY + 0.15), new THREE.Vector3(0, 1, 0));
+        this.vfx.dust(this.position.clone().setY(groundY + 0.15), this.velocity, 0xcfc4ae);
       }
       this.airTime = 0;
       this.grounded = true;
@@ -527,10 +546,10 @@ export class Kart {
       if (this.speed > KART.gravelMaxSpeed) {
         this.velocity.multiplyScalar(KART.gravelMaxSpeed / this.speed);
       }
-      if (this.speed > 8 && Math.random() < 0.5) {
-        this.vfx.wallChips(
-          this.position.clone().setY(this.position.y + 0.1),
-          new THREE.Vector3(0, 1, 0),
+      if (this.speed > 8 && Math.random() < 0.7) {
+        this.vfx.dust(
+          this.position.clone().setY(this.position.y + 0.15),
+          this.velocity,
         );
       }
     }
@@ -566,7 +585,12 @@ export class Kart {
       const inward = track.leftAt(c.index).clone().multiplyScalar(-Math.sign(c.lateral)).setY(0);
       this.vfx.wallChips(this.position.clone().setY(0.3), inward);
     }
-    this.vfx.update(dt);
+    // Spin-out stars — orbiting four-point stars while controls are dead.
+    if (this.isSpinning) {
+      const a = this.lastSimTime * 15 + this.driverPhase;
+      this.vfx.spinStar(this.position, a);
+      this.vfx.spinStar(this.position, a + Math.PI);
+    }
 
     this.syncVisual();
   }

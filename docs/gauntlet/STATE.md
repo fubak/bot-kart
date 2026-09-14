@@ -84,7 +84,20 @@ None.
   standings sort with ★ champion (BOT-A2 24), title re-arms fresh cup.
 - Console audit: 0 errors / 0 warnings across the GP session.
 - Latest commits: `2a85fa4` lap records → `61c433b` critic5 batch →
-  `f593a78` vendor chunk split → `54c82ea`/`5fe6294` critic6 batch.
+  `f593a78` vendor chunk split → `54c82ea`/`5fe6294` critic6 batch →
+  wave-6 visual production (uncommitted at doc time — see below).
+- **Wave 6 — Visual Production (this session):** grok-image texture
+  batch (9 assets → `assets/textures/`), `Sky.ts` gradient dome +
+  sun/stars + drifting clouds + fog-proof mountain silhouettes,
+  `Fx.ts` shared instanced particle system (sparks + smoke, replaces
+  per-kart KartVfx), textured road/grass/gravel with real UVs +
+  checker start, grandstand+crowd, sponsor billboards, balloons,
+  flags, ACES + PCF shadow-mapped sun + per-theme lighting + night
+  fill light, missile/trail/box/slick/pad item-visual rebuild.
+  Live-verified on all 3 tracks; AI smoke identical baselines
+  (0 wall hits, stalled 0 ×3); 68.3 fps / p95 15.2 ms @ ~600–790
+  draws / ~100k tris; build clean (game 92 kB + three vendor 612 kB,
+  textures as cached assets). Evidence: `evidence/wave6/`.
 - Wave-4 critic5 (lap-records playtest): 6/10 —
   `evidence/wave4/CRITIC5_REPORT.md`. Records verified end-to-end
   (per-track persist, toast timing, no-overwrite, AI can't set).

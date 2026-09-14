@@ -638,3 +638,75 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   a gamepad line when a pad is connected.
 - **Largest Gap:** no pad remapping or analog-item binding; no
   vibration/rumble; verified only via mock (no physical pad on hand).
+
+### ENV-003 — Sky system (wave 6)
+
+- **Domain:** Track/VFX
+- **Status:** Integrated
+- **Evidence:** `wave6/vis-title.png`, `vis-title-sr.png`,
+  `vis-title-nn.png` — `Sky.ts` gradient-dome shader (zenith→horizon,
+  per-theme palette) + sun disc (day) / 800-star field (night), 14
+  drifting cloud sprites (generated `cloud_sprite.png` luminance-alpha),
+  two silhouette mountain rings with baked atmospheric fade (fog-proof).
+- **Largest Gap:** clouds are single-sprite clones (no shape variety);
+  no dynamic weather/time-of-day transitions.
+
+### ENV-004 — Generated surface textures (wave 6)
+
+- **Domain:** Track
+- **Status:** Integrated
+- **Evidence:** `wave6/vis-title.png`, `vis-title-sr.png` — grok-image
+  tiles (`grass/asphalt/gravel` 512²) mapped onto ground plane, road
+  ribbon (real UVs, ~6 m/tile), gravel aprons, embankment skirt;
+  checker `start stripe`; procedural fallbacks keep the game working if
+  a texture fails (`Textures.ts` loader).
+- **Largest Gap:** tiles are shared across tracks (theme-tinted only);
+  PNG not KTX2-compressed yet (~2.9 MB total runtime payload).
+
+### ENV-005 — Production scenery (wave 6)
+
+- **Domain:** Track
+- **Status:** Integrated
+- **Evidence:** `wave6/vis-title.png`, `vis-title-sr2.png`,
+  `vis-title-nn.png` — grandstand (3 tiers + generated `crowd.png` faces
+  + canopy, pushed 20 m off-road), 7 sponsor billboards cycling 3
+  generated posters, tethered balloons, waving flags, accent top rail
+  on walls, rock scatter, per-tree color variance.
+- **Largest Gap:** scenery is identical per track (placement from
+  centerline math only); no animated crowd; balloons are static bobs.
+
+### VFX-001 — Shared particle system (wave 6)
+
+- **Domain:** VFX
+- **Status:** Integrated
+- **Evidence:** `wave6/vis-fx-pools.png`, `vis-fx-burst.png` — `Fx.ts`
+  two instanced billboard pools (additive sparks 512 + alpha smoke 384,
+  generated `smoke_puff.png` luminance-alpha). Emitters: drift sparks
+  (both rear wheels), boost flames, tire smoke, gravel dust, landing
+  puffs, wall chips, spin stars, pickup sparkle, missile trail +
+  explosion. Replaces per-kart `KartVfx` (single draw call per pool).
+- **Largest Gap:** additive pool is a procedural glow texture (no
+  generated art); no particle shadows or lit smoke.
+
+### VFX-002 — Item visuals (wave 6)
+
+- **Domain:** VFX/Items
+- **Status:** Integrated
+- **Evidence:** `wave6/vis-missile.png`, `vis-missile-trail.png` —
+  missile rebuilt (body/nose/fins/glow-sprite + roll), trail + impact
+  burst via `Fx`; item boxes bob+glow; slick dark disc; boost pads
+  pulse; all pickups emit sparkles.
+- **Largest Gap:** missile doesn't bank through turns; item box is
+  still a flat quad (no 3D box mesh).
+
+### LIGHT-001 — Renderer grading + shadows (wave 6)
+
+- **Domain:** Core/Track
+- **Status:** Integrated
+- **Evidence:** `wave6/vis-race-final.png`, `vis-title-nn.png` — ACES
+  tone mapping + sRGB output, PCF shadow-mapped sun (2048², ~90 m
+  ortho box follows player), per-theme hemisphere/sun tint, kart
+  castShadow on procedural + GLB meshes, track receives; night adds
+  player fill light for readability. 68 fps @ ~600–790 draws.
+- **Largest Gap:** shadow box only follows the player (rivals off-box
+  lose shadows); no cascade, distant scenery unshadowed.
