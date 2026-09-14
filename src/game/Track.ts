@@ -3,11 +3,22 @@ import { TRACK } from '../config/tuning';
 import { TEX, checkerTexture } from '../core/Textures';
 import {
   AnimatedProp,
+  InstanceAnim,
   ScatterCtx,
   dressNeon,
   dressPastoral,
   dressRidge,
 } from './Props';
+
+// tick()/builder scratch — module-level so the per-frame animation loop and
+// the featured-prop picks never allocate.
+const _m4 = new THREE.Matrix4();
+const _qA = new THREE.Quaternion();
+const _qB = new THREE.Quaternion();
+const _v3 = new THREE.Vector3();
+const _sv = new THREE.Vector3();
+const _ax = new THREE.Vector3();
+const UP_Y = new THREE.Vector3(0, 1, 0);
 
 // Test track: a closed Catmull-Rom circuit ("Proving Grounds").
 // Provides the road/barrier meshes plus a sampled centerline lookup used for
@@ -972,6 +983,13 @@ export class Track {
     this.spawnPt.copy(
       this.samples[Math.floor(this.samples.length * 0.01)].point,
     );
+    // WS-ANIM: per-instance canopy-sway payload — stride 7 (x,y,z,yaw,sx,sy,
+    // sz) + phase derived from yaw/scale so the shared rand stream (and all
+    // downstream prop placement) is identical to baseline.
+    const canopySway: InstanceAnim = {
+      base: new Float32Array(treeCount * 7),
+      phase: new Float32Array(treeCount),
+    };
     let placed = 0;
     let guard = 0;
     while (placed < treeCount && guard++ < treeCount * 4) {
@@ -988,17 +1006,31 @@ export class Track {
       // sections the source sample isn't always the nearest (float fix).
       const gy = this.fieldY(p);
       const sc = 0.8 + rand() * 0.9;
-      const rot = new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2);
+      const yaw = rand() * Math.PI * 2;
+      const rot = new THREE.Quaternion().setFromAxisAngle(up, yaw);
       m.compose(p.clone().setY(gy + 0.8 * sc), rot, new THREE.Vector3(sc, sc, sc));
       trunks.setMatrixAt(placed, m);
-      m.compose(p.clone().setY(gy + (1.6 + 1.6) * sc), rot, new THREE.Vector3(sc, sc, sc));
+      const cy = gy + (1.6 + 1.6) * sc;
+      m.compose(p.clone().setY(cy), rot, new THREE.Vector3(sc, sc, sc));
       canopies.setMatrixAt(placed, m);
       // Per-tree canopy hue shift — breaks the cloned-forest look.
       const tint = new THREE.Color(this.theme.canopy)
         .offsetHSL((rand() - 0.5) * 0.06, (rand() - 0.5) * 0.15, (rand() - 0.5) * 0.1);
       canopies.setColorAt(placed, tint);
+      const sj = placed * 7;
+      canopySway.base[sj] = p.x;
+      canopySway.base[sj + 1] = cy;
+      canopySway.base[sj + 2] = p.z;
+      canopySway.base[sj + 3] = yaw;
+      canopySway.base[sj + 4] = sc;
+      canopySway.base[sj + 5] = sc;
+      canopySway.base[sj + 6] = sc;
+      canopySway.phase[placed] = yaw * 1.618 + sc * 2.3;
       placed++;
     }
+    // Trim to actually-placed: if the guard ever bails early, untailored
+    // instances can't park identity matrices at the world origin.
+    trunks.count = canopies.count = placed;
     let rocksPlaced = 0;
     for (let c = 0; c < 40; c++) {
       let s = this.samples[0];
@@ -1032,6 +1064,10 @@ export class Track {
     canopies.userData.dress = 'canopies';
     rocks.userData.dress = 'rocks';
     this.group.add(trunks, canopies, rocks);
+    // WS-ANIM: pine canopy sway — phase-offset lean + drift per instance.
+    canopies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    canopies.userData.anim = canopySway;
+    this.animated.push({ obj: canopies, kind: 'sway', phase: 0, baseY: 0 });
 
     this.buildGrandstand(s0, hw);
     this.buildBillboards(hw);
@@ -1296,7 +1332,147 @@ export class Track {
       }
       pylons.forEach((pl, k) => (pl.count = counts[k]));
       this.group.add(...pylons);
+
+      // WS-ANIM signature: holo data-pylon — a dark tower with a bright
+      // scanline band scrolling up its road-facing screen.
+      const scanCv = document.createElement('canvas');
+      scanCv.width = 64;
+      scanCv.height = 256;
+      const sg = scanCv.getContext('2d')!;
+      sg.fillStyle = '#050a14';
+      sg.fillRect(0, 0, 64, 256);
+      const band = sg.createLinearGradient(0, 104, 0, 152);
+      band.addColorStop(0, 'rgba(50,225,255,0)');
+      band.addColorStop(0.5, 'rgba(140,245,255,1)');
+      band.addColorStop(1, 'rgba(50,225,255,0)');
+      sg.fillStyle = band;
+      sg.fillRect(0, 104, 64, 48);
+      // Faint static scanlines so the face reads as a screen even off-band.
+      sg.fillStyle = 'rgba(54,240,255,0.10)';
+      for (let yy = 0; yy < 256; yy += 8) sg.fillRect(0, yy, 64, 2);
+      const scanTex = new THREE.CanvasTexture(scanCv);
+      scanTex.colorSpace = THREE.SRGBColorSpace;
+      scanTex.wrapT = THREE.RepeatWrapping;
+      // Site it roadside on a straight-ish stretch — fixed candidates, first
+      // one clearing the drivable edge wins (deterministic, no rand draws).
+      for (const [f, sd] of [
+        [0.44, 1],
+        [0.31, -1],
+        [0.62, 1],
+      ] as const) {
+        const s = this.samples[Math.floor(f * n)];
+        const p = s.point.clone().addScaledVector(s.left, sd * (hw + 3.4));
+        if (this.nearStart(p) || this.nearStand(p) || this.roadClearance(p) < 1.8)
+          continue;
+        const py = new THREE.Group();
+        const mast = new THREE.Mesh(
+          new THREE.BoxGeometry(1.5, 7.4, 0.4),
+          new THREE.MeshStandardMaterial({
+            color: 0x161b26,
+            roughness: 0.55,
+            metalness: 0.4,
+          }),
+        );
+        mast.position.y = 3.7;
+        mast.castShadow = true;
+        py.add(mast);
+        const face = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.28, 6.9),
+          new THREE.MeshBasicMaterial({ map: scanTex }),
+        );
+        face.position.set(0, 3.7, 0.21);
+        py.add(face);
+        // Ground on the skirt field (road shoulder drops away) — embedded
+        // a touch so the mast can't hover on a graded edge.
+        py.position.copy(p).setY(this.fieldY(p) - 0.15);
+        py.rotation.y = Math.atan2(-s.left.x * sd, -s.left.z * sd); // screen faces the road
+        this.group.add(py);
+        this.avoidPts.push({ p: p.clone(), r: 2.5 });
+        this.animated.push({
+          obj: face,
+          kind: 'scan',
+          phase: 0,
+          baseY: 0,
+          speed: 0.5,
+        });
+        break;
+      }
     }
+
+    // WS-ANIM signature: farm/ridge windmill — PG and SR both get a turning
+    // rotor (pastoral reads as a farm mill, ridge as a water-pump windmill).
+    if (this.signature === 'pastoral' || this.signature === 'ridge') {
+      this.buildWindmill(hw);
+    }
+  }
+
+  /**
+   * Windmill landmark — tapered plank tower + a 4-blade rotor spinning
+   * about its local Z (the face aimed at the road). Two fixed candidate
+   * spots per circuit; the first with real clearance wins, so placement is
+   * deterministic without touching the shared rand stream.
+   */
+  private buildWindmill(hw: number): void {
+    const n = this.samples.length;
+    let s: Sample | null = null;
+    let side = 1;
+    for (const [f, sd] of [
+      [0.22, -1],
+      [0.5, 1],
+      [0.78, -1],
+      [0.36, 1],
+    ] as const) {
+      const c = this.samples[Math.floor(f * n)];
+      const p = c.point.clone().addScaledVector(c.left, sd * (hw + 16));
+      if (!this.nearStart(p) && !this.nearStand(p) && this.roadClearance(p) > 9) {
+        s = c;
+        side = sd;
+        break;
+      }
+    }
+    if (!s) return;
+    const pos = s.point.clone().addScaledVector(s.left, side * (hw + 16));
+    const gy = this.fieldY(pos);
+    const g = new THREE.Group();
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x7a5a38,
+      flatShading: true,
+      roughness: 1,
+    });
+    const tower = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 1.15, 8.4, 4),
+      woodMat,
+    );
+    tower.position.y = 4.05; // base embeds ~0.15 into the field
+    tower.rotation.y = Math.PI / 4; // diamond profile reads as plank legs
+    tower.castShadow = true;
+    g.add(tower);
+    // Rotor: two crossed blades + hub, spinning about local Z.
+    const rotor = new THREE.Group();
+    const bladeMat = new THREE.MeshStandardMaterial({
+      color: 0xe8e2d4,
+      flatShading: true,
+      side: THREE.DoubleSide,
+    });
+    const bladeA = new THREE.Mesh(new THREE.BoxGeometry(0.34, 4.4, 0.07), bladeMat);
+    const bladeB = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.34, 0.07), bladeMat);
+    const hub = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), woodMat);
+    rotor.add(bladeA, bladeB, hub);
+    rotor.position.set(0, 8.0, 1.0); // ahead of the tower peak
+    g.add(rotor);
+    g.position.set(pos.x, gy, pos.z);
+    // Rotor face (+Z) toward the road sample.
+    g.rotation.y = Math.atan2(-s.left.x * side, -s.left.z * side);
+    this.group.add(g);
+    this.avoidPts.push({ p: pos.clone(), r: 6 });
+    this.animated.push({
+      obj: rotor,
+      kind: 'spin',
+      phase: 0.4,
+      baseY: 0,
+      axis: 'z',
+      speed: 1.3,
+    });
   }
 
   // ---------- production scenery (wave 6+) ----------
@@ -1315,7 +1491,13 @@ export class Track {
       map: TEX.crowd(),
       side: THREE.DoubleSide,
     });
+    // WS-ANIM: the crowd texture is scrolled a few px by the 'crowdUV' tick
+    // hook — needs repeat wrap so the wobble doesn't smear the clamped
+    // edge. wrapS is read when the async image first uploads — do NOT
+    // needsUpdate here (that warns on a still-empty texture).
+    if (crowdMat.map) crowdMat.map.wrapS = THREE.RepeatWrapping;
     // Three stepped tiers rising away from the track.
+    let crowdPlane: THREE.Mesh | null = null;
     for (let i = 0; i < 3; i++) {
       const step = new THREE.Mesh(new THREE.BoxGeometry(22, 1.2, 2.6), standMat);
       step.position.set(0, 0.6 + i * 1.5, i * 2.4);
@@ -1325,6 +1507,68 @@ export class Track {
       crowd.position.set(0, 1.65 + i * 1.5, i * 2.4 - 1.28);
       crowd.rotation.x = -0.12;
       g.add(crowd);
+      if (i === 0) crowdPlane = crowd;
+    }
+    // WS-ANIM: front-row fans — one instanced mesh of bobbing head blobs
+    // over the tier faces. Real geometry motion reads at race distance
+    // where a texture scroll wouldn't; costs a single draw call.
+    const FAN_PER_TIER = 26;
+    const FAN_COUNT = FAN_PER_TIER * 3;
+    const headGeo = new THREE.IcosahedronGeometry(0.19, 0);
+    headGeo.scale(1, 1.35, 1); // person-blob, not a ball
+    const heads = new THREE.InstancedMesh(
+      headGeo,
+      new THREE.MeshBasicMaterial({ color: 0xffffff }), // instance-tinted
+      FAN_COUNT,
+    );
+    const fanAnim: InstanceAnim = {
+      base: new Float32Array(FAN_COUNT * 3),
+      phase: new Float32Array(FAN_COUNT),
+    };
+    // Local RNG — never touches the shared scatter stream.
+    const fanRng = (() => {
+      let s = 5150;
+      return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff);
+    })();
+    const fanPalette = [
+      0xffe14a, 0xff7ab0, 0x3fd8ff, 0xfaf6ea, 0xff9a3c, 0x7dff6a, 0xc86ef0,
+      0xff5a4a,
+    ];
+    let fj = 0;
+    for (let tier = 0; tier < 3; tier++) {
+      for (let k = 0; k < FAN_PER_TIER; k++) {
+        const x = -9.6 + (k / (FAN_PER_TIER - 1)) * 19.2 + (fanRng() - 0.5) * 0.6;
+        // Straddle the crowd-strip top edge (2.3 + tier*1.5): half the
+        // blob reads against the dot rows, half silhouettes against the
+        // tier behind — the bob stays legible at race distance.
+        const y = 2.14 + tier * 1.5 + fanRng() * 0.34;
+        // In FRONT of the crowd face (track sits toward local −z — the
+        // plane is at tier*2.4 − 1.28, the step front at −1.3).
+        const z = tier * 2.4 - 1.42 - fanRng() * 0.22;
+        const j3 = fj * 3;
+        fanAnim.base[j3] = x;
+        fanAnim.base[j3 + 1] = y;
+        fanAnim.base[j3 + 2] = z;
+        // Phase marches along the stand → a Mexican-wave sweep, not noise.
+        fanAnim.phase[fj] = x * 0.55 + tier * 1.4 + fanRng() * 0.8;
+        _m4.compose(_v3.set(x, y, z), _qA.identity(), _sv.set(1, 1, 1));
+        heads.setMatrixAt(fj, _m4);
+        heads.setColorAt(
+          fj,
+          new THREE.Color(
+            fanPalette[Math.floor(fanRng() * fanPalette.length)],
+          ),
+        );
+        fj++;
+      }
+    }
+    heads.count = fj;
+    heads.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    heads.userData.anim = fanAnim;
+    g.add(heads);
+    this.animated.push({ obj: heads, kind: 'crowd', phase: 0, baseY: 0 });
+    if (crowdPlane) {
+      this.animated.push({ obj: crowdPlane, kind: 'crowdUV', phase: 0, baseY: 0 });
     }
     // Canopy roof on slim posts.
     const roof = new THREE.Mesh(new THREE.BoxGeometry(23, 0.3, 7.5), roofMat);
@@ -1362,6 +1606,8 @@ export class Track {
     // Lifted off void-black — a barely-visible dark rim vs a light-swallowing
     // slab where the poster back loses the depth test at range (critic9).
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x39434f, roughness: 0.6 });
+    // WS-ANIM: placed boards collected for the featured-spin pick below.
+    const boards: { g: THREE.Group; pos: THREE.Vector3 }[] = [];
     for (let i = 0; i < spots.length; i++) {
       const idx = Math.floor(spots[i] * n);
       const s = this.samples[idx];
@@ -1405,6 +1651,39 @@ export class Track {
       // Face back along the travel direction so drivers see it on approach.
       g.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z) + (side > 0 ? 0.35 : -0.35);
       this.group.add(g);
+      boards.push({ g, pos });
+    }
+    // WS-ANIM featured boards: the two boards with the largest pine-tree
+    // clearance become rotating pylon signs (~28 s/rev). The frame sweeps a
+    // ~3.6 m radius, so the pick requires ≥6 m to the nearest trunk —
+    // otherwise the board stays static rather than mowing through a tree.
+    const trunks = this.group.children.find(
+      (o) => o.userData.dress === 'trunks',
+    ) as THREE.InstancedMesh | undefined;
+    const scored = boards.map((b) => {
+      let d2min = Infinity;
+      if (trunks) {
+        for (let t = 0; t < trunks.count; t++) {
+          trunks.getMatrixAt(t, _m4);
+          const dx = _m4.elements[12] - b.pos.x;
+          const dz = _m4.elements[14] - b.pos.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 < d2min) d2min = d2;
+        }
+      }
+      return { g: b.g, d: Math.sqrt(d2min) };
+    });
+    scored.sort((x, y) => y.d - x.d);
+    for (const { g, d } of scored.slice(0, 2)) {
+      if (d < 6.0) break; // sorted desc — nobody else qualifies either
+      this.animated.push({
+        obj: g,
+        kind: 'spin',
+        phase: g.rotation.y, // start from the road-facing pose
+        baseY: 0,
+        axis: 'y',
+        speed: 0.22,
+      });
     }
   }
 
@@ -1489,8 +1768,9 @@ export class Track {
   }
 
   /** Advance ambient animations (flag flutter, balloon bob/drift, neon
-   *  sign/gate emissive breathing). 'arch'/'scrub' stay tagged + idle for
-   *  the follow-up animation stream. */
+   *  sign/gate emissive breathing, crowd bob, canopy sway, featured-board
+   *  spin, scanline scroll). 'arch'/'scrub' stay tagged + idle-stable.
+   *  Everything runs off module scratch — no per-frame allocation. */
   tick(simTime: number): void {
     for (const a of this.animated) {
       if (a.kind === 'flag') {
@@ -1509,6 +1789,76 @@ export class Track {
           .material as THREE.MeshStandardMaterial;
         mat.emissiveIntensity =
           a.baseY + Math.sin(simTime * 2.2 + a.phase) * 0.22;
+      } else if (a.kind === 'crowd') {
+        // Front-row fans: asymmetric hop (jump up, settle back) with a
+        // phase that marches along the stand — a Mexican-wave read.
+        const im = a.obj as THREE.InstancedMesh;
+        const d = im.userData.anim as InstanceAnim;
+        for (let i = 0; i < im.count; i++) {
+          const j = i * 3;
+          const hop = Math.sin(simTime * 2.7 + d.phase[i]);
+          _m4.compose(
+            _v3.set(
+              d.base[j] + Math.sin(simTime * 1.2 + d.phase[i] * 1.7) * 0.05,
+              d.base[j + 1] + (hop > 0 ? hop * 0.2 : hop * 0.06),
+              d.base[j + 2],
+            ),
+            _qA.identity(),
+            _sv.set(1, 1, 1),
+          );
+          im.setMatrixAt(i, _m4);
+        }
+        im.instanceMatrix.needsUpdate = true;
+      } else if (a.kind === 'crowdUV') {
+        // Slow sub-cm texture wobble on the shared crowd map — the mass of
+        // dots shimmers behind the bobbing front row.
+        const mat = (a.obj as THREE.Mesh)
+          .material as THREE.MeshBasicMaterial;
+        if (mat.map) {
+          mat.map.offset.x = Math.sin(simTime * 1.05 + a.phase) * 0.008;
+        }
+      } else if (a.kind === 'sway') {
+        // Canopy wind: small lean about a per-instance horizontal axis
+        // (derived from its yaw) + a soft lateral drift. Trunks stay
+        // planted — the lean is tiny enough the canopy never unseats.
+        const im = a.obj as THREE.InstancedMesh;
+        const d = im.userData.anim as InstanceAnim;
+        const amp = 0.035 * (a.speed ?? 1);
+        for (let i = 0; i < im.count; i++) {
+          const j = i * 7;
+          const ph = d.phase[i];
+          const yaw = d.base[j + 3];
+          _ax.set(Math.sin(yaw + 1.31), 0, Math.cos(yaw + 1.31));
+          const lean =
+            Math.sin(simTime * 1.5 + ph) * amp +
+            Math.sin(simTime * 0.63 + ph * 2.17) * amp * 0.6;
+          _qA.setFromAxisAngle(_ax, lean);
+          _qB.setFromAxisAngle(UP_Y, yaw);
+          _qA.multiply(_qB); // lean in world space after the tree's yaw
+          _m4.compose(
+            _v3.set(
+              d.base[j] + Math.sin(simTime * 0.9 + ph) * amp * 1.7,
+              d.base[j + 1],
+              d.base[j + 2] + Math.cos(simTime * 0.77 + ph * 1.31) * amp * 1.7,
+            ),
+            _qA,
+            _sv.set(d.base[j + 4], d.base[j + 5], d.base[j + 6]),
+          );
+          im.setMatrixAt(i, _m4);
+        }
+        im.instanceMatrix.needsUpdate = true;
+      } else if (a.kind === 'spin') {
+        // Rotating pylon sign / windmill rotor — continuous slow turn.
+        a.obj.rotation[a.axis ?? 'y'] =
+          a.phase + simTime * (a.speed ?? 0.25);
+      } else if (a.kind === 'scan') {
+        // Scanline band crawling up the holo-pylon face.
+        const mat = (a.obj as THREE.Mesh)
+          .material as THREE.MeshBasicMaterial;
+        if (mat.map) {
+          mat.map.offset.y =
+            (simTime * (a.speed ?? 0.35) + a.phase) % 1;
+        }
       }
     }
   }

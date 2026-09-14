@@ -766,3 +766,22 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   console errors/warnings.
 - **Largest Gap:** kerbs on banked NN sections still read slightly
   proud from behind (inherent to box-on-banked-edge).
+
+### ANIM-001 — World animation (wave 7)
+
+- **Domain:** Track/Props/Sky
+- **Status:** Integrated
+- **Evidence:** `wave7/anim-*.png` (motion pairs) + `int-anim-*.png`.
+- **Shipped:** 78 instanced crowd head-blobs hop/wave over grandstand
+  tiers + crowd texture ±0.008 UV wobble (kind crowd/crowdUV); 2
+  featured billboards per track rotate as pylon signs (≥6 m tree
+  clearance gate, kind spin); all pine + orchard canopies per-instance
+  sway via userData.anim base/phase Float32Arrays (kind sway, zero
+  rand draws — scatter bit-identical); windmill rotor on PG + SR
+  (kind spin axis z); NN holo scanline pylon (kind scan, offset.y
+  scroll). All via existing tick(simTime); module scratch = zero
+  per-frame allocation. +5 draws PG/SR, +3 NN.
+- **Verified:** build clean; smoke identical ×3; NN 68.1 fps p95
+  15.4 ms @ 564 draws; 0 console errors/warnings.
+- **Largest Gap:** sway is whole-canopy lean (no flutter within a
+  crown); crowd hops are sync-banded not per-fan.

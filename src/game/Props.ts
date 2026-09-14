@@ -28,13 +28,33 @@ export type AnimatedKind =
   | 'sign'
   | 'arch'
   | 'gate'
-  | 'scrub';
+  | 'scrub'
+  // WS-ANIM kinds:
+  | 'crowd' // instanced bobbing heads over the grandstand tiers
+  | 'crowdUV' // subtle UV wobble on the shared crowd texture
+  | 'sway' // instanced canopy micro-oscillation (wind)
+  | 'spin' // continuous rotation — rotating boards, windmill rotor
+  | 'scan'; // UV offset.y scroll — NN holo-pylon scanline
 
 export interface AnimatedProp {
   obj: THREE.Object3D;
   kind: AnimatedKind;
   phase: number;
   baseY: number;
+  /** 'spin': rotation axis (default 'y'). */
+  axis?: 'x' | 'y' | 'z';
+  /** 'spin': rad/s (default 0.25). 'scan': texture rows/s (default 0.35).
+   *  'sway': amplitude multiplier (default 1). */
+  speed?: number;
+}
+
+/** Per-instance animation payload hung on InstancedMesh.userData.anim by
+ *  the builders; tick() recomposes matrices from it — zero per-frame
+ *  allocation. 'crowd' packs stride 3 (x,y,z); 'sway' packs stride 7
+ *  (x,y,z,yaw,sx,sy,sz). */
+export interface InstanceAnim {
+  base: Float32Array;
+  phase: Float32Array;
 }
 
 export interface ScatterCtx {
@@ -268,6 +288,13 @@ export function dressPastoral(ctx: ScatterCtx): DressResult {
     oCanopyMat,
     S.orchardTrees,
   );
+  // WS-ANIM: per-instance sway payload — stride 7 (x,y,z,yaw,sx,sy,sz) +
+  // phase. Phase derives from yaw/scale (NOT rand()) so the scatter RNG
+  // stream — and therefore prop placement — is unchanged vs baseline.
+  const oSway: InstanceAnim = {
+    base: new Float32Array(S.orchardTrees * 7),
+    phase: new Float32Array(S.orchardTrees),
+  };
   const orchardPalette = [0x4a9a44, 0x5aab4e, 0x3e8a4e, 0x6aa040];
   let oi = 0;
   scatter(
@@ -277,15 +304,17 @@ export function dressPastoral(ctx: ScatterCtx): DressResult {
     (p) => {
       const gy = ctx.fieldY(p);
       const sc = 0.85 + rand() * 0.8;
-      const rot = Q.setFromAxisAngle(UP, rand() * Math.PI * 2).clone();
+      const yaw = rand() * Math.PI * 2;
+      const rot = Q.setFromAxisAngle(UP, yaw).clone();
       M.compose(
         p.clone().setY(gy + 0.85 * sc),
         rot,
         new THREE.Vector3(sc, sc, sc),
       );
       oTrunks.setMatrixAt(oi, M);
+      const cy = gy + (1.7 + 1.15) * sc;
       M.compose(
-        p.clone().setY(gy + (1.7 + 1.15) * sc),
+        p.clone().setY(cy),
         rot,
         new THREE.Vector3(sc, sc * 0.8, sc),
       );
@@ -296,13 +325,26 @@ export function dressPastoral(ctx: ScatterCtx): DressResult {
           orchardPalette[Math.floor(rand() * orchardPalette.length)],
         ).offsetHSL((rand() - 0.5) * 0.04, (rand() - 0.5) * 0.12, 0),
       );
+      const j = oi * 7;
+      oSway.base[j] = p.x;
+      oSway.base[j + 1] = cy;
+      oSway.base[j + 2] = p.z;
+      oSway.base[j + 3] = yaw;
+      oSway.base[j + 4] = sc;
+      oSway.base[j + 5] = sc * 0.8;
+      oSway.base[j + 6] = sc;
+      oSway.phase[oi] = yaw * 1.618 + sc * 2.3;
       oi++;
     },
   );
   oTrunks.count = oCanopies.count = oi;
   oTrunks.castShadow = true;
   oCanopies.castShadow = true;
+  oCanopies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  oCanopies.userData.anim = oSway;
   objects.push(oTrunks, oCanopies);
+  // Round canopies are light foliage — sway a touch wider than the pines.
+  animated.push({ obj: oCanopies, kind: 'sway', phase: 0, baseY: 0, speed: 1.3 });
 
   // Wooden fence runs — posts + two rails hugging gentle stretches. Built
   // from collected matrices because run length adapts to clearance.
