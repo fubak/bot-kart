@@ -473,12 +473,15 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 
 - **Domain:** AI
 - **Status:** Integrated
-- **Evidence:** displacement sampling (0.5 s) detects pinned karts (both
-  nose-in-wall low-speed and wall-pressed high-speed); brake+steer-to-
-  tangent recovery freed a wedged bot in 251 ms. Spin-outs excluded via
-  new `kart.isSpinning`.
-- **Largest Gap:** recovery is reverse+steer only; no path-replanning if
-  the wedge point is re-entered.
+- **Evidence:** anchor-based wedge state (AiDriver): 0.5 s displacement
+  sampling detects pins, then a wall-clock escape ladder — reverse-out
+  0-3 s → forward-out 3-6 s → guaranteed lakitu respawn onto the
+  racing line at 6 s. The anchor only clears on >2.5 m real escape, so
+  reverse→re-wedge limit cycles can't reset it (critic6 D1). Live:
+  nose-in pins on PG + SR hairpin escaped ~2 s. Spin-outs excluded via
+  `kart.isSpinning`.
+- **Largest Gap:** no path-replanning after respawn (kart resumes
+  pursuit from the line); player still requires manual ⌫.
 
 ### UI-005 — Options menu
 
