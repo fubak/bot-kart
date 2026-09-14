@@ -158,6 +158,7 @@
     "integrated": 0
   },
   "recentChanges": [
+    "wave6 closeout: critic8 visual review 7/10 all defects fixed; full-GP gauntlet pass (all finishers, sorted standings, 68.7fps)",
     "wave6 visual production: generated textures (9), Sky.ts dome+clouds+mountains, Fx.ts shared particles, textured road/grass/gravel, grandstand+crowd+billboards+balloons+flags, ACES+PCF shadows+per-theme lighting+night fill, missile/box/slick/pad visuals; smoke identical x3, 68fps",
     "2026-09-13: repository initialized (Vite+TS+Three shell, docs, skills, toolchain)",
     "2026-09-13: Game Director specification installed in DEVIN_GAME_DIRECTOR.md",
@@ -168,8 +169,7 @@
     "2026-09-13: Coordinator entered execution \u00e2\u20ac\u201d Wave 1 Technical Spine started",
     "2026-09-13: Wave 1 slice built \u00e2\u20ac\u201d fixed-step loop, input, arcade kart (drift+boost), track, chase cam, HUD, __game hooks",
     "2026-09-13: baseline perf 75fps avg13.3ms p99 18.1ms 14 draws 5.6k tris (measured while driving)",
-    "2026-09-13: art direction set \u00e2\u20ac\u201d 3 Grok concepts Selected (A rounded canonical / B square heavy / C wedge fast)",
-    "2026-09-13: slice critic FAIL 4/10 \u00e2\u2020\u2019 fix pass: visible walls, wall contact-episode, steer ramp, boost bleed, cam shake"
+    "2026-09-13: art direction set \u00e2\u20ac\u201d 3 Grok concepts Selected (A rounded canonical / B square heavy / C wedge fast)"
   ],
   "blockers": [],
   "milestones": [
@@ -196,22 +196,18 @@
   ],
   "agents": {},
   "latestCritic": {
-    "id": "wave4-critic6",
-    "score": 6,
-    "verdict": "defects fixed post-report",
-    "report": "docs/gauntlet/evidence/wave4/CRITIC6_REPORT.md",
+    "id": "wave6-critic8",
+    "score": 7,
+    "verdict": "visual review \u2014 all defects fixed + gauntlet pass",
+    "report": "docs/gauntlet/evidence/wave6/CRITIC8_REPORT.md",
     "fixed": [
-      "D1 residual AI wedge limit-cycle deadlock (HIGH \u00e2\u20ac\u201d anchor-based wedge state, guaranteed lakitu respawn at 6s)",
-      "D8 swap teleport desyncs RacerProgress (MED \u00e2\u20ac\u201d resync() re-anchors tracker to landing leg, mask reset prevents gate-skip)"
+      "D1 billboard black-monolith backs",
+      "D2/D3 title orbit gantry clip + rock burial",
+      "D4 scatter through grandstand",
+      "D5 AI wall-creep stragglers (grind detector + !onWall escape)",
+      "LOW: grounded chevrons/scenery, anisotropy"
     ],
-    "reverified": [
-      "D2 \u00e2\u02dc\u2026REC scoping",
-      "D3 record validation (all corrupt shapes)",
-      "D4 displacement stuck hint",
-      "D5 M persistence",
-      "D6 no PAUSED/results overlay",
-      "D7 unbound hints"
-    ]
+    "gauntlet": "full GP pass \u2014 all finishers, standings sorted, 0 console errors, 68.7fps"
   },
   "wave3": {
     "units": [

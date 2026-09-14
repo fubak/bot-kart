@@ -107,7 +107,14 @@ None.
   (16 m exclusion), D5 AI wall-creep stragglers — escape required only
   displacement so grinders looped forever; now requires !onWall plus a
   grind detector (onWall && speed<8, 4 s → ladder). Smoke identical,
-  stalled 0.
+  stalled 0. LOW batch: chevron boards → posted thin boxes, billboards +
+  grandstand grounded to field level, anisotropy 4→8.
+- **Wave-6 whole-game gauntlet: PASS.** Full GP on the final build —
+  all 3 legs, every racer finished every leg (grind fix eliminated
+  straggler beaches), FINAL STANDINGS sorted (★ YOU 23 pts champion,
+  ★REC legit), console 0 errors/0 warnings, 68.7 fps p95 15.1 ms @
+  639 draws / 96k tris on Neon Night. Evidence: `gp-*.png`,
+  `fix8-*.png` in `evidence/wave6/`.
 - Wave-4 critic5 (lap-records playtest): 6/10 —
   `evidence/wave4/CRITIC5_REPORT.md`. Records verified end-to-end
   (per-track persist, toast timing, no-overwrite, AI can't set).
