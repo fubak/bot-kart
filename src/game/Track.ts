@@ -888,6 +888,12 @@ export class Track {
       const t = THREE.MathUtils.clamp((dist - hw) / 6, 0, 1);
       return THREE.MathUtils.lerp(s.point.y, -0.35, t) + 0.35; // base sits ON skirt
     };
+    // Grandstand footprint exclusion — the stand anchors at hw+20 left
+    // of s0 with a ~22×10 m body; scattered pines/rocks must not stab
+    // through it (critic8: trees clipped through the crowd tiers).
+    const standAnchor = s0.point.clone().addScaledVector(s0.left, hw + 20);
+    const nearStand = (p: THREE.Vector3) =>
+      p.distanceToSquared(standAnchor) < 16 * 16;
     let placed = 0;
     let guard = 0;
     while (placed < treeCount && guard++ < treeCount * 4) {
@@ -895,6 +901,7 @@ export class Track {
       const side = rand() < 0.5 ? 1 : -1;
       const dist = hw + 3 + rand() * 30;
       const p = s.point.clone().addScaledVector(s.left, side * dist);
+      if (nearStand(p)) continue;
       const gy = groundY(s, dist);
       const sc = 0.8 + rand() * 0.9;
       const rot = new THREE.Quaternion().setFromAxisAngle(up, rand() * Math.PI * 2);
@@ -909,10 +916,16 @@ export class Track {
       placed++;
     }
     for (let c = 0; c < 40; c++) {
-      const s = this.samples[Math.floor(rand() * n)];
-      const side = rand() < 0.5 ? 1 : -1;
-      const dist = hw + 4 + rand() * 24;
-      const p = s.point.clone().addScaledVector(s.left, side * dist);
+      let s = this.samples[0];
+      let dist = 0;
+      const p = new THREE.Vector3();
+      for (let retry = 0; retry < 8; retry++) {
+        s = this.samples[Math.floor(rand() * n)];
+        const side = rand() < 0.5 ? 1 : -1;
+        dist = hw + 4 + rand() * 24;
+        p.copy(s.point).addScaledVector(s.left, side * dist);
+        if (!nearStand(p)) break;
+      }
       const sc = 0.5 + rand() * 1.1;
       m.compose(
         p.setY(groundY(s, dist) + 0.4 * sc),
@@ -1012,6 +1025,12 @@ export class Track {
       );
       art.position.set(0, 5.6, 0.14);
       g.add(art);
+      // Poster on the back face too — the looped track exposes the back
+      // constantly, and a bare frame read as a black monolith (critic8).
+      const back = art.clone();
+      back.position.z = -0.14;
+      back.rotation.y = Math.PI;
+      g.add(back);
       const pos = s.point.clone().addScaledVector(s.left, side * (hw() + 7));
       g.position.set(pos.x, s.point.y, pos.z);
       // Face back along the travel direction so drivers see it on approach.

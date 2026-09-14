@@ -51,6 +51,10 @@ export class Kart {
   isSpinning = false;
   slipAngle = 0; // velocity-vs-heading angle (rad), drives drift visual
   private wallContact = false;
+  /** True while position-clamped against a wall face (AI grind detection). */
+  get onWall(): boolean {
+    return this.wallContact;
+  }
   private steerSmooth = 0;
   private impactSquash = 0; // 0..1 wall-hit squash, decays in syncVisual
   /** Spin-out state (item hits): yaw spins freely, controls dead, until this

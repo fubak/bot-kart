@@ -39,6 +39,7 @@ export class AiDriver {
   // escape (>2.5 m from the anchor) or the lakitu respawn (critic6 D1).
   private readonly wedgeAnchor = new THREE.Vector3();
   private wedgeTime = -1; // <0 = not wedged
+  private grindTime = 0; // sustained low-speed wall contact
 
   constructor(
     skill = 1.0,
@@ -68,6 +69,7 @@ export class AiDriver {
     this.posTimer = 0;
     this.stuckTime = 0;
     this.wedgeTime = -1;
+    this.grindTime = 0;
   }
 
   update(kart: Kart, track: Track, dt: number, traffic?: Kart[]): ControlState {
@@ -103,8 +105,22 @@ export class AiDriver {
       }
       this.lastPos.copy(kart.position);
     }
+    // Grind-beach detection (critic8: BOT-C logged 2:15+ laps — a kart
+    // creeping along a wall at a few m/s has enough displacement to
+    // defeat the wedge probe, yet pursuit can't break it free). Sustained
+    // wall contact at low speed arms the ladder mid-way: the kart has
+    // already failed to self-correct, so 2 s of forward-drive then lakitu.
+    if (kart.onWall && kart.speed < 8) {
+      this.grindTime += dt;
+    } else {
+      this.grindTime = 0;
+    }
     if (this.stuckTime >= 2 && this.wedgeTime < 0) {
       this.wedgeTime = 0;
+      this.wedgeAnchor.copy(kart.position);
+    }
+    if (this.grindTime > 4 && this.wedgeTime < 0) {
+      this.wedgeTime = 4;
       this.wedgeAnchor.copy(kart.position);
     }
     if (this.wedgeTime >= 0) {
@@ -121,9 +137,14 @@ export class AiDriver {
       // The ladder only clears on real displacement from the anchor —
       // an attempt that rocks the kart but re-wedges keeps climbing.
       this.wedgeTime += dt;
-      if (kart.position.distanceTo(this.wedgeAnchor) > 2.5) {
+      // Escape = real displacement AND off the wall. A kart creeping
+      // along the wall face satisfies displacement but is still beached
+      // (critic8: grinders cleared the ladder every ~1.6 s and creeped
+      // for whole laps); only an unclamped kart has truly escaped.
+      if (kart.position.distanceTo(this.wedgeAnchor) > 2.5 && !kart.onWall) {
         this.wedgeTime = -1;
         this.stuckTime = 0;
+        this.grindTime = 0;
       } else {
         const desired = Math.atan2(-tanNow.x, -tanNow.z);
         const err = wrapAngle(desired - kart.heading);

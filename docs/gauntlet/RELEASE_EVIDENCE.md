@@ -300,3 +300,21 @@ light, rebuilt missile/box/slick/pad visuals. Verified in-game on all
 0 wall hits, stalled 0 ×3); 68.3 fps p50 14.7 / p95 15.2 / worst
 15.7 ms @ 599 draws / 98.7k tris. Media registered in
 MEDIA_REGISTRY (tex-*/bb-* entries).
+
+**Critic8 (7/10) visual review + fix batch (this commit):** adversarial
+visual pass on the wave-6 build — `evidence/wave6/CRITIC8_REPORT.md`
+(60 shots). Held up: skies, all particles verified, items, readability,
+full GP, wrong-way, records HUD, 0 console errors, 68 fps. Fixed:
+D1 HIGH billboard backs read as black monoliths → mirrored poster
+plane on every board's back face (verified: 2 planes/board, rot π).
+D2 HIGH title orbit clipped the start gantry every ~11 s + D3 MED
+Switchback rock mounds buried the orbit → orbit r 8.5→5.2 / y 2.6→3.0
+keeps the camera inside the gantry footprint (posts ±7.2) and the prop
+band (≥hw+3); look target raised to +1.3 so the kart drops below the
+menu text (D8 LOW). D4 MED trees/rocks stabbed through the grandstand
+→ 16 m scatter exclusion around the stand anchor. D5 MED AI stragglers
+(2:15+ BOT-C laps) → root cause found: wall-creep satisfied the
+ladder's displacement escape while still clamped; escape now requires
+!onWall, plus a new grind detector (onWall && speed<8 for 4 s) arms
+the ladder at the forward rung. 3-track smoke identical baselines,
+stalled 0.
