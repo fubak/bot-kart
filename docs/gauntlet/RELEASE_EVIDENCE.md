@@ -341,3 +341,61 @@ back z-fight, minimap 0.88. Verified independently: typecheck+build
 clean; smoke identical ×3; NN 67.7 fps p50 14.6/p95 15.3/p99 15.6
 @ 619 draws; 0 console errors/warnings. Evidence `wave7/fix9-*` +
 `int-fix9-*`.
+
+---
+
+## Meta-gauntlet close-out (waves 8–19) — CLOSED at 8.5/10
+
+**Workstreams (all independently verified before accept):**
+
+- **WS-ANIM (71dde86):** crowd head-bob wave on grandstands, spinning
+  feature billboards, canopy sway (~110 instanced matrix writes/frame),
+  ridgeline windmill, NN scanline pylon. Verified live: motion sampled
+  across frames, 0 console errors.
+- **WS-MAT (c2e49ee):** MeshPhysicalMaterial clearcoat kart paint,
+  RoomEnvironment IBL (0.3/0.22 intensity), asphalt roughnessMap with
+  polished tire lines, gantry lamp strip. ANGLE X4122 program-info-log
+  warnings resolved via `checkShaderErrors=false` (benign D3D constant-
+  fold warnings in generated GLSL — per Three.js docs).
+- **WS-AUDIO (2173ae0):** item SFX for all 6 kinds (verified via tagged
+  `__sfx` counters: `launch:missile` etc.), per-track music themes
+  (theme idx tracks selection), ambience beds, UI blips, champion
+  jingle.
+- **CHAR-005 (a882d68):** driver idle look-around — head yaw sweeps
+  when stationary on title orbit/countdown.
+
+**Critic arc 11→19 (score: 7.5→7.6→8.4 clean→7.8→8.0→7.7→7.7→8.5 clean):**
+
+- FIX-003: player-only dead-stop pivot steering (1.39 rad yaw at
+  0 m/s verified); AI careful mode; NN sky lift; hat() buffer cache;
+  ink overlay cleared on quit-to-title.
+- FIX-004: dirSign hysteresis ends pin jitter (-2.91 rad net rotation
+  while pinned); grind-assist pursuit (reversing 8.7%→0% on SR);
+  AudioParam finite guards.
+- FIX-005: swap `resync()` gate-mask — teleports satisfy behind-gates,
+  lap crossing counts both directions (was silently denied); texture
+  disposal 39→36 flat over 6 rebuilds.
+- FIX-006: resync preserves back-grid unwrapped progress (96→96 exact);
+  pause trap on results closed via settings path; shadow map
+  2048→1536 → p95 17.0→16.4 ms.
+- FIX-007: pause can't engage on `finished`; Tab/Space/arrow
+  preventDefault; tie-consistent GP points/positions; final-leg
+  champion tiebreak.
+- FIX-008: `teleportedThisLap` — swap laps count for progression but
+  never write records (verified: 6.33 s teleport lap excluded,
+  normal lap still records).
+- FIX-009: persisted volume applied after AudioContext unlock
+  (masterVol/musicVol 0 → gains 0.00 verified); Enter/Esc aliases on
+  results (pad A advances all GP legs, B quits — verified end-to-end);
+  finished racers excluded from swap targets.
+- FIX-010: countdown orbit steers to chase azimuth + no hard copy at
+  GO → snap 10.5→0.18 m; per-field settings validation
+  (`masterVol:"banana"`→default, `musicVol:99`→clamp); blur auto-pause;
+  sky mountain disposal (geometry flat over 6 rebuilds).
+
+**Final verified numbers (critic-19 build):** NN busiest scene 68.1 fps,
+p95 15.4 ms, worst 16.0 ms — inside ≥55 fps / p95 ≤16.6 ms budget.
+Smoke baselines exact on all tracks (PG 22.69/19.22/18.12, SR
+26.42/22.46/21.62, NN 25.54/21.61/20.90; stalled 0). 0 console errors,
+0 warnings. Full 3-leg GP completes with all finishers, correct
+points, champion selection, and clean title re-arm.

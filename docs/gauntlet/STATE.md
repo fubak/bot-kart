@@ -42,21 +42,16 @@ consecutive clean passes to ship.
 
 ## Current Objective
 
-Wave 4 + post-critic expansion COMPLETE and live-verified: 6 items (boost/missile/slick/shield/
-ink/swap) with position-weighted rolls, distinct rival chassis, gravel
-inside-cuts at both hairpins (geometry corrected to the true inside edge),
-rubber-band pacing (2.96 s pack spread verified), driver celebrations,
-anti-wedge AI recovery, Bot C AI shortcut-taker, confetti + positional
-audio, title-orbit framing fix. Options menu live (`O`): master/music
-volume bars, reduced-motion + minimap toggles — evidence `options.png`.
-Second track SWITCHBACK RIDGE selectable on title via `T` (buildWorld
-rebuild; AI laps verified; both gravel cuts probed to correct inside
-edges). Driver limb emotes via the seated bots' articulated rigs —
-victory arm-pump, spin flail, head-into-turn tracking.
-Grand Prix cup mode (G): 3-race championship with 10/7/5/3 points and
-final standings. Options menu fully modal + persisted + difficulty
-(EASY/NORMAL/HARD scales AI skill). Night headlights on NEON NIGHT.
-Release evidence at RELEASE_EVIDENCE.md.
+**META-GAUNTLET CLOSED — criterion met at wave 19.** Critic-19 scored
+**8.5/10, CLEAN PASS** (no defect ≥MED), satisfying the ≥8.5 close
+rule. All six wave-7+ workstreams integrated and independently
+verified (WS-POST, WS-DRESS, WS-ANIM, WS-MAT, WS-AUDIO, CHAR-005);
+ten fix batches (FIX-001…010) closed every critic finding through
+wave 19. Final numbers: ~68 fps / p95 ~15.4 ms on NN busiest scene;
+smoke baselines exact on all 3 tracks; 0 console errors/warnings;
+full 3-leg GP + gamepad-only results navigation verified end-to-end.
+Close-out record: `evidence/wave19/CRITIC19_REPORT.md`,
+`QUALITY_UNITS.md` FIX-001…010, `RELEASE_EVIDENCE.md` final section.
 
 ---
 
@@ -215,6 +210,47 @@ None.
   flash, malformed binding validation, Esc closes options on title).
 - Leg animation shipped (a23641e): pedal work + spin/celebration kicks —
   every documented quality gap now closed.
+
+### Meta-gauntlet arc (waves 7–19) — CLOSED at 8.5/10
+
+- Wave-7 workstreams: WS-POST (3417943 — MSAA HDR bloom/ACES/grade/
+  vignette/speed-CA), WS-DRESS (b981dea — 2.2–3.2× themed scatter with
+  foldback-safe clearance), FIX-001 (84bd608 — critic-9 batch: seated
+  kerbs, AI progress watchdog, NN gate-saber bloom, organic ink).
+- Wave-8: WS-ANIM (71dde86 — crowd wave, spinning feature boards,
+  canopy sway, windmill, NN scanline pylon).
+- Wave-9: WS-MAT (c2e49ee — kart clearcoat, RoomEnvironment IBL,
+  road roughnessMap + tire polish, gantry lamp strip) + FIX-002
+  (8b7d7d6 — battered wall footings to grade, GP provisional rows,
+  rubber-band cap honored, Q-quit cup disarm).
+- Wave-10: WS-AUDIO (2173ae0 — full item SFX, per-track music themes,
+  ambience beds, UI cues, champion jingle) + CHAR-005 (a882d68 —
+  idle driver look-around).
+- Critic-11 7.5 → FIX-003 (7c24ccb — player-only standstill pivot
+  steering, AI post-recovery careful mode, NN sky lift, hat() buffer
+  cache, banner underside emissive, title-ink-overlay cleanup).
+- Critic-12 7.6 → FIX-004 (ae63043 — dirSign hysteresis kills pin
+  jitter, grind-assist pursuit pulls bots along wall faces, stuck-hint
+  pivot immunity, AudioParam finite guards).
+- Critic-13 **8.4 — first CLEAN PASS**; coordinator pivot-fade widen.
+- Critic-14 7.8 → FIX-005 (afa0fe4 — swap resync gate-mask preserves
+  lap eligibility both directions, respawn-during-spin fix, texture
+  disposal on rebuild 39→36 flat, `…` provisional glyph).
+- Critic-15 8.0 → FIX-006 (8ebe5c0 — resync score rebase preserves
+  back-grid unwrapped progress, results pause-trap fix, shadow map
+  2048→1536 for p95 headroom, results row nowrap).
+- Critic-16 7.7 → FIX-007 (39873a2 — pause gate on `finished`,
+  Tab/Space/arrow preventDefault, tie-consistent GP positions/points,
+  final-leg champion tiebreak).
+- Critic-17 7.7 → FIX-008 (a7d28ca — teleportedThisLap excludes swap
+  laps from records, R disabled mid-GP, G-disarm keeps track).
+- Critic-18 → FIX-009 (dbf5dbb — persisted volume applied post-unlock,
+  Enter/Esc pad aliases on results, finished racers excluded from
+  swap targets).
+- Critic-19 **8.5/10 — CLEAN PASS — GAUNTLET CLOSED** → FIX-010
+  (9e50551 — GO camera settle 10.5→0.18 m, per-field settings
+  validation, blur auto-pause, footer pad-alias hints, sky mountain
+  disposal kills ~2 geo/rebuild leak).
 
 ---
 
