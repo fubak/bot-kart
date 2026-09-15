@@ -208,6 +208,21 @@ export const POSTFX = {
   },
 } as const;
 
+// Particle effects (src/game/Fx.ts) — emission rates and caps for the
+// wave-20 VFX pass. Pools stay fixed-size; these shape density, not load.
+export const FX = {
+  // Slipstream speed-lines: emitter calls/sec while the draft burst is on
+  // (each call spawns 2 streak particles).
+  slipstreamRate: 40,
+  // Ambient theme motes (Fx.ambientTick): per-track emit rate /sec and the
+  // camera-centered spawn ring radii (m). Deliberately sparse — set
+  // dressing, never racing-line noise.
+  ambientRate: [3, 4, 3.5], // PG pollen / SR embers / NN data-motes
+  ambientRing: [6, 20],
+  // Item-roulette glints above a spinning kart's roof (per kart, /sec).
+  rouletteGlintRate: 16,
+} as const;
+
 // AI drivers (src/game/AiDriver.ts) — pure-pursuit centerline following with
 // curvature-aware speed control and hold-to-drift on tight corners.
 export const AI = {

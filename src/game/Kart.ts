@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { KART } from '../config/tuning';
+import { FX, KART } from '../config/tuning';
 import type { ControlState } from '../core/Input';
 import type { Track } from './Track';
 import { Fx } from './Fx';
@@ -484,6 +484,8 @@ export class Kart {
       this.hopT -= dt;
       if (this.hopT < 0) {
         this.impactSquash = Math.max(this.impactSquash, KART.driftHopSquash);
+        // Hop touchdown — a light dust puff sells the kart settling back.
+        this.vfx.landingDust(this.position, this.velocity, 0.25);
       }
     }
     // Spin-out (item hits): yaw whips freely, controls dead, velocity decays.
@@ -577,6 +579,12 @@ export class Kart {
         }
         if (tier >= 0) {
           this.boostTimer = Math.max(this.boostTimer, KART.boostTime[tier]);
+          // Mini-turbo release: one-shot tailpipe burst in the tier color.
+          const pipe = this.position
+            .clone()
+            .addScaledVector(fwd, -(KART.length / 2 - 0.55));
+          pipe.y = this.position.y + 0.5;
+          this.vfx.turboBurst(pipe, this.velocity, tier);
         }
         this.driftDir = 0;
         this.driftCharge = 0;
@@ -709,7 +717,11 @@ export class Kart {
         this.impactSquash = Math.min(0.55, this.airTime * 0.45);
         this.lastWallHit = simTime;
         this.lastWallImpact = Math.min(1, this.airTime * 0.5);
-        this.vfx.dust(this.position.clone().setY(groundY + 0.15), this.velocity, 0xcfc4ae);
+        this.vfx.landingDust(
+          this.position.clone().setY(groundY),
+          this.velocity,
+          Math.min(1, this.airTime * 0.5),
+        );
       }
       this.airTime = 0;
       this.grounded = true;
@@ -796,15 +808,9 @@ export class Kart {
     // --- slipstream/drafting ---
     this.slipstreamT = Math.max(0, this.slipstreamT - dt);
     this.updateDraft(dt, simTime, traffic);
-    if (this.slipstreamT > 0 && Math.random() < 40 * dt) {
-      // Wind streaks whipping past — pale puffs flung off the flanks.
-      // slipstreamT is the flag the VFX stream hooks real speed-lines onto.
-      const side = Math.random() < 0.5 ? -1 : 1;
-      const p = this.position
-        .clone()
-        .addScaledVector(right2, side * 0.9)
-        .setY(this.position.y + 0.7);
-      this.vfx.dust(p, this.velocity, 0xdfeeff);
+    if (this.slipstreamT > 0 && Math.random() < FX.slipstreamRate * dt) {
+      // MK wind-tunnel speed-lines streaming past the kart (VFX-DEEP).
+      this.vfx.slipstream(this.position, this.velocity, right2);
     }
 
     this.syncVisual();

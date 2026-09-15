@@ -3,7 +3,7 @@ import type { Kart } from './Kart';
 import type { Track } from './Track';
 import type { Fx } from './Fx';
 import type { Audio } from '../core/Audio';
-import { AI, KART } from '../config/tuning';
+import { AI, FX, KART } from '../config/tuning';
 import { chevronTexture, glowTexture } from '../core/Textures';
 
 // Item system: floating pickup boxes on the racing line + usable items.
@@ -28,6 +28,16 @@ const ROULETTE_S = 1.2;
 const ROULETTE_TICK_MIN = 0.055; // fastest icon flip (s)
 const ROULETTE_TICK_MAX = 0.24; // slowest flip, just before landing
 const ITEM_KINDS: ItemKind[] = ['boost', 'missile', 'slick', 'shield', 'ink', 'swap'];
+// Roulette-glint tint per icon — mirrors RaceHud's slot palette so the
+// over-kart sparkle reads as the same item the HUD is cycling.
+const ITEM_GLOW: Record<ItemKind, THREE.Color> = {
+  boost: new THREE.Color(0xffd454),
+  missile: new THREE.Color(0xff5a3c),
+  slick: new THREE.Color(0x8a8f96),
+  shield: new THREE.Color(0x7be8ff),
+  ink: new THREE.Color(0xc070ff),
+  swap: new THREE.Color(0x7dff8a),
+};
 
 interface Box {
   mesh: THREE.Mesh;
@@ -319,8 +329,11 @@ export class Items {
       // the ±48-sample continuity window walks a phantom path (critic6 D8).
       racers?.[kartIdx].resync(kart.position, kart.trackIdx);
       racers?.[target].resync(other.position, other.trackIdx);
-      this.fx?.pickupSparkle(kart.position.clone().setY(kart.position.y + 0.8));
-      this.fx?.pickupSparkle(other.position.clone().setY(other.position.y + 0.8));
+      // Imploding spark rings at both exchanged positions — each point is
+      // one kart's departure and the other's arrival, so two bursts cover
+      // all four teleport events (VFX-DEEP).
+      this.fx?.teleportBurst(kart.position);
+      this.fx?.teleportBurst(other.position);
       return item;
     }
     if (item === 'ink') {
@@ -480,6 +493,12 @@ export class Items {
         this.rouletteIcon[k] = icon;
         this.rouletteTick[k]++;
       }
+      // Slot-spin glint over the kart — tiny sparkle in the current icon's
+      // color so nearby players can read a rolling roulette (VFX-DEEP).
+      const icon = this.rouletteIcon[k];
+      if (icon && Math.random() < FX.rouletteGlintRate * dt) {
+        this.fx?.rouletteGlint(this.karts[k].position, ITEM_GLOW[icon]);
+      }
     }
     // Boost pads pulse — the arrows throb to read "drive over me".
     // Pulse crosses the bloom gate near the top of the wave — pads breathe
@@ -493,6 +512,7 @@ export class Items {
         if (dx * dx + dz * dz < 4.5) {
           kart.boostTimer = Math.max(kart.boostTimer, KART.boostTime[0]);
           p.cooldownUntil = simTime + 1.0;
+          this.fx?.padFlash(kart.position, kart.velocity);
           this.audio?.padBoost(this.volOf(kart));
           break;
         }

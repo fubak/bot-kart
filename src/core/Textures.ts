@@ -101,6 +101,37 @@ export function starTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(cv);
 }
 
+/** Speed-line streak — a thin horizontal dart with tapered ends and a
+ *  soft vertical gaussian falloff. Mapped onto the square particle quad
+ *  (4:1 source aspect reads as an elongated line), rotated into its
+ *  screen-space velocity by the emitter — slipstream wind-tunnel lines. */
+export function streakTexture(): THREE.CanvasTexture {
+  const w = 128;
+  const h = 32;
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const g = cv.getContext('2d')!;
+  // Horizontal body: transparent tail → bright head (motion direction +u).
+  const hg = g.createLinearGradient(0, 0, w, 0);
+  hg.addColorStop(0, 'rgba(255,255,255,0)');
+  hg.addColorStop(0.3, 'rgba(255,255,255,0.75)');
+  hg.addColorStop(0.72, 'rgba(255,255,255,1)');
+  hg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = hg;
+  g.fillRect(0, 0, w, h);
+  // Vertical gaussian mask — keeps only a thin centered band.
+  g.globalCompositeOperation = 'destination-in';
+  const vg = g.createLinearGradient(0, 0, 0, h);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(0.42, 'rgba(0,0,0,1)');
+  vg.addColorStop(0.58, 'rgba(0,0,0,1)');
+  vg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = vg;
+  g.fillRect(0, 0, w, h);
+  return new THREE.CanvasTexture(cv);
+}
+
 /** Boost-pad chevron arrows — three forward arrows on transparent bg. */
 export function chevronTexture(color = '#b8ffe0'): THREE.CanvasTexture {
   const cv = document.createElement('canvas');

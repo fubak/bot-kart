@@ -448,6 +448,7 @@ export class Game {
         const i = this.track.nearestIndexNear(this.kart.position, this.kart.trackIdx);
         const t = this.track.tangentAt(i);
         this.kart.reset(this.track.pointAt(i), Math.atan2(-t.x, -t.z));
+        this.fx.materialize(this.kart.position);
       }
       // Quit to title (Q): regrid + title phase, no reload needed (D3).
       if (code === 'KeyQ') {
@@ -501,6 +502,9 @@ export class Game {
     });
 
     this.chaseCam = new ChaseCamera(window.innerWidth / window.innerHeight);
+    // Fx needs the live camera to rotate speed-line streaks into their
+    // screen-space velocity direction (VFX-DEEP).
+    this.fx.camera = this.chaseCam.camera;
     // Post chain lives in PostFX (bloom/vignette/speed-CA) — render-side
     // only. Needs the live chase camera, so it builds here (WS-POST).
     this.postfx = new PostFX(this.renderer, this.scene, this.chaseCam.camera);
@@ -753,6 +757,9 @@ export class Game {
     // World ambience + feedback: particles/clouds tick on render time,
     // countdown engine revs puff exhaust, the shadow box tracks the player.
     this.fx.update(frameDt);
+    // Per-track ambient motes — a sparse ring of atmosphere around the
+    // camera (pollen/embers/data-sparks by theme).
+    this.fx.ambientTick(this.chaseCam.camera.position, this.trackIdx, frameDt);
     this.sky.update(frameDt);
     this.track.tick(this.simTime);
     if (this.race.phase === 'countdown' && Math.random() < 26 * frameDt) {
