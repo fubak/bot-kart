@@ -777,10 +777,14 @@ export class Kart {
       if (armL) armL.node.rotation.copy(armL.base);
       if (armR) armR.node.rotation.copy(armR.base);
       // Head tracks the steering — the driver looks into the corner.
+      // At near-standstill (title orbit, grid, countdown) the head
+      // wanders instead: a slow two-frequency glance that reads as the
+      // driver scanning the crowd/rivals.
+      const idleLook = Math.abs(this.forwardSpeed) < 2 ? Math.sin(t * 0.53) * 0.5 + Math.sin(t * 0.21) * 0.25 : 0;
       if (headN)
         headN.node.rotation.set(
           headN.base.x,
-          headN.base.y - this.steerVisual * 0.45 - slip * 0.25,
+          headN.base.y - this.steerVisual * 0.45 - slip * 0.25 + idleLook,
           headN.base.z,
         );
       // Pedal work: right leg presses with throttle, left with brake —

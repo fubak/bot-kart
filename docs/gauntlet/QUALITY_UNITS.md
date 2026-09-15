@@ -855,3 +855,15 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   track (0/1/2); 0 console errors/warnings.
 - **Largest Gap:** all voices are oscillator/noise synthesis — no
   samples; mixing is static (no sidechain ducking under SFX).
+
+### CHAR-005 — Idle look-around (wave 10, coordinator pass)
+
+- **Domain:** Kart
+- **Status:** Integrated
+- **Evidence:** `wave10/int-char-title-*.png`; live probe headY sweep
+  -0.74→0.00 at speed 0.
+- **Shipped:** head wanders (two-frequency glance) when |fwdSpeed|<2 —
+  title orbit/grid/countdown the driver scans instead of staring
+  frozen. Existing coverage confirmed complete: slope pitch/roll, slip
+  lean, impact+landing squash, pedal work, celebrations, spin flail,
+  blink, idle bob, gravel jitter, airborne tilt.
