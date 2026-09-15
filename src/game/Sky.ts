@@ -145,6 +145,14 @@ export class Sky {
     // Silhouette mountain rings — fog is baked into the color instead of
     // sampled at runtime (the far ring sits beyond fog-far and would
     // vanish); nearer = darker, farther = closer to the horizon color.
+    // clear() only detaches — dispose the old range first or every
+    // applyTheme (each buildWorld) leaks ~2 geometries (critic19 NIT).
+    this.mountains.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const m = mesh.material;
+      if (m) for (const mm of Array.isArray(m) ? m : [m]) mm.dispose();
+    });
     this.mountains.clear();
     const rng = (() => { let s = 777; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff); })();
     // Partial grade compensation for mountains — full squaring (as used on

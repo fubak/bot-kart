@@ -1023,3 +1023,25 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   was locked — asymmetric free advancement for the swapper).
 - **Verified:** Enter on results → countdown (restart path); build
   clean; smoke unaffected.
+
+### FIX-010 — Critic-19 polish batch (wave 19)
+
+- **Domain:** Camera / settings / input / GPU hygiene / HUD
+- **Status:** Integrated
+- **Evidence:** `wave19/CRITIC19_REPORT.md` (**8.5/10 — clean pass**).
+- **Camera GO handover:** countdown orbit steers to the chase azimuth
+  through the last 1.2 s, and the first racing frame no longer
+  hard-copies position (hard seed only for >12 m teleports) — measured
+  snap 10.5 m worst → 0.18 m settle.
+- **Settings validation:** per-field type/range checks on load —
+  `masterVol:"banana"` and `musicVol:99` are rejected/clamped instead
+  of NaN-ing an AudioParam on every keydown. Verified live: defaults
+  apply, no exceptions.
+- **Blur auto-pause:** window blur during racing pauses (field no
+  longer races on while the player's held keys are dropped).
+- **Results footer advertises Enter/Esc aliases** (pad A/B paths).
+- **Sky geometry leak:** `applyTheme` disposed nothing on
+  `mountains.clear()` — ~2 geometries leaked per buildWorld. Now
+  traverses+disposes first; verified 395→380 flat across 6 rebuilds.
+- **Verified:** typecheck+build clean; console 0E/0W incl. corrupt-
+  settings session.

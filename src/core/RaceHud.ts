@@ -415,9 +415,9 @@ export class RaceHud {
           .join('');
         const footer = gp?.mode
           ? gp.done
-            ? `[R] restart &nbsp;·&nbsp; [Q] title`
-            : `[N] next race &nbsp;·&nbsp; [Q] abandon cup`
-          : `[R] restart &nbsp;·&nbsp; [Q] title`;
+            ? `[R/Enter] restart &nbsp;·&nbsp; [Q/Esc] title`
+            : `[N/Enter] next race &nbsp;·&nbsp; [Q/Esc] abandon cup`
+          : `[R/Enter] restart &nbsp;·&nbsp; [Q/Esc] title`;
         this.resultsEl.innerHTML =
           `<div style="font-size:30px;font-weight:900;margin-bottom:10px">` +
           `${gpFinal ? 'FINAL STANDINGS' : 'RESULTS'}${gp?.mode && !gp.done ? ` — leg ${gp.leg + 1}/${gp.total}` : ''}</div>` +

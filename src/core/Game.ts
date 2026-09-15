@@ -270,7 +270,24 @@ export class Game {
     // Restore persisted settings + last-played track.
     try {
       const s = JSON.parse(localStorage.getItem('grok-kart-settings') ?? '{}');
-      Object.assign(this.settings, { open: false }, s);
+      // Per-field validation (critic19): Object.assign let a stored
+      // `masterVol:"banana"` NaN the AudioParam on every unlock — one
+      // uncaught TypeError per keydown forever.
+      const num = (v: unknown): number | null =>
+        typeof v === 'number' && Number.isFinite(v) ? v : null;
+      const bool = (v: unknown): boolean | null =>
+        typeof v === 'boolean' ? v : null;
+      for (const [k, v] of Object.entries(s)) {
+        if (!(k in this.settings) || k === 'open') continue;
+        const cur = (this.settings as Record<string, unknown>)[k];
+        let valid =
+          typeof cur === 'number' ? num(v) : typeof cur === 'boolean' ? bool(v) : v;
+        // Volume fields are 0..1 sliders — a stored 99 is finite but not sane.
+        if (typeof valid === 'number' && (k === 'masterVol' || k === 'musicVol')) {
+          valid = Math.min(1, Math.max(0, valid));
+        }
+        if (valid !== null) (this.settings as Record<string, unknown>)[k] = valid;
+      }
       if (typeof s.track === 'number' && s.track >= 0 && s.track < TRACKS.length) {
         this.trackIdx = s.track;
       }
@@ -497,6 +514,12 @@ export class Game {
     this.chaseCam.reducedMotion = this.settings.reducedMotion;
 
     initInput();
+    // Auto-pause on window blur: held keys clear on blur (correct — else
+    // they'd stick), but the field kept racing while the player coasted
+    // dead (critic19). Pausing is the only fair outcome.
+    window.addEventListener('blur', () => {
+      if (this.race.phase === 'racing' && !this.settings.open) this.paused = true;
+    });
     // AudioContext unlocks on first trusted gesture.
     const unlock = () => {
       this.audio.unlock();

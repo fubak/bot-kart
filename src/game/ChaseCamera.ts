@@ -40,7 +40,17 @@ export class ChaseCamera {
     const inCountdown = !!race && (race.phase === 'countdown' || race.phase === 'title');
     if (inCountdown) {
       this.introAngle += dt * 0.55;
-      const a = this.introAngle;
+      let a = this.introAngle;
+      // Steer the orbit to the chase azimuth through the last ~1.2 s of
+      // countdown — GO then hands off with a settle, not the copy() jump
+      // that snapped the camera 1.9–10.5 m every start (critic19).
+      if (race.phase === 'countdown') {
+        const w = 1 - THREE.MathUtils.clamp(race.countdownLeft / 1.2, 0, 1);
+        let d = kart.heading - a;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        a += d * THREE.MathUtils.smoothstep(w, 0, 1);
+      }
       // r=5.2 keeps the orbit inside the start gantry (posts at ±7.2 m
       // lateral) and inside the prop scatter band (trees/rocks ≥ hw+3) —
       // the old r=8.5 swept past a post dead-center every ~11 s and let
@@ -50,7 +60,12 @@ export class ChaseCamera {
         .add(new THREE.Vector3(Math.sin(a) * 5.2, 3.35, Math.cos(a) * 5.2));
       this.initialized = false;
     } else if (!this.initialized) {
-      this.camera.position.copy(targetPos);
+      // Hard-seed only on a genuine teleport (>12 m out) — at GO the orbit
+      // has already steered to the chase azimuth, so the damped lerp pulls
+      // in smoothly instead of jump-cutting (critic19 GO snap).
+      if (this.camera.position.distanceTo(targetPos) > 12) {
+        this.camera.position.copy(targetPos);
+      }
       this.lookTarget.copy(kart.position).addScaledVector(fwd, CAMERA.lookAhead);
       this.initialized = true;
     }
