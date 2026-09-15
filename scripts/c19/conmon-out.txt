@@ -286,3 +286,112 @@ debug: [vite] connecting...
 debug: [vite] connected.
 debug: [vite] connecting...
 debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+exception: {"exceptionId":4,"text":"Uncaught","lineNumber":845,"columnNumber":47,"scriptId":"872","url":"http://localhost:5173/src/game/Kart.ts?t=1789478414211","stackTrace":{"callFrames":[{"functionName":"syncVisual","scriptId":"872","url":"http://localhost:5173/src/game/Kart.ts?t=1789478414211","lineNumber":845,"columnNumber":47},{"functionName":"update","scriptId":"872","url":"http://localhost:5173/src/game/Kart.ts?t=1789478414211","lineNumber":784,"columnNumber":7},{"functionName":"frame","scriptId":"871","url":"http://localhost:5173/src/core/Game.ts?t=1789478414211","lineNumber":715,"columnNumber":13},{"functionName":"","scriptId":"871","url":"http://localhost:5173/src/core/Game.ts?t=1789478414211","lineNumber":671,"columnNumber":46},{"functionName":"onAnimationFrame","scriptId":"12","url":"http
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":5,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","u
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":6,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","u
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":7,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","u
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":8,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","u
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":9,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","u
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":10,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":11,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":12,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":13,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":14,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","
+debug: [vite] connected.
+debug: [vite] connecting...
+error: THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 1. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.
+exception: {"exceptionId":15,"text":"Uncaught","lineNumber":17981,"columnNumber":15,"scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","stackTrace":{"callFrames":[{"functionName":"computeBoundingSphere","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":17981,"columnNumber":15},{"functionName":"intersectsObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":18485,"columnNumber":46},{"functionName":"projectObject","scriptId":"965","url":"http://localhost:5173/node_modules/.vite/deps/three.module-Cg0SxxSv.js?v=33be1a43","lineNumber":51594,"columnNumber":43},{"functionName":"projectObject","scriptId":"965","
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+log: [ai-smoke] {
+  "track": "PROVING GROUNDS",
+  "solo": [
+    {
+      "skill": 0.85,
+      "simSeconds": 71.56,
+      "phase": "finished",
+      "lapsCompleted": 3,
+      "lapTimes": [
+        23.17,
+        22.69,
+        22.69
+      ],
+      "bestLap": 22.69,
+      "wallHits": 0,
+      "wallHitIdx": [],
+      "wallHitSpeed": [],
+      "firstHitTrace": [],
+      "maxLateral": 4.12,
+      "driftPct": 7.8,
+      "avgSpeed": 15.58,
+      "topSpeed": 24,
+      "wrongWaySeen": 0
+    },
+    {
+      "ski
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.

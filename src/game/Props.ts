@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SCENERY } from '../config/tuning';
+import { TEX } from '../core/Textures';
 
 // Set-dressing prop factories (WS-DRESS). Everything here is procedural and
 // instanced — flat-shaded low-poly matching the existing scenery. Each theme
@@ -31,6 +32,7 @@ export type AnimatedKind =
   | 'scrub'
   // WS-ANIM kinds:
   | 'crowd' // instanced bobbing heads over the grandstand tiers
+  | 'crowdArm' // instanced waving arms on a fan subset (VIS-DEEP)
   | 'crowdUV' // subtle UV wobble on the shared crowd texture
   | 'sway' // instanced canopy micro-oscillation (wind)
   | 'spin' // continuous rotation — rotating boards, windmill rotor
@@ -50,8 +52,8 @@ export interface AnimatedProp {
 
 /** Per-instance animation payload hung on InstancedMesh.userData.anim by
  *  the builders; tick() recomposes matrices from it — zero per-frame
- *  allocation. 'crowd' packs stride 3 (x,y,z); 'sway' packs stride 7
- *  (x,y,z,yaw,sx,sy,sz). */
+ *  allocation. 'crowd' packs stride 5 (x,y,z,sx,sy); 'crowdArm' packs
+ *  stride 4 (x,y,z,side); 'sway' packs stride 7 (x,y,z,yaw,sx,sy,sz). */
 export interface InstanceAnim {
   base: Float32Array;
   phase: Float32Array;
@@ -927,6 +929,329 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
   });
   studs.forEach((st, k) => (st.count = studCounts[k]));
   objects.push(...studs);
+
+  // ================= VIS-DEEP: mid-level band =================
+  // NN frames ran 30-40% near-black above the horizon — the neon set tops
+  // out at ~7.4 m (holo mast) and the sky starts at ~20°. Everything here
+  // is emissive or unlit so it glows through bloom at zero light cost.
+  const MID = S.mid;
+
+  // Elevated cable runs: sagging light strands strung between slim masts
+  // along both shoulders — the circuit's elevated power/transit lines
+  // sweeping the mid-sky band. Posts dark, strands emissive, both
+  // instanced (2 draws total for ~500 pieces).
+  const cableLat = ctx.hw + MID.cableLateral;
+  const maxAnchors = Math.ceil(ctx.samples.length / MID.cableEvery) * 2 + 4;
+  const cablePosts = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.14, MID.cableHeight, 0.14),
+    darkMat,
+    maxAnchors,
+  );
+  const cableGeo = new THREE.BoxGeometry(1, 0.045, 0.045);
+  const cableMat = new THREE.MeshStandardMaterial({
+    color: 0x101418,
+    emissive: 0x36f0ff,
+    // 1.3 — over the ~1.0 linear bloom gate so the strand reads as a lit
+    // line, but under the sign pulse so it doesn't saber the sky.
+    emissiveIntensity: 1.3,
+    roughness: 0.4,
+  });
+  const cables = new THREE.InstancedMesh(cableGeo, cableMat, maxAnchors * 2);
+  let cpi = 0;
+  let cci = 0;
+  const spanSeg = (a: THREE.Vector3, b: THREE.Vector3) => {
+    // Two segments meeting at a dipped midpoint — reads as catenary sag.
+    const mid = a.clone().lerp(b, 0.5);
+    mid.y -= MID.cableSag;
+    for (const [pa, pb] of [
+      [a, mid],
+      [mid, b],
+    ] as const) {
+      if (cci >= maxAnchors * 2) return;
+      const d = pb.clone().sub(pa);
+      const len = d.length();
+      if (len < 0.4) continue;
+      Q.setFromUnitVectors(X_AXIS, d.normalize());
+      M.compose(
+        pa.clone().add(pb).multiplyScalar(0.5),
+        Q,
+        new THREE.Vector3(len, 1, 1),
+      );
+      cables.setMatrixAt(cci++, M);
+    }
+  };
+  const nSamples = ctx.samples.length;
+  for (const side of [1, -1]) {
+    let prev: THREE.Vector3 | null = null;
+    for (let i = 0; i <= nSamples; i += MID.cableEvery) {
+      const s = ctx.samples[i % nSamples];
+      const p = s.point.clone().addScaledVector(s.left, side * cableLat);
+      // Break the run on exclusions/low clearance (gravel mouths, the
+      // start orbit) — strands resume at the next clean mast.
+      if (ctx.excluded(p) || ctx.roadClearance(p) < 0.5) {
+        prev = null;
+        continue;
+      }
+      const gy = ctx.fieldY(p);
+      if (cpi < maxAnchors) {
+        M.compose(
+          p.clone().setY(gy + MID.cableHeight * 0.5),
+          Q.identity(),
+          new THREE.Vector3(1, 1, 1),
+        );
+        cablePosts.setMatrixAt(cpi++, M);
+      }
+      const top = p.clone().setY(gy + MID.cableHeight);
+      if (prev) spanSeg(prev, top);
+      prev = top;
+    }
+  }
+  cablePosts.count = cpi;
+  cables.count = cci;
+  objects.push(cablePosts, cables);
+
+  // Skyline towers: distant dark slabs ringing the circuit at 55-95 m —
+  // the city the night circuit races through. Flat navy with a faint
+  // self-lift so they silhouette against the sky, not merge into it.
+  const towerGeo = new THREE.BoxGeometry(1, 1, 1);
+  const towerMat = new THREE.MeshStandardMaterial({
+    color: 0x131b30,
+    emissive: 0x101c34,
+    emissiveIntensity: 0.5,
+    flatShading: true,
+    roughness: 0.9,
+  });
+  const towers = new THREE.InstancedMesh(towerGeo, towerMat, MID.towers);
+  // Rooftop/facade light dots: unlit HDR white × instanceColor hues — the
+  // 1.5 base pushes them just over the bloom gate so the tower tops
+  // twinkle cyan/magenta/amber against the dark band.
+  const dotGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+  const dotMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(1.5, 1.5, 1.5),
+  });
+  const dots = new THREE.InstancedMesh(dotGeo, dotMat, MID.towerDots);
+  const dotPalette = [0x36f0ff, 0xff4ad8, 0xffb03a, 0xbfd8ff];
+  let ti = 0;
+  let di = 0;
+  const dot = (p: THREE.Vector3, colorIdx?: number) => {
+    if (di >= MID.towerDots) return;
+    M.compose(p, Q.identity(), new THREE.Vector3(1, 1, 1));
+    dots.setMatrixAt(di, M);
+    dots.setColorAt(
+      di,
+      new THREE.Color(
+        dotPalette[colorIdx ?? Math.floor(rand() * dotPalette.length)],
+      ),
+    );
+    di++;
+  };
+  scatter(
+    ctx,
+    MID.towers,
+    { min: ctx.hw + 52, max: ctx.hw + 95, margin: 38 },
+    (p, s) => {
+      const gy = ctx.fieldY(p);
+      const w = 7 + rand() * 9;
+      const h = 16 + rand() * 26;
+      const d = 7 + rand() * 9;
+      const yaw =
+        Math.atan2(s.tangent.x, s.tangent.z) + (rand() - 0.5) * 0.7;
+      M.compose(
+        p.clone().setY(gy + h * 0.5 - 2), // base embedded — no floaters
+        Q.setFromAxisAngle(UP, yaw),
+        new THREE.Vector3(w, h, d),
+      );
+      towers.setMatrixAt(ti++, M);
+      // Rooftop ring: 2-3 corner lights + a beacon crown.
+      const topY = gy + h - 2.2;
+      const corners = 2 + Math.floor(rand() * 2);
+      for (let c = 0; c < corners; c++) {
+        const a = yaw + (c / corners) * Math.PI * 2 + rand();
+        dot(
+          new THREE.Vector3(
+            p.x + Math.cos(a) * w * 0.38,
+            topY + rand() * 1.2,
+            p.z + Math.sin(a) * d * 0.38,
+          ),
+        );
+      }
+      dot(new THREE.Vector3(p.x, topY + 1.6 + rand() * 1.4, p.z), 3); // crown
+      // Facade strip: 2-4 lit dots stepping down the track-facing side —
+      // a lit elevator-shaft read against the dark slab.
+      const dir = s.point.clone().sub(p).setY(0).normalize();
+      const face = Math.max(w, d) * 0.5 + 0.3;
+      const strip = 2 + Math.floor(rand() * 3);
+      for (let c = 0; c < strip; c++) {
+        dot(
+          new THREE.Vector3(
+            p.x + dir.x * face,
+            gy + h * (0.55 + c * 0.14),
+            p.z + dir.z * face,
+          ),
+        );
+      }
+    },
+  );
+  towers.count = ti;
+  dots.count = di;
+  objects.push(towers, dots);
+
+  // Distant holo billboards: big sponsor panels glowing over the circuit
+  // on tall masts — mid-band landmarks. Unlit map × 1.35 sits over the
+  // bloom gate → soft neon wash at 25-40 m. Two textures → two instanced
+  // quads; masts share darkMat.
+  const holoGeo = new THREE.PlaneGeometry(10, 4.5);
+  const holoMats = [0, 1].map(
+    (k) =>
+      new THREE.MeshBasicMaterial({
+        map: TEX.billboards[k](),
+        side: THREE.DoubleSide,
+        color: new THREE.Color(1.35, 1.35, 1.35),
+      }),
+  );
+  const holoBoards = holoMats.map(
+    (mm) => new THREE.InstancedMesh(holoGeo, mm, Math.ceil(MID.holoBoards / 2)),
+  );
+  const holoPosts = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.3, 1, 0.3),
+    darkMat,
+    MID.holoBoards,
+  );
+  const holoCounts = [0, 0];
+  let hpi = 0;
+  scatter(
+    ctx,
+    MID.holoBoards,
+    { min: ctx.hw + 18, max: ctx.hw + 34, margin: 9 },
+    (p, s) => {
+      const gy = ctx.fieldY(p);
+      const panelY = gy + 10.5 + rand() * 3;
+      // Panel normal aims at the road sample — drivers read it head-on.
+      const yaw = Math.atan2(s.point.x - p.x, s.point.z - p.z);
+      M.compose(
+        p.clone().setY(panelY),
+        Q.setFromAxisAngle(UP, yaw),
+        new THREE.Vector3(0.85 + rand() * 0.5, 0.85 + rand() * 0.5, 1),
+      );
+      const which = Math.floor(rand() * 2);
+      if (holoCounts[which] >= Math.ceil(MID.holoBoards / 2)) return;
+      holoBoards[which].setMatrixAt(holoCounts[which]++, M);
+      M.compose(
+        p.clone().setY(gy + (panelY - gy) * 0.5),
+        Q.setFromAxisAngle(UP, yaw),
+        new THREE.Vector3(1, panelY - gy, 1),
+      );
+      holoPosts.setMatrixAt(hpi++, M);
+      ctx.avoid(p, 3);
+    },
+  );
+  holoBoards.forEach((b, k) => (b.count = holoCounts[k]));
+  holoPosts.count = hpi;
+  objects.push(holoPosts, ...holoBoards);
+
+  // Elevated rail beam: a girder run along the longest straight — dark
+  // beam on tall masts with a glowing under-strip. The mid-level
+  // signature piece; follows the road's elevation like a transit line.
+  const railSide = (() => {
+    const s = ctx.samples[Math.floor(nSamples * 0.6)];
+    return ctx.innerSide(s);
+  })();
+  const railStart = ctx.straightSpot(0.52, 0.66, (i) => {
+    const s = ctx.samples[i];
+    const p = s.point.clone().addScaledVector(s.left, railSide * (ctx.hw + 5.5));
+    return !ctx.excluded(p) && ctx.roadClearance(p) > 2.5;
+  });
+  if (railStart >= 0) {
+    const beamGeo = new THREE.BoxGeometry(1, 0.55, 0.95);
+    const railBeams = new THREE.InstancedMesh(beamGeo, darkMat, MID.railSamples);
+    const stripGeo = new THREE.BoxGeometry(1, 0.13, 0.1);
+    const stripMat = new THREE.MeshStandardMaterial({
+      color: 0x101418,
+      emissive: 0x36f0ff,
+      emissiveIntensity: 1.7,
+      roughness: 0.4,
+    });
+    const railStrips = new THREE.InstancedMesh(stripGeo, stripMat, MID.railSamples * 2);
+    const railMasts = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.4, 1, 0.4),
+      darkMat,
+      Math.ceil(MID.railSamples / MID.railEvery) + 8,
+    );
+    let rbi = 0;
+    let rsi = 0;
+    let rmi = 0;
+    const mast = (p: THREE.Vector3, topY: number) => {
+      if (rmi >= Math.ceil(MID.railSamples / MID.railEvery) + 8) return;
+      const gy = ctx.fieldY(p);
+      const mh = topY - gy;
+      if (mh < 2.5) return;
+      M.compose(
+        p.clone().setY(gy + mh * 0.5),
+        Q.identity(),
+        new THREE.Vector3(1, mh, 1),
+      );
+      railMasts.setMatrixAt(rmi++, M);
+    };
+    // Two-pass: collect valid anchors (nulls mark breaks), then span
+    // consecutive anchors and seat a mast at every run start/end/interval
+    // so a beam end never floats mid-air.
+    const anchors: { p: THREE.Vector3; top: THREE.Vector3 }[] = [];
+    for (let k = 0; k < MID.railSamples; k++) {
+      const s = ctx.samples[(railStart + k) % nSamples];
+      const p = s.point.clone().addScaledVector(s.left, railSide * (ctx.hw + 5.5));
+      if (ctx.excluded(p) || ctx.roadClearance(p) < 2.2) {
+        anchors.push({ p, top: p }); // sentinel: top === p marks a break
+        continue;
+      }
+      anchors.push({ p, top: p.clone().setY(s.point.y + 7.6) });
+    }
+    let runStart = -1;
+    for (let k = 0; k <= anchors.length; k++) {
+      const a = k < anchors.length ? anchors[k] : null;
+      const valid = a !== null && a.top !== a.p;
+      if (valid) {
+        if (runStart < 0) {
+          runStart = k;
+          mast(a.p, a.top.y); // every run opens on a mast
+        } else if ((k - runStart) % MID.railEvery === 0) {
+          mast(a.p, a.top.y);
+        }
+        if (k > 0 && anchors[k - 1].top !== anchors[k - 1].p) {
+          const prev = anchors[k - 1];
+          const d = a.top.clone().sub(prev.top);
+          const len = d.length();
+          if (len > 0.3 && len < 9) {
+            Q.setFromUnitVectors(X_AXIS, d.normalize());
+            const mid = prev.top.clone().add(a.top).multiplyScalar(0.5);
+            M.compose(mid, Q, new THREE.Vector3(len, 1, 1));
+            railBeams.setMatrixAt(rbi++, M);
+            // Lit edge lines on BOTH beam faces — an under-strip vanished
+            // behind the girder at driver angles; side rails read as the
+            // transit line's glow edge from any side (critic VIS-DEEP).
+            const perp = new THREE.Vector3(-d.z, 0, d.x).normalize();
+            for (const zs of [-0.46, 0.46]) {
+              if (rsi >= MID.railSamples * 2) break;
+              M.compose(
+                mid.clone().addScaledVector(perp, zs),
+                Q,
+                new THREE.Vector3(len, 1, 1),
+              );
+              railStrips.setMatrixAt(rsi++, M);
+            }
+          }
+        }
+      } else if (runStart >= 0) {
+        // Run just closed — cap it with a terminal mast.
+        const last = anchors[k - 1];
+        mast(last.p, last.top.y);
+        runStart = -1;
+      }
+    }
+    railBeams.count = rbi;
+    railStrips.count = rsi;
+    railMasts.count = rmi;
+    objects.push(railBeams, railStrips, railMasts);
+  }
 
   objects.forEach((o) => (o.userData.dress = 'neon'));
   return { objects, animated };

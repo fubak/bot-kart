@@ -104,7 +104,7 @@ export class Kart {
   private readonly body: THREE.Group;
   private readonly proceduralBody: THREE.Object3D[] = [];
   private readonly placeholderDriver: THREE.Object3D[] = [];
-  private glbWheels: THREE.Object3D[] = [];
+  private glbWheels: { node: THREE.Object3D; front: boolean; baseY: number }[] = [];
   private wheelSpin = 0;
   private steerVisual = 0;
   private pedalL = 0; // brake held — left leg press
@@ -248,7 +248,16 @@ export class Kart {
     // parts are tread/hub pieces of the same wheel — matching the prefix
     // would double-spin them).
     model.traverse((o) => {
-      if (/^wheel_(fl|fr|rl|rr)$/.test(o.name)) this.glbWheels.push(o);
+      if (/^wheel_(fl|fr|rl|rr)$/.test(o.name)) {
+        // 'YXZ' so the spin (local X axle) applies before the steer yaw —
+        // 'XYZ' would roll the already-yawed wheel about the kart axis.
+        o.rotation.order = 'YXZ';
+        this.glbWheels.push({
+          node: o,
+          front: o.name === 'wheel_fl' || o.name === 'wheel_fr',
+          baseY: o.rotation.y,
+        });
+      }
       if (o instanceof THREE.Mesh) o.castShadow = true;
     });
     for (const o of this.proceduralBody) o.visible = false;
@@ -329,17 +338,46 @@ export class Kart {
     return p;
   }
 
+  /**
+   * Team tint that keeps the authored material contrast. The old
+   * `lerp(tint, 0.55)` dragged EVERY panel to the same mid-tone — kart-b's
+   * gunmetal/navy/orange stack collapsed into one orange blob, which is why
+   * the rivals read as flat boxes (critic VIS-DEEP). Now: chromatic panels
+   * rotate hue the short way toward the team color (lightness untouched —
+   * darks stay dark, accents stay bright), plus a light 16% value-lerp so
+   * achromatic trim also takes a hue cast. Emitters/rubber/glazing keep
+   * their authored color — tinting a glow mat just browns the neon.
+   */
   private tintModel(root: THREE.Object3D): void {
     root.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       const cloned = mats.map((m) => {
         const c = m.clone();
-        if ('color' in c) (c.color as THREE.Color).lerp(this.tint!, 0.55);
+        if ('color' in c && !/glow|tire|visor|windshield|glass|lens/i.test(c.name ?? '')) {
+          Kart.hueShift(c.color as THREE.Color, this.tint!);
+        }
         return c;
       });
       o.material = Array.isArray(o.material) ? cloned : cloned[0];
     });
+  }
+
+  private static hueShift(col: THREE.Color, tint: THREE.Color): void {
+    const hsl = { h: 0, s: 0, l: 0 };
+    col.getHSL(hsl);
+    const th = { h: 0, s: 0, l: 0 };
+    tint.getHSL(th);
+    if (hsl.s > 0.05) {
+      let dh = th.h - hsl.h;
+      dh -= Math.round(dh); // shortest arc around the wheel
+      col.setHSL(
+        THREE.MathUtils.euclideanModulo(hsl.h + dh * 0.62, 1),
+        THREE.MathUtils.clamp(hsl.s + (th.s - hsl.s) * 0.25, 0, 1),
+        hsl.l,
+      );
+    }
+    col.lerp(tint, 0.16);
   }
 
   /** Grok Bot A GLB as the driver — authored seated, origin at seat base. */
@@ -375,6 +413,30 @@ export class Kart {
             }
           }
         });
+        // Driver identity (VIS-DEEP): team-tint the shell panels — same
+        // hue-shift as the chassis — so the rival bots carry their kart's
+        // color on collar/cuffs/stripes. Glows + visor keep authored color.
+        if (this.tint) this.tintModel(bot);
+        // The third rival drives the same bot-A shell as the player — add
+        // a swept team-color crest fin over the dome so it isn't a driver
+        // clone (bots B/C are distinct authored shells). Parented to the
+        // head node so it rides the look-around/celebration motion.
+        if (this.tint && this.botUrl === botGlbUrl && headNode) {
+          const crest = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, 0.14, 0.32),
+            new THREE.MeshStandardMaterial({
+              color: new THREE.Color(this.tint).lerp(new THREE.Color(0xffffff), 0.2),
+              emissive: new THREE.Color(this.tint),
+              emissiveIntensity: 0.4,
+              flatShading: true,
+              roughness: 0.5,
+            }),
+          );
+          // Half-embedded in the dome top, swept back behind the antenna.
+          crest.position.set(0, 0.46, 0.18);
+          crest.rotation.x = 0.3;
+          headNode.add(crest);
+        }
         for (const o of this.placeholderDriver) o.visible = false;
         for (const name of ['arm_l', 'arm_r', 'head', 'leg_l', 'leg_r']) {
           const node = bot.getObjectByName(name);
@@ -884,7 +946,13 @@ export class Kart {
     this.group.rotation.z = -this.slopeRoll * 0.6;
     this.wheelSpin += (this.forwardSpeed / KART.wheelRadius) * this.lastDt;
     for (const w of this.wheels) w.rotation.x = this.wheelSpin;
-    for (const w of this.glbWheels) w.rotation.x = this.wheelSpin;
+    for (const w of this.glbWheels) {
+      w.node.rotation.x = this.wheelSpin;
+      // Front wheels also take the steer yaw — same visual lock as the
+      // procedural frontAxle below (was spin-only: GLB rivals steered
+      // with dead-straight front wheels, critic VIS-DEEP).
+      if (w.front) w.node.rotation.y = w.baseY - this.steerVisual * 0.45;
+    }
     // Visual steer on front axle.
     this.frontAxle.rotation.y = -this.steerVisual * 0.45;
     // Body yaws with the TRUE slip angle (not a fixed snap) + leans into it.

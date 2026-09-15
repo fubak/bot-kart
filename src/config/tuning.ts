@@ -181,6 +181,20 @@ export const SCENERY = {
     holoColumns: 40,   // thin light strips, infield-weighted
     crates: 56,        // dark tech boxes, some stacked
     studs: 120,        // low runway-style light studs
+    // VIS-DEEP mid-level band: NN frames ran 30-40% near-black above the
+    // structures — these emissive/unlit pieces fill the band between the
+    // neon set and the sky. All instanced; ~10 draw calls total.
+    mid: {
+      cableEvery: 9,   // centerline samples between catenary masts
+      cableLateral: 1.9, // m past road half-width the light runs hang over
+      cableHeight: 5.6,  // mast/strand height over local grade (m)
+      cableSag: 0.85,    // mid-span dip (m) — two segments per span
+      towers: 24,        // distant skyline slabs ringing the circuit
+      towerDots: 110,    // cap on rooftop/facade light dots
+      holoBoards: 6,     // far glowing billboards on tall masts
+      railSamples: 150,  // elevated beam run length (centerline samples)
+      railEvery: 12,     // samples between rail masts
+    },
   },
 } as const;
 

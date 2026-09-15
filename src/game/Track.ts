@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TRACK } from '../config/tuning';
 import { TEX, checkerTexture } from '../core/Textures';
 import {
@@ -1676,20 +1677,30 @@ export class Track {
       g.add(crowd);
       if (i === 0) crowdPlane = crowd;
     }
-    // WS-ANIM: front-row fans — one instanced mesh of bobbing head blobs
+    // WS-ANIM: front-row fans — one instanced mesh of bobbing fan busts
     // over the tier faces. Real geometry motion reads at race distance
     // where a texture scroll wouldn't; costs a single draw call.
+    // VIS-DEEP: blob heads → busts. Head + shoulders/torso merged into one
+    // geometry — same draw call, but the front row reads as PEOPLE.
     const FAN_PER_TIER = 26;
     const FAN_COUNT = FAN_PER_TIER * 3;
     const headGeo = new THREE.IcosahedronGeometry(0.19, 0);
     headGeo.scale(1, 1.35, 1); // person-blob, not a ball
+    headGeo.translate(0, 0.18, 0);
+    const torsoGeo = new THREE.CylinderGeometry(0.24, 0.3, 0.4, 6)
+      .toNonIndexed(); // icosahedron is non-indexed — merge needs parity
+    torsoGeo.scale(1.4, 1, 0.75); // wide shoulders, shallow chest
+    torsoGeo.translate(0, -0.14, 0);
+    const fanGeo = mergeGeometries([torsoGeo, headGeo])!;
     const heads = new THREE.InstancedMesh(
-      headGeo,
+      fanGeo,
       new THREE.MeshBasicMaterial({ color: 0xffffff }), // instance-tinted
       FAN_COUNT,
     );
+    // base packs stride 5: x,y,z + per-fan sx,sy — crowd bodies get
+    // width/height variety so the front row isn't 78 identical clones.
     const fanAnim: InstanceAnim = {
-      base: new Float32Array(FAN_COUNT * 3),
+      base: new Float32Array(FAN_COUNT * 5),
       phase: new Float32Array(FAN_COUNT),
     };
     // Local RNG — never touches the shared scatter stream.
@@ -1712,13 +1723,19 @@ export class Track {
         // In FRONT of the crowd face (track sits toward local −z — the
         // plane is at tier*2.4 − 1.28, the step front at −1.3).
         const z = tier * 2.4 - 1.42 - fanRng() * 0.22;
-        const j3 = fj * 3;
+        const j3 = fj * 5;
         fanAnim.base[j3] = x;
         fanAnim.base[j3 + 1] = y;
         fanAnim.base[j3 + 2] = z;
+        fanAnim.base[j3 + 3] = 0.8 + fanRng() * 0.5; // shoulder width
+        fanAnim.base[j3 + 4] = 0.85 + fanRng() * 0.35; // height
         // Phase marches along the stand → a Mexican-wave sweep, not noise.
         fanAnim.phase[fj] = x * 0.55 + tier * 1.4 + fanRng() * 0.8;
-        _m4.compose(_v3.set(x, y, z), _qA.identity(), _sv.set(1, 1, 1));
+        _m4.compose(
+          _v3.set(x, y, z),
+          _qA.identity(),
+          _sv.set(fanAnim.base[j3 + 3], fanAnim.base[j3 + 4], fanAnim.base[j3 + 3]),
+        );
         heads.setMatrixAt(fj, _m4);
         heads.setColorAt(
           fj,
@@ -1734,6 +1751,60 @@ export class Track {
     heads.userData.anim = fanAnim;
     g.add(heads);
     this.animated.push({ obj: heads, kind: 'crowd', phase: 0, baseY: 0 });
+    // VIS-DEEP: waving-arms subset — every third fan gets one raised arm
+    // on a shoulder pivot (base at the joint), sweeping with the same
+    // Mexican-wave phase. One extra instanced mesh = one extra draw.
+    const armGeo = new THREE.BoxGeometry(0.08, 0.46, 0.08);
+    armGeo.translate(0, 0.23, 0); // pivot at the shoulder
+    const ARM_COUNT = Math.ceil(FAN_COUNT / 3);
+    const arms = new THREE.InstancedMesh(
+      armGeo,
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      ARM_COUNT,
+    );
+    const armAnim: InstanceAnim = {
+      base: new Float32Array(ARM_COUNT * 4), // x,y,z,side
+      phase: new Float32Array(ARM_COUNT),
+    };
+    let aj = 0;
+    // Arms reuse the heads' stored anim payload — same fan positions and
+    // the same wave phase, so each arm pumps exactly when its fan hops.
+    const armRng = (() => {
+      let s = 8721;
+      return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff);
+    })();
+    for (let fi = 0; fi < FAN_COUNT; fi += 3) {
+      const fj3 = fi * 5;
+      const x = fanAnim.base[fj3];
+      const y = fanAnim.base[fj3 + 1];
+      const z = fanAnim.base[fj3 + 2];
+      const side = armRng() < 0.5 ? -1 : 1;
+      const j4 = aj * 4;
+      armAnim.base[j4] = x + side * 0.26 * fanAnim.base[fj3 + 3]; // shoulder joint
+      armAnim.base[j4 + 1] = y + 0.04 * fanAnim.base[fj3 + 4];
+      armAnim.base[j4 + 2] = z;
+      armAnim.base[j4 + 3] = side;
+      armAnim.phase[aj] = fanAnim.phase[fi];
+      _m4.compose(
+        _v3.set(armAnim.base[j4], armAnim.base[j4 + 1], z),
+        _qA.setFromAxisAngle(_ax.set(0, 0, 1), -side * 1.2),
+        _sv.set(1, 1, 1),
+      );
+      arms.setMatrixAt(aj, _m4);
+      // Arm matches its fan's shirt color — reads as a raised arm, not
+      // a stray flag. instanceColor was written in the heads loop above.
+      const ic = heads.instanceColor;
+      arms.setColorAt(
+        aj,
+        ic ? new THREE.Color(ic.getX(fi), ic.getY(fi), ic.getZ(fi)) : new THREE.Color(0xfaf6ea),
+      );
+      aj++;
+    }
+    arms.count = aj;
+    arms.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    arms.userData.anim = armAnim;
+    g.add(arms);
+    this.animated.push({ obj: arms, kind: 'crowdArm', phase: 0, baseY: 0 });
     if (crowdPlane) {
       this.animated.push({ obj: crowdPlane, kind: 'crowdUV', phase: 0, baseY: 0 });
     }
@@ -1977,7 +2048,7 @@ export class Track {
         const im = a.obj as THREE.InstancedMesh;
         const d = im.userData.anim as InstanceAnim;
         for (let i = 0; i < im.count; i++) {
-          const j = i * 3;
+          const j = i * 5;
           const hop = Math.sin(simTime * 2.7 + d.phase[i]);
           _m4.compose(
             _v3.set(
@@ -1986,6 +2057,31 @@ export class Track {
               d.base[j + 2],
             ),
             _qA.identity(),
+            _sv.set(d.base[j + 3], d.base[j + 4], d.base[j + 3]),
+          );
+          im.setMatrixAt(i, _m4);
+        }
+        im.instanceMatrix.needsUpdate = true;
+      } else if (a.kind === 'crowdArm') {
+        // Waving arms: raised arm on a shoulder pivot, sweeping higher as
+        // its fan's hop peaks (same phase → the wave reads coordinated).
+        const im = a.obj as THREE.InstancedMesh;
+        const d = im.userData.anim as InstanceAnim;
+        for (let i = 0; i < im.count; i++) {
+          const j = i * 4;
+          const side = d.base[j + 3];
+          const hop = Math.sin(simTime * 2.7 + d.phase[i]);
+          _qA.setFromAxisAngle(
+            _ax.set(0, 0, 1),
+            -side * (1.05 + Math.max(0, hop) * 0.7 + hop * 0.12),
+          );
+          _m4.compose(
+            _v3.set(
+              d.base[j],
+              d.base[j + 1] + (hop > 0 ? hop * 0.2 : hop * 0.06),
+              d.base[j + 2],
+            ),
+            _qA,
             _sv.set(1, 1, 1),
           );
           im.setMatrixAt(i, _m4);
