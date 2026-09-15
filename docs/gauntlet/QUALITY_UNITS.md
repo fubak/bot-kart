@@ -1045,3 +1045,40 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   traverses+disposes first; verified 395→380 flat across 6 rebuilds.
 - **Verified:** typecheck+build clean; console 0E/0W incl. corrupt-
   settings session.
+
+### SG-11..15 + Critic-20/21 — Domain master gauntlet (waves 20–21)
+
+- **Domain:** Gameplay / particles / SFX / HUD / visual
+- **Status:** Integrated — **critic-21: 8.5/10 CLEAN PASS**
+- **Evidence:** `wave20/` + `wave21/` (CRITIC20/21 reports, ~50 shots).
+
+- **SG-11 GAME-FEEL:** item roulette (1.2 s HUD spin, weighted roll at
+  pickup, unusable mid-spin, AI too); slipstream drafting (0.9 s in
+  wake cone → 1.3 s +5.5 m/s, per-pair cooldown, all karts — 8 organic
+  AI drafts observed in 30 s); drift-hop 0.3 m visual arc; ultra
+  mini-turbo tier-3 (1.9 s → 2.4 s, violet; colors fixed to
+  blue→orange→violet). Smoke baselines identical ×3.
+- **SG-12 VFX-DEEP:** NDC-rotated slipstream speed-lines (new streak
+  pool), tier-colored turboBurst on drift release, landingDust by fall
+  height, teleportBurst at swap endpoints, materialize at respawn,
+  rouletteGlint, padFlash, per-track ambient motes. Pool peaks ≪ caps.
+- **SG-13 SFX-DEEP:** 15 cues — roulette ticks/ding, charge-tier blips,
+  tier-pitched release whoosh, draft whoosh + wind loop, hop chirp,
+  landing thud, kart thock, scrape + rumble loops, position stingers,
+  finalLap, GO chord, respawn riser, crowd swell. sfxSnapshot probes.
+- **SG-14 HUD-PRES:** P#/4 badge pop (green/red), FINAL LAP banner,
+  live standings ticker (positionOf order, player highlight, ~4 Hz),
+  countdown lamp rig → green GO flash; cached DOM writes throughout.
+- **SG-15 VIS-DEEP:** AI kart authored palettes + crest (hueShift vs
+  flat tint), wheel spin+steer all karts, crowd busts + synced waving
+  arms, NN mid-band (360 cable garlands, 24 towers/110 dots, 6 holo
+  boards, elevated rail w/ edge strips + colonnade).
+- **FIX-011 (critic-20):** phantom-cue family — Kart.reset() clears
+  vy/grounded/airTime + resetCount; Audio re-seeds all diff memory on
+  reset; increment-only drafts; !isSpinning release guard; racing-
+  gated roulette cues.
+- **FIX-012 (critic-21):** countdown ticker grid ordinals (shared
+  positionOf stamped P1×4 on all-tie).
+- **Final numbers:** NN 68 fps / p95 15.3-15.5 ms; smoke identical
+  ×3; disposal flat over 21 track cycles; console 0E/0W; full 3-leg
+  GP verified end-to-end twice.

@@ -399,3 +399,20 @@ Smoke baselines exact on all tracks (PG 22.69/19.22/18.12, SR
 26.42/22.46/21.62, NN 25.54/21.61/20.90; stalled 0). 0 console errors,
 0 warnings. Full 3-leg GP completes with all finishers, correct
 points, champion selection, and clean title re-arm.
+
+---
+
+## Domain master gauntlet (waves 20–21) — CLOSED at 8.5/10 clean
+
+Five domain sub-gauntlets + two critic waves: SG-11 gameplay mechanics
+(item roulette, slipstream drafting, drift-hop, ultra mini-turbo),
+SG-12 particle depth (streak pool + 7 emitters incl. ambient motes),
+SG-13 sound depth (15 procedural cues + loops, phantom-free after
+FIX-011), SG-14 HUD presentation (position badge, FINAL LAP banner,
+standings ticker, countdown lamp rig), SG-15 visual depth (AI hero
+karts, wheel spin/steer, crowd busts + arms, NN mid-band dressing).
+Critics: 20 → 8.0 (4 phantom-cue defects, fixed FIX-011) →
+21 → **8.5 CLEAN** (1 LOW, fixed FIX-012). Perf 68 fps / p95 15.3 ms
+on NN; smoke baselines identical on all 3 tracks; console 0E/0W;
+GP end-to-end verified. Reports: `evidence/wave20/CRITIC20_REPORT.md`,
+`evidence/wave21/CRITIC21_REPORT.md`.
