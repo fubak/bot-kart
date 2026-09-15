@@ -512,7 +512,9 @@ export class Audio {
     }
 
     // --- engine: pitch tracks forward speed, boosted while boosting ---
-    const sp = kart.speed / 28;
+    // Guard non-finite kart state (teleport/reset races can briefly NaN
+    // speed) — setTargetAtTime throws on NaN and would spam the console.
+    const sp = Number.isFinite(kart.speed) ? kart.speed / 28 : 0;
     const boost = kart.boostTimer > 0;
     const freq = 60 + sp * 190 + (boost ? 60 : 0);
     this.engine!.osc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.05);
@@ -521,11 +523,12 @@ export class Audio {
     this.engine!.gain.gain.setTargetAtTime(eGain, this.ctx.currentTime, 0.08);
 
     // --- skid while drifting (louder with slip) ---
+    const slip = Number.isFinite(kart.slipAngle) ? Math.abs(kart.slipAngle) : 0;
     const skidTarget =
-      kart.state === 'drift' ? Math.min(0.4, Math.abs(kart.slipAngle) * 1.4) : 0;
+      kart.state === 'drift' ? Math.min(0.4, slip * 1.4) : 0;
     this.skid!.gain.gain.setTargetAtTime(skidTarget, this.ctx.currentTime, 0.06);
     this.skid!.filter.frequency.setTargetAtTime(
-      900 + Math.abs(kart.slipAngle) * 2200,
+      900 + slip * 2200,
       this.ctx.currentTime,
       0.08,
     );
@@ -545,7 +548,7 @@ export class Audio {
       if (!rk) continue;
       const d = kart.position.distanceTo(rk.position);
       const near = Math.max(0, 1 - d / 26); // audible within ~26 m
-      const rsp = rk.speed / 28;
+      const rsp = Number.isFinite(rk.speed) ? rk.speed / 28 : 0;
       e.osc.frequency.setTargetAtTime(70 + rsp * 150, this.ctx.currentTime, 0.08);
       e.gain.gain.setTargetAtTime(near * 0.05, this.ctx.currentTime, 0.1);
     }

@@ -200,7 +200,7 @@ export class AiDriver {
         this.wedgeTime = -1;
         this.stuckTime = 0;
         this.grindTime = 0;
-        this.carefulTime = 4; // escaped — re-enter at reduced pace
+        this.carefulTime = 6; // escaped — re-enter at reduced pace
       } else {
         const desired = Math.atan2(-tanNow.x, -tanNow.z);
         const err = wrapAngle(desired - kart.heading);
@@ -212,7 +212,7 @@ export class AiDriver {
           this.stuckTime = 0;
           this.wedgeTime = -1;
           this.recovering = false;
-          this.carefulTime = 4; // lakitu — re-enter at reduced pace
+          this.carefulTime = 6; // lakitu — re-enter at reduced pace
           return idle;
         }
         if (this.wedgeTime > 3) {
@@ -257,6 +257,17 @@ export class AiDriver {
 
     const la = track.lookahead(kart.position, look, kart.trackIdx);
     const target = la.point;
+    // Grind assist (critic12 D2): wall-pressed at <8 m/s, the normal
+    // lookahead target sits behind the hairpin's inside wall — steering
+    // toward it keeps the kart nose-in grinding (the 10%-of-lap stall
+    // clusters on the SR descent). While creeping on the wall, jump the
+    // pursuit point ~2.5× farther so the kart steers ALONG the wall face
+    // and off the pin on its own. Recovery-path only: a clean solo run
+    // never satisfies the condition → baselines unchanged.
+    if (this.grindTime > 0.5 && this.wedgeTime < 0) {
+      const laFar = track.lookahead(kart.position, look * 2.5, kart.trackIdx);
+      target.copy(laFar.point);
+    }
     // Shift the pursuit point onto this bot's preferred line — plus a
     // temporary sidestep while executing an overtake (see traffic below).
     let lineBias = this.lineOffset;

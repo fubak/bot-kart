@@ -153,6 +153,7 @@ export class Game {
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
   private stuckFor = 0;
   private readonly stuckPrevPos = new THREE.Vector3(); // seconds throttle-held below 1.5 m/s (D4 hint)
+  private stuckPrevHeading = 0;
   // Options key-rebind: while armed, the next keydown becomes the action's
   // code (Escape cancels). Meta/game-command keys are reserved so a drive
   // bind can never shadow pause/quit/menu.
@@ -624,7 +625,17 @@ export class Game {
     // defeat the hint exactly when it's needed.
     const moved = this.kart.position.distanceTo(this.stuckPrevPos);
     this.stuckPrevPos.copy(this.kart.position);
-    if (canDrive && input.throttle > 0 && !this.kart.isSpinning && moved < 0.02) {
+    // A successful pivot rotates without translating (critic12 LOW: the
+    // hint popped mid-escape) — heading change means the pin is working
+    // loose, not stuck.
+    const turned = Math.abs(
+      THREE.MathUtils.euclideanModulo(
+        this.kart.heading - this.stuckPrevHeading + Math.PI,
+        Math.PI * 2,
+      ) - Math.PI,
+    );
+    this.stuckPrevHeading = this.kart.heading;
+    if (canDrive && input.throttle > 0 && !this.kart.isSpinning && moved < 0.02 && turned < 0.008) {
       this.stuckFor += frameDt;
     } else {
       this.stuckFor = 0;

@@ -888,3 +888,27 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   smoke identical ×3 after re-gate; typecheck+build clean.
 - **Remaining LOWs (accepted):** orange AI kart detail; SR strata
   wedge residual.
+
+### FIX-004 — Critic-12 defect batch (wave 12)
+
+- **Domain:** Whole-game
+- **Status:** Integrated
+- **Evidence:** `wave12/CRITIC12_REPORT.md` (7.6/10, 0H/2M/3L).
+- **Fixed + verified:** wall-pin pivot defeated by dirSign jitter —
+  under steerMinSpeed steer direction now follows drive INTENT
+  (brake-dominant→reverse, else forward) instead of restitution-flicked
+  fwdSpeed sign; verified nose-in at a wall: −2.91 rad net rotation in
+  3 s vs ±0.0087 oscillation before; pivot authority now fades
+  smoothly to steerMinSpeed×3 instead of a 0.4→0.002 cliff at 0.8 m/s.
+- **AI grind cycles:** grind-assist — while wall-pressed <8 m/s the
+  pursuit point jumps 2.5× farther down the centerline so the kart
+  steers ALONG the wall face off the pin; careful mode 4 s→6 s. Live
+  SR traffic: reversing 8.7%→0%, <4 m/s 13.6%→10.6%→2.1% (window 2),
+  stalls episodic not cyclic.
+- **STUCK hint during pivots:** hint now requires no heading change —
+  a working pivot doesn't flag it.
+- **Audio NaN guard:** speed/slipAngle sanitized before
+  setTargetAtTime (found via console audit: one NaN frame threw).
+- **Verified:** smoke exact ×3 (PG 22.69/19.22/18.12, SR
+  26.42/22.46/21.62, NN 25.54/21.61/20.90, 0 hits, stalled 0);
+  typecheck+build clean; console 0E/0W.

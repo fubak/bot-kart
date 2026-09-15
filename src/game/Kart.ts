@@ -549,15 +549,25 @@ export class Kart {
       THREE.MathUtils.smoothstep(speedAbs, KART.steerMinSpeed, KART.steerFullSpeed) *
       (1 - 0.35 * THREE.MathUtils.clamp(speedAbs / KART.maxSpeed, 0, 1));
     const pivot =
-      this.pivotSteer &&
-      speedAbs < KART.steerMinSpeed &&
-      Math.abs(input.throttle) + Math.abs(input.brake) > 0.1
-        ? 0.4
+      this.pivotSteer && Math.abs(input.throttle) + Math.abs(input.brake) > 0.1
+        ? 0.4 * (1 - THREE.MathUtils.smoothstep(speedAbs, KART.steerMinSpeed * 0.6, KART.steerMinSpeed * 3))
         : 0;
     const steerAuthority = Math.max(speedFactor, pivot);
     const steerMul = drifting ? KART.driftSteerMul : 1;
-    // Reverse steering when going backward.
-    const dirSign = fwdSpeed >= 0 ? 1 : -1;
+    // Reverse steering when going backward — but NOT off raw fwdSpeed at
+    // a dead stop: nose-in at a wall, restitution jitter drives fwdSpeed
+    // ± across 0 every tick, which flipped the pivot yaw each frame and
+    // pinned the kart in place (critic12 MED). Under steerMinSpeed the
+    // steer direction follows drive intent: brake-dominant → reverse,
+    // otherwise → forward.
+    const dirSign =
+      speedAbs < KART.steerMinSpeed
+        ? input.brake > Math.abs(input.throttle)
+          ? -1
+          : 1
+        : fwdSpeed >= 0
+          ? 1
+          : -1;
     const yawDelta = -this.steerSmooth * KART.steerRate * steerMul * steerAuthority * dirSign * dt;
     this.heading += yawDelta;
     // Drift arc model: the velocity vector follows a fraction of the yaw —
