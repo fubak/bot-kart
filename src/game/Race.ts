@@ -128,13 +128,17 @@ export class RacerProgress {
    *  (critic6 D8). Keeps lap/history; rebinds position bookkeeping to
    *  where the kart actually is: progress follows the teleport (score
    *  drops when sent backward — the swap really exchanges places).
-   *  Gate mask: mid-lap gates BEHIND the new index count as satisfied —
-   *  the swap is a sanctioned item, so the exchanged position is
-   *  legitimate (critic14 MED: mask=0 scheduled behind-gates for NEXT
-   *  lap, so fullMask could never fill on the swap lap and the line
-   *  crossing was silently denied — a backward swap stole ~a whole lap).
-   *  Gates ahead of i still must be driven: a backward-swapped kart
-   *  re-earns the gates it was placed in front of. */
+   *
+   *  The lap base is NOT (lap-1)*n: karts gridded behind the line have
+   *  their first counted crossing at 2n (the spawn crossing is free and
+   *  denied by the full-mask rule), so every lap boundary is offset by
+   *  their spawn index (critic15 MED: (lap-1)*n rebasing dropped a
+   *  back-grid kart's score by ~1024). The correct base is the current
+   *  lap's start = nextCross[line] - n — slot-agnostic, works any lap.
+   *  nextCross is left AS-IS: update() naturally fires gates whose
+   *  crossing is already ≤ the new progressIdx, marking behind-gates
+   *  satisfied for a sanctioned teleport (critic14: wiping the mask
+   *  denied the swap-lap line crossing outright). */
   resync(pos: THREE.Vector3, hint = -1): void {
     const n = this.track.sampleCount;
     // Prefer the kart's own continuity hint (swap exchanges trackIdx too)
@@ -142,15 +146,9 @@ export class RacerProgress {
     const i =
       hint >= 0 ? this.track.nearestIndexNear(pos, hint) : this.track.nearestIndex(pos);
     this.lastIdx = i;
-    this.progressIdx = (this.lap - 1) * n + i;
     const lineGate = this.gates.length - 1;
-    this.mask = 0;
-    for (let k = 0; k < lineGate; k++) {
-      if (this.gates[k] <= i) this.mask |= 1 << k;
-    }
-    this.nextCross = this.gates.map((g) =>
-      g > i ? g + (this.lap - 1) * n : g + this.lap * n,
-    );
+    const lapBase = this.nextCross[lineGate] - n;
+    this.progressIdx = lapBase + i;
     this.backwardAccum = 0;
     this.wrongWay = false;
   }

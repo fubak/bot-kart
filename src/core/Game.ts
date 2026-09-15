@@ -224,7 +224,10 @@ export class Game {
     // Player-following shadow box: the sun hovers 160 m along the theme's
     // light direction so casters stay inside a tight ~140 m ortho window.
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    // 1536² keeps the follow-box shadows clean at the chase cam while
+    // trimming ~0.3 ms/frame of shadow-pass fill on the busiest scene
+    // (critic15: NN p95 rode the 16.6 ms budget line at 2048²).
+    this.sun.shadow.mapSize.set(1536, 1536);
     const sc = this.sun.shadow.camera;
     sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70;
     sc.near = 40; sc.far = 300;
@@ -372,6 +375,10 @@ export class Game {
       if (this.settings.open) {
         if (e.code === 'KeyO' || e.code === 'Escape' || e.code === 'KeyP') {
           this.settings.open = false;
+          // Results has no PAUSED overlay — releasing the options panel
+          // must also release the pause or N sits dead with no feedback
+          // (critic15: O→Esc left an invisible pause on the results screen).
+          if (this.race.phase === 'finished') this.paused = false;
           this.audio.uiBack();
         } else {
           this.menuKey(e.code);

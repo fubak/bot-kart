@@ -934,3 +934,26 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   rebuilds (was +11–18 per rebuild).
 - **Verified:** NN smoke exact (25.54/21.61/20.90, stalled 0);
   typecheck+build clean.
+
+### FIX-006 — Critic-15 defect batch (wave 15)
+
+- **Domain:** Race rules / UI / perf
+- **Status:** Integrated
+- **Evidence:** `wave15/CRITIC15_REPORT.md` (8.0/10, 1M/3L) +
+  `fix15-*.png`.
+- **MED — resync score drop FIXED:** `(lap-1)*n` rebasing was wrong
+  for back-grid karts — their lap-1 boundary is 2n (the spawn crossing
+  is free-and-denied). Rebase is now `nextCross[line]-n` (slot-agnostic,
+  any lap) and `nextCross` is kept so update() naturally re-fires
+  behind-gates — no manual mask. Verified: in-place resync preserves
+  score exactly (96→96 vs 1065→41 before); forward/backward swap lap
+  counting still correct.
+- **Invisible pause on results:** settings-close on 'finished' now
+  releases the pause (O→Esc left N dead with no overlay shown).
+- **Yaw valley:** pivot fade end 5→6 m/s — floor ~0.59 rad/s at 3 m/s.
+- **NN perf headroom:** sun shadow 2048²→1536² — measured p95
+  16.6→16.4, worst 24.3→19.6 on a clean session (the critic's 17.3 was
+  largely stacked-browser contention; the trim buys real margin).
+- **Results wrap:** rows nowrap — "+10 → 10 pts" can't split mid-token.
+- **Verified:** NN smoke exact (25.54/21.61/20.90, stalled 0);
+  typecheck+build clean; console 0E/0W.

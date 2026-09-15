@@ -380,7 +380,7 @@ export class RaceHud {
             const best =
               fmt(rr.bestLapTime) +
               (r === 0 && record?.setThisRace ? ' ★REC' : '');
-            const cls = r === 0 ? ' style="color:#7be8ff"' : '';
+            const cls = r === 0 ? ';color:#7be8ff' : '';
             let pts = '';
             if (gp?.mode) {
               if (gp.done) {
@@ -400,7 +400,7 @@ export class RaceHud {
               }
             }
             const crown = gpFinal && i === 0 ? ' ★' : '';
-            return `<div${cls}>${pos}${crown}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}${pts}</div>`;
+            return `<div style="white-space:nowrap${cls}">${pos}${crown}  ${names[r] ?? 'BOT-' + r}   ${time}   best ${best}${pts}</div>`;
           })
           .join('');
         const footer = gp?.mode
