@@ -550,7 +550,7 @@ export class Kart {
       (1 - 0.35 * THREE.MathUtils.clamp(speedAbs / KART.maxSpeed, 0, 1));
     const pivot =
       this.pivotSteer && Math.abs(input.throttle) + Math.abs(input.brake) > 0.1
-        ? 0.4 * (1 - THREE.MathUtils.smoothstep(speedAbs, KART.steerMinSpeed * 0.6, KART.steerMinSpeed * 3))
+        ? 0.4 * (1 - THREE.MathUtils.smoothstep(speedAbs, KART.steerMinSpeed * 0.6, 5))
         : 0;
     const steerAuthority = Math.max(speedFactor, pivot);
     const steerMul = drifting ? KART.driftSteerMul : 1;
