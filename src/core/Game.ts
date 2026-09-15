@@ -463,7 +463,10 @@ export class Game {
           this.paused = false;
           this.audio.uiConfirm();
           this.race.beginCountdown(this.simTime);
-        } else {
+        } else if (!(this.gpMode && this.race.phase === 'finished')) {
+          // Mid-cup results: N is the only forward path — R would replay
+          // the leg unadvertised, re-rolling a bad result before the
+          // points lock in (critic17). Single-race/final-standings R ok.
           this.restartRace();
           this.audio.uiConfirm();
         }
@@ -589,7 +592,9 @@ export class Game {
       // a cup the player believed they had left. G re-arms from the title.
       this.gpMode = false;
       this.resetCup();
-      this.buildWorld(0);
+      // Stay on the leg's own track — snapping to track 0 silently
+      // moved the player off the circuit they were on (critic17 NIT).
+      this.buildWorld(this.trackIdx);
       return;
     }
     this.items.reset();

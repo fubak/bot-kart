@@ -982,3 +982,25 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   cross-lap swap direction follows raw-index exchange semantics.
 - **Verified:** typecheck+build clean; console 0E/0W; NN p95 15.4 ms
   (critic-measured, clean session).
+
+### FIX-008 — Critic-17 defect batch (wave 17)
+
+- **Domain:** Race rules / records / UI
+- **Status:** Integrated
+- **Evidence:** `wave17/CRITIC17_REPORT.md` (7.7/10, 1M/2L).
+- **MED — teleported-lap record poisoning FIXED:** `resync()` now sets
+  `teleportedThisLap`; the granted lap still counts toward position
+  (exchange is the item's power) but is excluded from `bestLapTime` and
+  the persisted records. Verified live: resync at idx ~1000 → 5.0 s
+  "lap" counted but `bestLap` untouched; the next honest lap records
+  normally. Flag clears on lap boundary + reset.
+- **R on mid-cup results disabled** — N is the only forward path; an
+  unadvertised R replayed the leg, re-rolling a bad result before
+  points locked (single-race and final-standings R unaffected).
+- **Q-quit disarm keeps the leg's track** — was silently snapping to
+  track 0.
+- **Accepted (documented):** gpFinal double-tie (points + final-leg
+  position both equal) falls back to array order — deterministic and
+  unreachable without a contrived same-tick finish.
+- **Verified:** typecheck+build clean; smoke unaffected (resync path
+  only reachable via swap/debug).

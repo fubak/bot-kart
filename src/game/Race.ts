@@ -33,6 +33,7 @@ export class RacerProgress {
   private nextCross: number[] = [];
   private mask = 0;
   private spawnOffset = 0;
+  private teleportedThisLap = false;
 
   constructor(
     private readonly track: Track,
@@ -49,6 +50,7 @@ export class RacerProgress {
     this.finished = false;
     this.finishTime = 0;
     this.backwardAccum = 0;
+    this.teleportedThisLap = false;
     this.lastIdx = this.track.nearestIndex(spawnPos);
     this.progressIdx = this.lastIdx;
     this.spawnOffset = this.lastIdx;
@@ -102,7 +104,14 @@ export class RacerProgress {
       const t = simTime - this.lapStart;
       this.lastLapTime = t;
       this.lapTimes.push(t);
-      if (!this.bestLapTime || t < this.bestLapTime) this.bestLapTime = t;
+      // A lap completed on a swap-teleport's granted position isn't a
+      // driven time — the lap counts (position exchange is the item's
+      // power) but it must not enter bestLapTime/records (critic17 MED:
+      // 2.33–6.33 s teleported "laps" wrote unbeatable track records).
+      if (!this.teleportedThisLap && (!this.bestLapTime || t < this.bestLapTime)) {
+        this.bestLapTime = t;
+      }
+      this.teleportedThisLap = false;
       this.lapStart = simTime;
       if (this.lap >= this.totalLaps) {
         this.finished = true;
@@ -149,6 +158,7 @@ export class RacerProgress {
     const lineGate = this.gates.length - 1;
     const lapBase = this.nextCross[lineGate] - n;
     this.progressIdx = lapBase + i;
+    this.teleportedThisLap = true;
     this.backwardAccum = 0;
     this.wrongWay = false;
   }
