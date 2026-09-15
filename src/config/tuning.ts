@@ -223,6 +223,19 @@ export const FX = {
   rouletteGlintRate: 16,
 } as const;
 
+// Procedural SFX (src/core/Audio.ts) — trigger thresholds and loop levels
+// for the wave-20 sound-depth pass. Everything is synthesized; these shape
+// when cues fire and how loud the continuous loops sit under engine/music.
+export const AUDIO = {
+  bumpMinInterval: 0.15, // s — min gap between kart-kart "thock" one-shots
+  scrapeMinSpeed: 4,     // m/s — wall-grind scrape loop fades in above this
+  scrapeGain: 0.16,      // peak scrape gain (under the skid loop's 0.4)
+  rumbleMinSpeed: 3,     // m/s — gravel-apron rumble loop fades in above this
+  rumbleGain: 0.15,      // peak rumble gain
+  windGain: 0.12,        // sustained slipstream wind-layer gain (one-shot
+                         // draft whoosh rides on top)
+} as const;
+
 // AI drivers (src/game/AiDriver.ts) — pure-pursuit centerline following with
 // curvature-aware speed control and hold-to-drift on tight corners.
 export const AI = {

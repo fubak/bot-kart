@@ -151,6 +151,7 @@ export class Game {
     );
   }
   private readonly celebrated: boolean[] = []; // per-racer finish confetti fired
+  private bumpCount = 0; // kart-vs-kart contacts involving the player (audio)
   private stuckFor = 0;
   private readonly stuckPrevPos = new THREE.Vector3(); // seconds throttle-held below 1.5 m/s (D4 hint)
   private stuckPrevHeading = 0;
@@ -449,6 +450,7 @@ export class Game {
         const t = this.track.tangentAt(i);
         this.kart.reset(this.track.pointAt(i), Math.atan2(-t.x, -t.z));
         this.fx.materialize(this.kart.position);
+        this.audio.respawn();
       }
       // Quit to title (Q): regrid + title phase, no reload needed (D3).
       if (code === 'KeyQ') {
@@ -810,7 +812,15 @@ export class Game {
       [this.kart, ...this.aiKarts],
       this.race.phase !== 'title' && this.settings.minimap,
     );
-    this.audio.update(this.kart, this.race, this.simTime, this.aiKarts);
+    this.audio.update(
+      this.kart,
+      this.race,
+      this.simTime,
+      this.aiKarts,
+      this.items,
+      this.bumpCount,
+      this.paused,
+    );
     // Post chain: bloom + grade pass — speed factor drives the top-speed
     // chromatic edge, reducedMotion keeps it fully disengaged (WS-POST).
     this.renderer.info.reset(); // autoReset=false → one count for the whole frame
@@ -852,7 +862,10 @@ export class Game {
           b.velocity.z += nz * impulse;
           a.velocity.multiplyScalar(0.98);
           b.velocity.multiplyScalar(0.98);
-          if (a === this.kart || b === this.kart) this.kart.lastWallHit = this.simTime;
+          if (a === this.kart || b === this.kart) {
+            this.kart.lastWallHit = this.simTime;
+            this.bumpCount++; // audio thock channel (rate-limited in Audio)
+          }
         }
         a.trackIdx = this.track.constrain(a.position, a.trackIdx).index;
         b.trackIdx = this.track.constrain(b.position, b.trackIdx).index;

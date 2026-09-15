@@ -24,7 +24,8 @@ const MISSILE_HIT = 2.4; // hit radius, m
 const MISSILE_SLOW = 0.25; // victim keeps this fraction of velocity
 // Item roulette: the HUD slot spins ~1.2 s before the rolled item lands
 // (genre signature — instant grants read as a bug to kart players).
-const ROULETTE_S = 1.2;
+// Exported: Audio pitches the tick cue by spin progress off the same clock.
+export const ROULETTE_S = 1.2;
 const ROULETTE_TICK_MIN = 0.055; // fastest icon flip (s)
 const ROULETTE_TICK_MAX = 0.24; // slowest flip, just before landing
 const ITEM_KINDS: ItemKind[] = ['boost', 'missile', 'slick', 'shield', 'ink', 'swap'];

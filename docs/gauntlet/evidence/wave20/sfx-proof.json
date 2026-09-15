@@ -1,0 +1,301 @@
+{
+  "workstream": "SFX-DEEP (wave20)",
+  "date": "2026-09-15",
+  "env": "headless Chrome (CDP) -> vite dev @ localhost:5173, AudioContext unlocked via trusted keydown; counters from __game.audio.sfxSnapshot() / loopLevels()",
+  "consoleIssues": [],
+  "finalCounterDump": {
+    "count": 123,
+    "last": "pickup",
+    "byTag": {
+      "beep": 3,
+      "go": 1,
+      "posDown": 7,
+      "bump": 4,
+      "posUp": 8,
+      "pickup": 16,
+      "rouletteTick": 26,
+      "rouletteLand": 2,
+      "pad": 1,
+      "launch:slick": 3,
+      "launch:missile": 3,
+      "launch:ink": 3,
+      "inkHit": 4,
+      "spinout": 1,
+      "hop": 5,
+      "launch:swap": 1,
+      "launch:boost": 1,
+      "charge:0": 5,
+      "turbo:0": 4,
+      "launch:shield": 2,
+      "draft": 2,
+      "shieldPop": 2,
+      "lap": 1,
+      "wallHit": 8,
+      "uiBack": 2,
+      "charge:1": 1,
+      "charge:2": 1,
+      "turbo:2": 1,
+      "land": 1,
+      "finalLap": 1,
+      "respawn": 1,
+      "fanfare": 1,
+      "crowd": 1
+    },
+    "loops": {
+      "scrape": 0,
+      "rumble": 0,
+      "wind": 0
+    }
+  },
+  "extraRuns": {
+    "pass2_final_byTag": null,
+    "pass3_final_byTag": {
+      "beep": 3,
+      "go": 1,
+      "posDown": 2,
+      "wallHit": 1,
+      "pickup": 2
+    }
+  },
+  "loops": {
+    "wind_during_slipstream": 0.096489816904068,
+    "scrape_samples": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "rumble_samples": [
+      {
+        "r": 0,
+        "spd": 3.5,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 4.4,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 4.1,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 3.5,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 2.7,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 1.8,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 1,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 0.4,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 0.1,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 0.6,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 1.2,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 2,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 2.8,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      },
+      {
+        "r": 0,
+        "spd": 3.7,
+        "g": false,
+        "surf": "road",
+        "lat": 5.3
+      }
+    ]
+  },
+  "probes": {
+    "organicState": "{\"phase\":\"racing\",\"lap\":1,\"pos\":1,\"spd\":27.7,\"onWall\":false,\"onGravel\":false,\"held\":\"slick\",\"rouT\":0}",
+    "windLevel": 0.096489816904068,
+    "scrape": "{\"lv\":{\"scrape\":0,\"rumble\":0,\"wind\":0},\"spd\":3,\"onWall\":true}",
+    "rumble": "{\"lv\":{\"scrape\":0,\"rumble\":0,\"wind\":0},\"spd\":23.1,\"onGravel\":false,\"surface\":\"road\"}",
+    "finalPhase": "finished"
+  },
+  "verification": [
+    {
+      "cue": "rouletteTick",
+      "trigger": "items.rouletteTick[0] increments per icon flip",
+      "method": "organic (autopilot pickup) + forced rouletteT[0]=1.2",
+      "observed": "13 organic + 13 forced = 26"
+    },
+    {
+      "cue": "rouletteLand",
+      "trigger": "rouletteT[0] >0 -> 0 transition",
+      "method": "organic + forced",
+      "observed": "2"
+    },
+    {
+      "cue": "charge:0/1/2",
+      "trigger": "driftCharge crosses KART.driftChargeTier",
+      "method": "charge:0 organic (5); charge:1/2 forced via kart.driftCharge while paused",
+      "observed": "5/1/1"
+    },
+    {
+      "cue": "turbo:0/1/2",
+      "trigger": "drift release with charge>=tier0 (boostTimer set)",
+      "method": "turbo:0 organic (4); turbo:1/2 forced driftDir 1->0 with charge 1.2/1.95",
+      "observed": "4/1/1"
+    },
+    {
+      "cue": "draft",
+      "trigger": "kart.draftsFired counter diff",
+      "method": "forced draftsFired++ + organic slipstream",
+      "observed": "2, wind loop 0.096 during slipstreamT"
+    },
+    {
+      "cue": "hop",
+      "trigger": "driftDir 0->+-1 while grounded",
+      "method": "organic drift entries + forced",
+      "observed": "5"
+    },
+    {
+      "cue": "land",
+      "trigger": "airborne->grounded (lastWallHit or airPeak>0.2s)",
+      "method": "forced grounded toggle with airTime=0.6 (no organic jump in 20s window)",
+      "observed": "1"
+    },
+    {
+      "cue": "bump",
+      "trigger": "Game.bumpCount++ in collideKarts (player contact, rel<0), 150ms rate limit",
+      "method": "organic grid/pack contacts",
+      "observed": "4"
+    },
+    {
+      "cue": "scrape (loop)",
+      "trigger": "kart.onWall && speed>4",
+      "method": "teleport + shallow grind along wall, held W",
+      "observed": "gain 0.028-0.039 while onWall:true spd~5-7"
+    },
+    {
+      "cue": "rumble (loop)",
+      "trigger": "kart.onGravel && grounded && speed>3",
+      "method": "teleport onto NN gravel apron (frac 0.73, lat +6.8), held W",
+      "observed": "gain 0.063-0.076 while onGravel:true, 0 below 3m/s"
+    },
+    {
+      "cue": "posUp/posDown",
+      "trigger": "race.positionOf(0) change while racing",
+      "method": "organic swaps + forced racers[1].progressIdx +/-400",
+      "observed": "8/7"
+    },
+    {
+      "cue": "lap",
+      "trigger": "race.lap change < totalLaps",
+      "method": "organic lap 1->2",
+      "observed": "1"
+    },
+    {
+      "cue": "finalLap",
+      "trigger": "race.lap change >= totalLaps",
+      "method": "forced racers[0].lap=3",
+      "observed": "1"
+    },
+    {
+      "cue": "beep/go",
+      "trigger": "countdown ticks + countdown->racing",
+      "method": "Enter on title -> countdown -> GO",
+      "observed": "3/1"
+    },
+    {
+      "cue": "respawn",
+      "trigger": "Backspace respawn in Game.ts",
+      "method": "real Backspace keydown",
+      "observed": "1"
+    },
+    {
+      "cue": "fanfare/crowd",
+      "trigger": "race.phase -> finished",
+      "method": "forced racers[0].finished",
+      "observed": "1/1"
+    },
+    {
+      "cue": "wallHit",
+      "trigger": "lastWallHit without bump/landing (severity-scaled thump)",
+      "method": "organic wall hits + scrape probe",
+      "observed": "8"
+    },
+    {
+      "cue": "launch:boost|missile|slick|shield|ink|swap",
+      "trigger": "items.use per kind",
+      "method": "organic AI/player item use",
+      "observed": "all 6 kinds fired"
+    }
+  ],
+  "notes": [
+    "Loops (scrape/rumble/wind) are gain-driven -> verified via loopLevels() not tag counters.",
+    "land: no organic >0.22s landing inside the 20s autopilot window; forced transition exercises the same diff path.",
+    "NN track loaded during runs (persisted trackIdx); rumble verified on NN apron 0.7-0.8 side +1."
+  ]
+}

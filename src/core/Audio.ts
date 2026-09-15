@@ -1,6 +1,7 @@
 import type { Kart } from '../game/Kart';
 import type { Race } from '../game/Race';
-import type { ItemKind } from '../game/Items';
+import { ROULETTE_S, type ItemKind, type Items } from '../game/Items';
+import { AUDIO, KART } from '../config/tuning';
 import { Music } from './Music';
 
 // Procedural audio — Web Audio oscillators/noise, no samples. Engine pitch
@@ -11,6 +12,17 @@ import { Music } from './Music';
 // bed (crowd+birds / ridge wind / neon hum) on its own bus. Context unlocks
 // on the first real user gesture; every call no-ops while suspended so
 // headless QA never crashes.
+//
+// SFX-DEEP layer: per-frame state diffs turn gameplay events into cues —
+// roulette slot ticks, drift-charge tier blips, tier-colored mini-turbo
+// release, slipstream wind rush, drift-entry hop chirp, landing thuds,
+// kart-kart thocks, wall-grind scrape + gravel rumble + draft wind loops,
+// position-change arps, final-lap flourish, GO chord, respawn riser, and a
+// crowd swell under the finish fanfare. Continuous cues are looped
+// source→filter→gain chains built once in unlock() and gain-driven per
+// frame (no retriggering, no per-frame node allocation); one-shots build
+// nodes per event only. Every AudioParam write is finite-guarded — a NaN
+// throws, so kart/race inputs are sanitized before reaching a param.
 
 export class Audio {
   private ctx: AudioContext | null = null;
@@ -20,10 +32,28 @@ export class Audio {
   private engine: { osc: OscillatorNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private skid: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private boost: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
+  // SFX-DEEP continuous loops (all share the noise buffer, gain-driven):
+  // slipstream wind layer, wall-grind scrape, off-road gravel rumble.
+  private wind: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
+  private scrape: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
+  private rumble: { src: AudioBufferSourceNode; gain: GainNode; filter: BiquadFilterNode } | null = null;
   private lastCd = -1;
   private lastWallT = -1;
   private lastLap = 1;
   private lastPhase = 'countdown';
+  // SFX-DEEP state-diff memory — each mirrors the gameplay channel it
+  // watches so update() can fire a one-shot exactly on the transition.
+  private lastRouletteTick = 0;
+  private rouletteWasSpinning = false;
+  private lastDriftDir = 0;
+  private lastDriftCharge = 0;
+  private lastDriftTier = -1;
+  private lastDrafts = 0;
+  private wasGrounded = true;
+  private airPeak = 0; // longest airborne streak before this landing (s)
+  private lastBumps = 0;
+  private bumpAudioAt = -10; // ctx.currentTime of last thock (rate limit)
+  private lastPos = 1;
   private readonly music = new Music();
   private rivalEngines: { osc: OscillatorNode; gain: GainNode }[] = [];
   // Ambience bed: looping sources + a sparse-event timer, rebuilt per track.
@@ -33,6 +63,8 @@ export class Audio {
   /** QA introspection: one-shot SFX fired since unlock + the last one's tag. */
   sfxCount = 0;
   lastSfx = '';
+  /** Per-tag fire tally — QA counts each cue type separately. */
+  readonly sfxByTag: Record<string, number> = {};
 
   /** Call once on a trusted user gesture (keydown/pointerdown). */
   unlock(): void {
@@ -83,6 +115,49 @@ export class Audio {
     bSrc.connect(bFilter).connect(bGain).connect(this.master);
     bSrc.start();
     this.boost = { src: bSrc, gain: bGain, filter: bFilter };
+
+    // Slipstream wind layer: bandpassed noise sustained while the draft
+    // burst is on — under the one-shot whoosh that marks the trigger.
+    const wSrc = ctx.createBufferSource();
+    wSrc.buffer = noiseBuf;
+    wSrc.loop = true;
+    const wFilter = ctx.createBiquadFilter();
+    wFilter.type = 'bandpass';
+    wFilter.frequency.value = 800;
+    wFilter.Q.value = 0.8;
+    const wGain = ctx.createGain();
+    wGain.gain.value = 0;
+    wSrc.connect(wFilter).connect(wGain).connect(this.master);
+    wSrc.start();
+    this.wind = { src: wSrc, gain: wGain, filter: wFilter };
+
+    // Wall-grind scrape: tighter bandpass than the skid loop (~1.1-2.5 kHz)
+    // so rail-grinding reads as a rough scrape, not a tire slide.
+    const gSrc = ctx.createBufferSource();
+    gSrc.buffer = noiseBuf;
+    gSrc.loop = true;
+    const gFilter = ctx.createBiquadFilter();
+    gFilter.type = 'bandpass';
+    gFilter.frequency.value = 1600;
+    gFilter.Q.value = 2.6;
+    const gGain = ctx.createGain();
+    gGain.gain.value = 0;
+    gSrc.connect(gFilter).connect(gGain).connect(this.master);
+    gSrc.start();
+    this.scrape = { src: gSrc, gain: gGain, filter: gFilter };
+
+    // Off-road rumble: lowpassed noise bed while on gravel aprons at speed.
+    const rSrc = ctx.createBufferSource();
+    rSrc.buffer = noiseBuf;
+    rSrc.loop = true;
+    const rFilter = ctx.createBiquadFilter();
+    rFilter.type = 'lowpass';
+    rFilter.frequency.value = 210;
+    const rGain = ctx.createGain();
+    rGain.gain.value = 0;
+    rSrc.connect(rFilter).connect(rGain).connect(this.master);
+    rSrc.start();
+    this.rumble = { src: rSrc, gain: rGain, filter: rFilter };
 
     // Music gets its own bus so options can mix it vs SFX independently.
     this.musicBus = ctx.createGain();
@@ -142,15 +217,19 @@ export class Audio {
     o.stop(t + dur);
   }
 
-  private thump(): void {
+  /** Wall/item impact body-hit — gain and pitch scale with impact severity
+   *  (0 = graze, 1 = full-speed shunt) via kart.lastWallImpact. */
+  private thump(sev = 0.6): void {
     if (!this.ctx || !this.master) return;
+    this.tag('wallHit');
+    const s = Number.isFinite(sev) ? Math.min(1, Math.max(0, sev)) : 0.6;
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
     o.type = 'sine';
-    o.frequency.setValueAtTime(120, t);
+    o.frequency.setValueAtTime(95 + s * 45, t);
     o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.5, t);
+    g.gain.setValueAtTime(0.22 + s * 0.3, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
     o.connect(g).connect(this.master);
     o.start(t);
@@ -162,7 +241,7 @@ export class Audio {
     nf.type = 'highpass';
     nf.frequency.value = 1800;
     const ng = this.ctx.createGain();
-    ng.gain.setValueAtTime(0.3, t);
+    ng.gain.setValueAtTime(0.12 + s * 0.2, t);
     ng.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
     n.connect(nf).connect(ng).connect(this.master);
     n.start(t);
@@ -190,6 +269,7 @@ export class Audio {
   private tag(name: string): void {
     this.sfxCount++;
     this.lastSfx = name;
+    this.sfxByTag[name] = (this.sfxByTag[name] ?? 0) + 1;
   }
 
   /** Osc with a freq glide f0→f1 and an instant-attack/exp-decay envelope. */
@@ -244,7 +324,36 @@ export class Audio {
     n.stop(t + dur + 0.02);
   }
 
-  /** Item-box pickup: rolling tick, then a two-note acquire ding. */
+  /** Filtered noise SWELL: gain attacks over `atk` s before decaying —
+   *  wind rushes and crowd swells need a rise, not noiseHit's instant hit. */
+  private noiseSwell(
+    dur: number,
+    atk: number,
+    gain: number,
+    type: BiquadFilterType,
+    freq: number,
+    q = 1,
+    f1?: number,
+    delay = 0,
+  ): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !this.skid || gain <= 0.001) return;
+    const t = ctx.currentTime + delay;
+    const n = ctx.createBufferSource();
+    n.buffer = this.skid.src.buffer!;
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.setValueAtTime(Math.max(10, freq), t);
+    if (f1) f.frequency.exponentialRampToValueAtTime(Math.max(10, f1), t + dur);
+    f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + Math.max(0.01, atk));
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    n.connect(f).connect(g).connect(this.master);
+    n.start(t);
+    n.stop(t + dur + 0.02);
+  }
   itemPickup(vol = 1): void {
     if (!this.live()) return;
     this.tag('pickup');
@@ -314,6 +423,175 @@ export class Audio {
     if (!this.live()) return;
     this.tag('pad');
     this.sweep(480, 1400, 0.12, 0.18 * vol, 'square');
+  }
+
+  // ------------------------------------------------------------------
+  // SFX-DEEP cues — fired by the state diffs in update() (or by Game for
+  // respawn). All quiet on purpose: they sit under the engine and music.
+
+  /** Item roulette icon flip — short tick; pitch climbs as the spin slows
+   *  (classic slot feel: fast flat ticks → slower, slightly higher taps). */
+  private rouletteTickSfx(progress: number): void {
+    if (!this.live()) return;
+    this.tag('rouletteTick');
+    const p = Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0;
+    const f = 640 + p * 320;
+    this.sweep(f, f, 0.032, 0.13, 'square');
+  }
+
+  /** Roulette stops on the rolled item — bright two-note "item landed". */
+  private rouletteLand(): void {
+    if (!this.live()) return;
+    this.tag('rouletteLand');
+    this.sweep(988, 988, 0.08, 0.2, 'triangle');
+    this.sweep(1480, 1480, 0.17, 0.18, 'triangle', 0.07);
+  }
+
+  /** Drift charge crossing tier `t` while sliding — soft rising "charge
+   *  up" blip; the violet ultra tier gets a distinctive shimmer. */
+  private chargeTier(tier: number): void {
+    if (!this.live()) return;
+    this.tag(`charge:${tier}`);
+    if (tier === 0) {
+      this.sweep(660, 1150, 0.12, 0.15, 'triangle');
+    } else if (tier === 1) {
+      this.sweep(820, 1450, 0.14, 0.17, 'triangle');
+      this.sweep(1640, 2900, 0.12, 0.06, 'sine', 0.02);
+    } else {
+      this.sweep(920, 1950, 0.2, 0.19, 'triangle');
+      this.sweep(1380, 2900, 0.22, 0.09, 'sine', 0.03);
+      this.noiseHit(0.24, 0.07, 'highpass', 5200);
+    }
+  }
+
+  /** Mini-turbo release — a deeper whoosh than pad/item boosts with a
+   *  tier-colored chord (blue=root, orange=+fifth, violet=+octave). */
+  private turboRelease(tier: number): void {
+    if (!this.live()) return;
+    this.tag(`turbo:${tier}`);
+    this.noiseHit(0.4, 0.28, 'lowpass', 420, 0.8, 2100);
+    const base = [330, 415, 494][tier] ?? 330;
+    this.sweep(base * 0.5, base, 0.32, 0.2, 'sawtooth');
+    if (tier >= 1) this.sweep(base * 0.75, base * 1.5, 0.32, 0.11, 'sawtooth', 0.02);
+    if (tier >= 2) this.sweep(base, base * 2, 0.36, 0.09, 'triangle', 0.05);
+  }
+
+  /** Slipstream burst fires — ~0.6 s wind-rush swell under the sustained
+   *  wind layer that runs for the burst duration. */
+  private draftWhoosh(): void {
+    if (!this.live()) return;
+    this.tag('draft');
+    this.noiseSwell(0.6, 0.14, 0.26, 'bandpass', 500, 0.8, 2600);
+    this.sweep(160, 430, 0.45, 0.07, 'sine', 0.05);
+  }
+
+  /** Drift-entry hop — small chirp as the kart pops into the slide. */
+  private hopChirp(): void {
+    if (!this.live()) return;
+    this.tag('hop');
+    this.sweep(430, 900, 0.09, 0.13, 'triangle');
+  }
+
+  /** Touchdown — soft low thud, body + noise bed, scaled by fall time. */
+  private landThud(sev: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !this.live()) return;
+    const s = Number.isFinite(sev) ? Math.min(1, Math.max(0, sev)) : 0;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(95, t);
+    o.frequency.exponentialRampToValueAtTime(46, t + 0.13);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.1 + s * 0.26, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.2);
+    this.noiseHit(0.09, 0.04 + s * 0.1, 'lowpass', 640);
+  }
+
+  /** Kart-vs-kart contact — mid "thock" (rate-limited at the call path). */
+  private thock(sev: number): void {
+    if (!this.live()) return;
+    this.tag('bump');
+    const s = Number.isFinite(sev) ? Math.min(1, Math.max(0, sev)) : 0;
+    this.sweep(230, 120, 0.1, 0.2 + s * 0.14, 'sine');
+    this.noiseHit(0.06, 0.13 + s * 0.1, 'lowpass', 1600);
+  }
+
+  /** Race position changed mid-race — quiet 3-note arp: rising = gained a
+   *  place, falling = lost one. */
+  private posStinger(up: boolean): void {
+    if (!this.live()) return;
+    this.tag(up ? 'posUp' : 'posDown');
+    const seq = up ? [660, 880, 1108] : [620, 494, 392];
+    seq.forEach((f, i) =>
+      this.sweep(f, f, i === seq.length - 1 ? 0.16 : 0.08, 0.14, 'triangle', i * 0.08),
+    );
+  }
+
+  /** Entering the last lap — a hotter flourish than the per-lap blip so
+   *  "FINAL LAP" reads with real urgency. */
+  private finalLap(): void {
+    if (!this.live()) return;
+    this.tag('finalLap');
+    [784, 988, 1175, 1568].forEach((f, i) =>
+      this.sweep(f, f, 0.11, 0.24, 'square', i * 0.085),
+    );
+    this.noiseHit(0.45, 0.09, 'highpass', 4200, 1, undefined, 0.12);
+  }
+
+  /** GO! — a brighter start chord than the countdown beeps. */
+  private goHorn(): void {
+    if (!this.live()) return;
+    this.tag('go');
+    [523, 659, 784].forEach((f) => this.sweep(f, f, 0.45, 0.16, 'sawtooth'));
+    this.sweep(1046, 1046, 0.5, 0.2, 'square', 0.02);
+    this.noiseHit(0.28, 0.1, 'highpass', 3200);
+  }
+
+  /** Lakitu/Backspace respawn — materialize riser matching the FX burst. */
+  respawn(vol = 1): void {
+    if (!this.live()) return;
+    this.tag('respawn');
+    this.sweep(260, 1650, 0.34, 0.18 * vol, 'sine');
+    this.sweep(520, 2500, 0.3, 0.08 * vol, 'triangle', 0.04);
+    this.noiseHit(0.22, 0.1 * vol, 'highpass', 2600, 1, 6200, 0.06);
+  }
+
+  /** Player crosses the line — crowd cheer swell layered under the
+   *  finish fanfare (~1.5 s filtered-noise rise). */
+  private crowdSwell(): void {
+    if (!this.live()) return;
+    this.tag('crowd');
+    this.noiseSwell(1.5, 0.35, 0.2, 'bandpass', 800, 0.55, 1500);
+    this.noiseSwell(1.3, 0.5, 0.11, 'bandpass', 1700, 0.7, 2600, 0.12);
+  }
+
+  /** QA probe: current continuous-loop output gains — the scrape/rumble/
+   *  wind loops are gain-driven so the one-shot counters never see them. */
+  loopLevels(): { scrape: number; rumble: number; wind: number } {
+    return {
+      scrape: this.scrape?.gain.gain.value ?? 0,
+      rumble: this.rumble?.gain.gain.value ?? 0,
+      wind: this.wind?.gain.gain.value ?? 0,
+    };
+  }
+
+  /** QA dump: counters + per-tag tally + live loop levels in one shot. */
+  sfxSnapshot(): {
+    count: number;
+    last: string;
+    byTag: Record<string, number>;
+    loops: { scrape: number; rumble: number; wind: number };
+  } {
+    return {
+      count: this.sfxCount,
+      last: this.lastSfx,
+      byTag: { ...this.sfxByTag },
+      loops: this.loopLevels(),
+    };
   }
 
   /** Menu cursor move — short quiet blip. */
@@ -479,36 +757,183 @@ export class Audio {
     }
   }
 
-  /** Per-frame update: reads kart + race state, drives continuous sources. */
-  update(kart: Kart, race: Race, simTime: number, rivals: Kart[] = []): void {
+  /** Per-frame update: reads kart + race state, drives continuous sources.
+   *  `items` feeds the player-slot roulette ticks, `bumps` is Game's
+   *  kart-vs-kart contact counter, `paused` ducks the new grind loops (a
+   *  frozen kart state would otherwise sustain them under the pause menu). */
+  update(
+    kart: Kart,
+    race: Race,
+    simTime: number,
+    rivals: Kart[] = [],
+    items?: Items,
+    bumps = 0,
+    paused = false,
+  ): void {
     if (!this.ctx || this.ctx.state === 'suspended') return;
+    const now = this.ctx.currentTime;
 
-    // --- countdown beeps ---
+    // --- countdown beeps → GO chord ---
     if (race.phase === 'countdown') {
       const c = Math.ceil(race.countdownLeft);
       if (c !== this.lastCd && c > 0) {
         this.lastCd = c;
+        this.tag('beep');
         this.blip(440, 0.12);
       }
     } else if (this.lastCd !== 0) {
-      // Transitioned out of countdown → GO!
+      // Transitioned out of countdown → GO! (gated on racing so quitting
+      // to the title mid-countdown doesn't blast the start chord).
       this.lastCd = 0;
-      this.blip(880, 0.3, 0.4);
+      if (race.phase === 'racing') this.goHorn();
     }
 
     // --- lap / finish ---
     if (race.phase === 'racing' && race.lap !== this.lastLap) {
-      this.blip(660, 0.15, 0.4, 'triangle');
-      setTimeout(() => this.blip(990, 0.2, 0.4, 'triangle'), 120);
+      if (race.lap >= race.totalLaps) {
+        this.finalLap();
+      } else {
+        this.tag('lap');
+        this.blip(660, 0.15, 0.4, 'triangle');
+        setTimeout(() => this.blip(990, 0.2, 0.4, 'triangle'), 120);
+      }
     }
     this.lastLap = race.lap;
-    if (race.phase === 'finished' && this.lastPhase !== 'finished') this.fanfare();
+    if (race.phase === 'finished' && this.lastPhase !== 'finished') {
+      this.fanfare();
+      this.crowdSwell();
+    }
     this.lastPhase = race.phase;
 
-    // --- wall impact ---
-    if (kart.lastWallHit !== this.lastWallT && kart.lastWallHit >= 0) {
-      this.lastWallT = kart.lastWallHit;
-      this.thump();
+    // --- impact channel: lastWallHit carries walls, kart bumps, landings,
+    // and item hits — the parallel bump counter + grounded edge tell them
+    // apart so each gets its own voice (thock / soft thud / body thump). ---
+    const bumped = bumps !== this.lastBumps;
+    this.lastBumps = bumps;
+    const impacted = kart.lastWallHit !== this.lastWallT && kart.lastWallHit >= 0;
+    if (impacted) this.lastWallT = kart.lastWallHit;
+    const landed = !this.wasGrounded && kart.grounded;
+    const sev = Number.isFinite(kart.lastWallImpact)
+      ? Math.min(1, Math.max(0, kart.lastWallImpact))
+      : 0;
+    if (impacted) {
+      if (bumped) {
+        if (now - this.bumpAudioAt >= AUDIO.bumpMinInterval) {
+          this.bumpAudioAt = now;
+          this.thock(0.35 + 0.65 * sev);
+        }
+      } else if (landed) {
+        this.tag('land');
+        this.landThud(sev);
+      } else {
+        this.thump(sev);
+      }
+    } else if (landed && this.airPeak > 0.2) {
+      // Short hop below the kart's own 0.22 s feedback channel — soft tap.
+      this.tag('land');
+      this.landThud(Math.min(0.4, this.airPeak * 0.5));
+    }
+    if (!kart.grounded) {
+      this.airPeak = Math.max(this.airPeak, kart.airTime);
+    } else {
+      this.airPeak = 0;
+    }
+    this.wasGrounded = kart.grounded;
+
+    // --- drift events: entry hop chirp, charge-tier blips, release whoosh ---
+    const dDir = kart.driftDir;
+    const dChg = Number.isFinite(kart.driftCharge) ? kart.driftCharge : 0;
+    if (this.lastDriftDir === 0 && dDir !== 0 && kart.grounded) this.hopChirp();
+    if (dDir !== 0) {
+      const tiers = KART.driftChargeTier;
+      let tier = -1;
+      for (let t = tiers.length - 1; t >= 0; t--) {
+        if (dChg >= tiers[t]) {
+          tier = t;
+          break;
+        }
+      }
+      if (tier > this.lastDriftTier) this.chargeTier(tier);
+      this.lastDriftTier = tier;
+    } else {
+      // Drift released: a turbo fired only when the charge had reached a
+      // tier (lastDriftCharge is the pre-reset sample — release zeroes it).
+      if (
+        this.lastDriftDir !== 0 &&
+        kart.boostTimer > 0 &&
+        this.lastDriftCharge >= KART.driftChargeTier[0]
+      ) {
+        let tier = 0;
+        for (let t = KART.driftChargeTier.length - 1; t >= 0; t--) {
+          if (this.lastDriftCharge >= KART.driftChargeTier[t]) {
+            tier = t;
+            break;
+          }
+        }
+        this.turboRelease(tier);
+      }
+      this.lastDriftTier = -1;
+    }
+    this.lastDriftDir = dDir;
+    this.lastDriftCharge = dChg;
+
+    // --- slipstream: wind-rush one-shot on the burst + sustained layer ---
+    if (kart.draftsFired !== this.lastDrafts) {
+      this.lastDrafts = kart.draftsFired;
+      this.draftWhoosh();
+    }
+    const slipT = Number.isFinite(kart.slipstreamT) ? kart.slipstreamT : 0;
+    const windT =
+      !paused && slipT > 0 ? Math.min(AUDIO.windGain, 0.04 + slipT * 0.06) : 0;
+    this.wind!.gain.gain.setTargetAtTime(windT, now, 0.1);
+    this.wind!.filter.frequency.setTargetAtTime(700 + slipT * 500, now, 0.12);
+
+    // --- wall-grind scrape + gravel-apron rumble (speed-following loops) ---
+    const spd = Number.isFinite(kart.speed) ? kart.speed : 0;
+    const scrapeT =
+      !paused && kart.onWall && spd > AUDIO.scrapeMinSpeed
+        ? Math.min(
+            AUDIO.scrapeGain,
+            0.02 + ((spd - AUDIO.scrapeMinSpeed) / 24) * AUDIO.scrapeGain,
+          )
+        : 0;
+    this.scrape!.gain.gain.setTargetAtTime(scrapeT, now, 0.05);
+    this.scrape!.filter.frequency.setTargetAtTime(1100 + spd * 55, now, 0.08);
+    const rumbleT =
+      !paused && kart.onGravel && kart.grounded && spd > AUDIO.rumbleMinSpeed
+        ? Math.min(AUDIO.rumbleGain, 0.04 + (spd / KART.maxSpeed) * AUDIO.rumbleGain)
+        : 0;
+    this.rumble!.gain.gain.setTargetAtTime(rumbleT, now, 0.08);
+    this.rumble!.filter.frequency.setTargetAtTime(160 + spd * 4, now, 0.1);
+
+    // --- item roulette: a tick per icon flip on the player's slot + a
+    // landing ding when the spin resolves (rivals' slots stay silent). ---
+    if (items) {
+      const spinning = items.rouletteT[0] > 0;
+      if (spinning) {
+        const tick = items.rouletteTick[0] ?? 0;
+        if (tick !== this.lastRouletteTick) {
+          this.lastRouletteTick = tick;
+          const progress = 1 - Math.max(0, items.rouletteT[0]) / ROULETTE_S;
+          this.rouletteTickSfx(progress);
+        }
+      } else {
+        if (this.rouletteWasSpinning) this.rouletteLand();
+        this.lastRouletteTick = 0;
+      }
+      this.rouletteWasSpinning = spinning;
+    }
+
+    // --- position-change stinger: seed while not racing so the GO
+    // transition can't fire a phantom move, then arp on every swap. ---
+    if (race.phase === 'racing') {
+      const pos = race.positionOf(0);
+      if (pos !== this.lastPos) {
+        this.posStinger(pos < this.lastPos);
+        this.lastPos = pos;
+      }
+    } else {
+      this.lastPos = race.positionOf(0);
     }
 
     // --- engine: pitch tracks forward speed, boosted while boosting ---
