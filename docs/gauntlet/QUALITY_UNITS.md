@@ -957,3 +957,28 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Results wrap:** rows nowrap — "+10 → 10 pts" can't split mid-token.
 - **Verified:** NN smoke exact (25.54/21.61/20.90, stalled 0);
   typecheck+build clean; console 0E/0W.
+
+### FIX-007 — Critic-16 defect batch (wave 16)
+
+- **Domain:** Input / UI / race rules
+- **Status:** Integrated
+- **Evidence:** `wave16/CRITIC16_REPORT.md` (7.9/10, 1M/4L).
+- **MED — results pause trap closed at the gate:** the options-close
+  fix (FIX-006) covered only the side door — P/Esc still toggled pause
+  on 'finished' where the PAUSED overlay is suppressed, dead-ending N.
+  Pause now only engages in racing/countdown — verified P is a no-op
+  on results (0 PAUSED elements) and still freezes sim mid-race.
+- **Focus theft:** `preventDefault` on Tab/Space/arrows at the input
+  layer — Tab no longer blurs the page mid-race (blur cleared held
+  keys → dead coast). F-keys left for dev tools.
+- **Same-tick finish ties:** position display AND points award now use
+  `race.positionOf(r)` — tied finishers show P1/P1 and earn identical
+  GP points (was P1/P2 display with 10/7 by array order).
+- **GP champion tiebreak:** final-leg finish position decides points
+  ties (climactic decider) instead of array order.
+- **Accepted (documented):** pre-free-crossing resync −1024 score is
+  unreachable via gameplay (earliest pickup lands after every back-grid
+  kart has crossed); ⌫ clearing ink/spin is a fair trade for its cost;
+  cross-lap swap direction follows raw-index exchange semantics.
+- **Verified:** typecheck+build clean; console 0E/0W; NN p95 15.4 ms
+  (critic-measured, clean session).

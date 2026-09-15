@@ -116,8 +116,22 @@ export const UNIVERSAL_ALTERNATES: readonly string[] = [
 
 const keys = new Set<string>();
 
+// Browser-behavior keys the game owns: Tab must not steal focus
+// mid-race (critic16 D2 — blur clears held keys and the kart coasts
+// dead), Space/arrows must not scroll the page. F-keys are left alone
+// for dev tools.
+const BROWSER_KEYS = new Set([
+  'Tab',
+  'Space',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+]);
+
 export function initInput(): void {
   window.addEventListener('keydown', (e) => {
+    if (BROWSER_KEYS.has(e.code)) e.preventDefault();
     if (e.repeat) return;
     keys.add(e.code);
   });

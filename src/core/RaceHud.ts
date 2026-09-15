@@ -362,7 +362,13 @@ export class RaceHud {
         // Grand Prix final leg: rank by cup points, crown the champion.
         const gpFinal = gp?.mode && gp.done;
         const dispOrder = gpFinal
-          ? [...race.racers.keys()].sort((a, b) => gp.points[b] - gp.points[a])
+          ? [...race.racers.keys()].sort(
+              // Cup tiebreak: better final-leg result decides — MK-style
+              // climactic decider, not array order (critic16 D4).
+              (a, b) =>
+                gp.points[b] - gp.points[a] ||
+                race.positionOf(a) - race.positionOf(b),
+            )
           : order;
         // Points are awarded on the N-press, so a leg's results screen
         // shows "earned this leg → running total" (critic D5: leg-1 read
@@ -375,7 +381,11 @@ export class RaceHud {
             // to print a concrete "P#  +N → M pts" off live score order,
             // then the racer's real finish reordered it — the displayed
             // delta contradicted what the N-press actually awarded.
-            const pos = rr.finished || gpFinal ? `P${i + 1}` : '…';
+            // Finished rows show positionOf — same-tick finishers share a
+            // place (P1,P1,P3), matching the award (critic16 D5). On final
+            // standings every row is concrete by definition.
+            const pos =
+              rr.finished || gpFinal ? `P${gpFinal ? i + 1 : race.positionOf(r)}` : '…';
             const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
             const best =
               fmt(rr.bestLapTime) +
@@ -393,7 +403,7 @@ export class RaceHud {
                 // sorted order the award loop uses — so a same-tick finish
                 // tie can't display +10 to a row the award scores +7
                 // (critic10: positionOf ties on equal finishTime).
-                const earned = GP_PTS[i] ?? 0;
+                const earned = GP_PTS[race.positionOf(r) - 1] ?? 0;
                 pts = `   +${earned} → ${gp.points[r] + earned} pts`;
               } else {
                 pts = '   …pts provisional';

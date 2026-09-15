@@ -391,9 +391,15 @@ export class Game {
         this.audio.uiConfirm();
         return;
       }
-      // Pause works in any play phase (not title — nothing to freeze there).
+      // Pause works in racing/countdown only — title has nothing to
+      // freeze, and 'finished' suppresses the PAUSED overlay so a pause
+      // there is invisible and dead-ends the N-advance (critic15+16: the
+      // same trap twice — disallow it outright rather than render it).
       // Critic: gating to 'racing' + paused surviving restart = P→R soft-lock.
-      if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase !== 'title') {
+      if (
+        (e.code === 'KeyP' || e.code === 'Escape') &&
+        (this.race.phase === 'racing' || this.race.phase === 'countdown')
+      ) {
         this.paused = !this.paused;
         this.audio.uiBack();
       }
@@ -429,8 +435,11 @@ export class Game {
         const order = [...this.race.racers.keys()].sort(
           (a, b) => this.race.positionOf(a) - this.race.positionOf(b),
         );
-        order.forEach((r, pos) => {
-          this.gpPoints[r] += Game.GP_POINTS[pos] ?? 0;
+        order.forEach((r) => {
+          // Award by positionOf, not row index — same-tick finishers
+          // share a position and must earn identical points (critic16 D5:
+          // the table showed P1/P1 but awarded 10/7 by array order).
+          this.gpPoints[r] += Game.GP_POINTS[this.race.positionOf(r) - 1] ?? 0;
         });
         this.gpLeg++;
         if (this.gpLeg >= TRACKS.length) {

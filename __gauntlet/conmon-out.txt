@@ -1,0 +1,1 @@
+conmon attached → C:/github/bot-kart/__gauntlet/console.log
