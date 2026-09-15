@@ -42,6 +42,18 @@ function fmt(t: number): string {
   return `${m}:${s.toFixed(2).padStart(5, '0')}`;
 }
 
+// Held-item readout glyphs: colored badge + name — readable at a glance.
+// Module-scope: the roulette flips the slot every ~60 ms, so this table
+// must not be rebuilt per update.
+const ITEM_GLYPHS: Record<string, [string, string]> = {
+  boost: ['⚡', '#ffd454'],
+  missile: ['✹', '#ff5a3c'],
+  slick: ['◍', '#8a8f96'],
+  shield: ['◯', '#7be8ff'],
+  ink: ['✦', '#c070ff'],
+  swap: ['⇄', '#7dff8a'],
+};
+
 export class RaceHud {
   private readonly center: HTMLDivElement;
   private readonly lapEl: HTMLDivElement;
@@ -181,6 +193,7 @@ export class RaceHud {
     gp?: GpState,
     stuckHint = false,
     record?: RecordInfo,
+    itemSpinning = false,
   ): void {
     // Options overlay renders in every phase (openable from pause or title).
     if (opts?.open) {
@@ -330,20 +343,17 @@ export class RaceHud {
     this.recordEl.style.display =
       !paused && record?.flash && race.phase !== 'countdown' ? 'block' : 'none';
     // Held-item readout: colored glyph badge + name — readable at a glance.
-    const ITEM_GLYPHS: Record<string, [string, string]> = {
-      boost: ['⚡', '#ffd454'],
-      missile: ['✹', '#ff5a3c'],
-      slick: ['◍', '#8a8f96'],
-      shield: ['◯', '#7be8ff'],
-      ink: ['✦', '#c070ff'],
-      swap: ['⇄', '#7dff8a'],
-    };
+    // While the roulette spins the slot cycles icons without the use-key
+    // hint (the item isn't usable until it lands).
     if (race.phase === 'racing' && heldItem) {
       const [glyph, color] = ITEM_GLYPHS[heldItem] ?? ['●', '#fff'];
-      this.itemEl.innerHTML =
-        `<span style="color:${color};font-size:26px">${glyph}</span> ` +
-        `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">` +
-        `[${keyName(bindings.item)}]</span>`;
+      this.itemEl.innerHTML = itemSpinning
+        ? `<span style="color:${color};font-size:26px">${glyph}</span> ` +
+          `<span style="color:#8fa4c0">${heldItem.toUpperCase()}</span> ` +
+          `<span style="color:#5a6a80;font-size:14px">···</span>`
+        : `<span style="color:${color};font-size:26px">${glyph}</span> ` +
+          `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">` +
+          `[${keyName(bindings.item)}]</span>`;
     } else {
       this.itemEl.textContent = '';
     }

@@ -702,8 +702,8 @@ export class Game {
       this.stuckFor = 0;
     }
     while (!this.paused && this.accumulator >= SIM.fixedDt) {
-      this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime);
       const allKarts = [this.kart, ...this.aiKarts];
+      this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime, allKarts);
       const scores = this.race.racers.map((r) => r.score);
       const racing = this.race.phase === 'racing';
       for (let i = 0; i < this.aiKarts.length; i++) {
@@ -717,7 +717,7 @@ export class Game {
           AI.rubberBandUp,
         );
         const cs = canDrive ? this.aiDrivers[i].update(this.aiKarts[i], this.track, SIM.fixedDt, allKarts) : IDLE;
-        this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime);
+        this.aiKarts[i].update(SIM.fixedDt, cs, this.track, this.simTime, allKarts);
         // AI uses held items on straights at speed — keeps the field lively.
         if (this.items.held[i + 1] && this.aiKarts[i].speed > 18 && Math.random() < 0.4 * SIM.fixedDt) {
           this.items.use(i + 1, this.simTime, scores, this.race.racers);
@@ -775,7 +775,7 @@ export class Game {
       this.race,
       this.kart,
       this.simTime,
-      this.items.held[0],
+      this.items.slotItem(0),
       this.paused,
       {
         ...this.settings,
@@ -797,6 +797,7 @@ export class Game {
         flash: this.simTime - this.recordFlashAt < 2.5,
         setThisRace: this.recordSetThisRace,
       },
+      this.items.slotSpinning(0),
     );
     this.minimap.update(
       [this.kart, ...this.aiKarts],

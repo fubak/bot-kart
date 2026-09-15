@@ -160,6 +160,15 @@ type EmitOpts = Partial<Particle> & {
 const SPARK_CAP = 640;
 const SMOKE_CAP = 448;
 
+// Drift charge-tier palette: [uncharged, tier-1 blue, tier-2 orange,
+// tier-3 violet ultra]. Shared instances — driftSparks reads, never mutates.
+const TIER_COLORS = [
+  new THREE.Color(0x9a9a9a),
+  new THREE.Color(0x3fd8ff),
+  new THREE.Color(0xffa028),
+  new THREE.Color(0xd86aff),
+];
+
 export class Fx {
   readonly object = new THREE.Group();
   private readonly spark = new Pool(SPARK_CAP, glowTexture(), THREE.AdditiveBlending);
@@ -196,15 +205,16 @@ export class Fx {
 
   // ---------- kart feedback ----------
 
-  /** Drift sparks at a wheel contact patch; color encodes charge tier. */
+  /** Drift sparks at a wheel contact patch; color encodes charge tier —
+   *  blue → orange → violet for the three mini-turbo tiers. */
   driftSparks(pos: THREE.Vector3, vel: THREE.Vector3, charge: number): void {
-    const tier1 = KART.driftChargeTier[0];
-    const tier2 = KART.driftChargeTier[1];
+    const tiers = KART.driftChargeTier;
     const color =
-      charge >= tier2 ? new THREE.Color(0x3fd8ff) :
-      charge >= tier1 ? new THREE.Color(0xffa028) :
-      new THREE.Color(0x9a9a9a);
-    const rate = charge >= tier2 ? 3 : charge >= tier1 ? 2 : 1;
+      charge >= tiers[2] ? TIER_COLORS[3] :
+      charge >= tiers[1] ? TIER_COLORS[2] :
+      charge >= tiers[0] ? TIER_COLORS[1] :
+      TIER_COLORS[0];
+    const rate = charge >= tiers[2] ? 4 : charge >= tiers[1] ? 3 : charge >= tiers[0] ? 2 : 1;
     for (let i = 0; i < rate; i++) {
       const v = vel.clone().multiplyScalar(-0.25).setY(1.4);
       this.s(this.spark, pos, v, color, {
@@ -214,7 +224,7 @@ export class Fx {
     }
     // Tire smoke while drifting — grey-white puffs, tinted by charge.
     if (Math.random() < 0.5) {
-      const sc = charge >= tier1 ? color.clone().lerp(new THREE.Color(0xffffff), 0.55)
+      const sc = charge >= tiers[0] ? color.clone().lerp(new THREE.Color(0xffffff), 0.55)
         : new THREE.Color(0xcfd4da);
       const v = vel.clone().multiplyScalar(-0.12).setY(0.9);
       this.s(this.smoke, pos, v, sc, {

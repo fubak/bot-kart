@@ -60,10 +60,34 @@ export const KART = {
 
   // Drift → mini-turbo: charge seconds needed per boost tier. Real corners
   // sustain ~0.6 s of drift (critic: 0.9 s tier-1 never fired in a race).
-  driftChargeTier: [0.45, 1.1],
+  // Three tiers — blue → orange → violet sparks; the ultra tier needs a
+  // long sweeper hold (~1.9 s of genuine sliding) and pays back ~2.4 s.
+  driftChargeTier: [0.45, 1.1, 1.9],
   boostSpeed: 9, // added m/s during boost
-  boostTime: [0.7, 1.4], // boost duration per tier
+  boostTime: [0.7, 1.4, 2.4], // boost duration per tier
   boostAccel: 26,
+
+  // Drift-entry hop: the kart visibly pops when a drift latches — sells
+  // the weight transfer. Visual-only channel (group Y offset + landing
+  // squash); the physics velocity vector is untouched.
+  driftHopTime: 0.22, // seconds up-and-down
+  driftHopHeight: 0.3, // apex height (m)
+  driftHopSquash: 0.3, // landing squash fed into the impact-squash channel
+
+  // Slipstream/drafting: hold inside a leading kart's wake cone for
+  // draftTime seconds to fire a speed burst. The cone is measured in the
+  // LEADER's frame — gap is distance behind their bumper, lat is the
+  // corridor half-width. A fired burst locks that pair out for
+  // draftCooldown seconds (a different leader may still be drafted).
+  draftGapMin: 2, // m behind the leader where the wake starts
+  draftGapMax: 12, // wake fades out (~4.6 kart lengths)
+  draftLat: 1.2, // corridor half-width (m)
+  draftHeadingCos: 0.85, // ~32° — both karts must run the same direction
+  draftMinSpeed: 12, // m/s — parking-lot trains make no wake
+  draftTime: 0.9, // sustained seconds in the cone → burst
+  draftBoostTime: 1.3, // burst duration (s)
+  draftBoostSpeed: 5.5, // +m/s top speed during the burst (~+20%)
+  draftCooldown: 4, // per-pair refractory period after a burst (s)
   // Above maxSpeed (boost end, downhill), bleed back instead of hard-clamping.
   overSpeedDecay: 32,
 

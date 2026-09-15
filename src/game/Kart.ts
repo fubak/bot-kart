@@ -15,6 +15,10 @@ import botGlbUrl from '../../assets/exported/characters/grokbot-a.glb?url';
 export type DriveState = 'grip' | 'drift' | 'boost';
 
 const UP = new THREE.Vector3(0, 1, 0);
+// Scratch vectors for the slipstream cone test — no per-step allocs.
+const _draftRel = new THREE.Vector3();
+const _draftFwdA = new THREE.Vector3();
+const _draftFwdB = new THREE.Vector3();
 
 export class Kart {
   readonly group = new THREE.Group();
@@ -27,6 +31,20 @@ export class Kart {
   driftDir = 0; // -1/0/+1 (locked while drifting)
   driftCharge = 0;
   boostTimer = 0;
+  /** Slipstream burst remaining (s) — the drafting payoff. QA/VFX read it:
+   *  >0 means the wind-burst is on (extra top speed + streak emission). */
+  slipstreamT = 0;
+  /** Seconds currently sustained inside a leading kart's wake cone —
+   *  reaches KART.draftTime → the burst fires. Resets when the cone breaks. */
+  draftT = 0;
+  /** Total slipstream bursts fired (QA counter). */
+  draftsFired = 0;
+  /** The kart this one last drafted — per-pair cooldown target. */
+  private draftLeader: Kart | null = null;
+  private draftCdUntil = -1; // sim-time the pair cooldown ends
+  /** Drift-entry hop arc timer (<0 = idle). Visual only — drives a
+   *  group-Y offset in syncVisual, never touches velocity/position.y. */
+  private hopT = -1;
   state: DriveState = 'grip';
   lastWallHit = -1; // sim-time of last impact w/ feedback (walls + landings)
   lastWallImpact = 0; // 0..1 severity of the last impact (camera/audio scale)
@@ -440,20 +458,42 @@ export class Kart {
     this.spinUntil = 0;
     this.isSpinning = false;
     this.celebrating = false;
+    this.slipstreamT = 0;
+    this.draftT = 0;
+    this.draftsFired = 0;
+    this.draftLeader = null;
+    this.draftCdUntil = -1;
+    this.hopT = -1;
     this.trackIdx = -1; // teleported — re-anchor globally on next update
     this.syncVisual();
   }
 
-  update(dt: number, input: ControlState, track: Track, simTime: number): void {
+  update(
+    dt: number,
+    input: ControlState,
+    track: Track,
+    simTime: number,
+    traffic?: Kart[],
+  ): void {
     this.lastSimTime = simTime;
     this.isSpinning = simTime < this.spinUntil;
     if (this.trackIdx < 0) this.trackIdx = track.nearestIndex(this.position);
+    // Drift-entry hop: ticked up here so a mid-hop spin-out still lands
+    // (and squashes) instead of freezing the kart at apex.
+    if (this.hopT >= 0) {
+      this.hopT -= dt;
+      if (this.hopT < 0) {
+        this.impactSquash = Math.max(this.impactSquash, KART.driftHopSquash);
+      }
+    }
     // Spin-out (item hits): yaw whips freely, controls dead, velocity decays.
     if (this.isSpinning) {
       this.heading += 11 * dt;
       this.velocity.multiplyScalar(1 - Math.min(1, 3.2 * dt));
       this.driftDir = 0;
       this.driftCharge = 0;
+      this.slipstreamT = 0; // getting tagged kills the draft burst too
+      this.draftT = 0;
       this.position.addScaledVector(this.velocity, dt);
       this.trackIdx = track.constrain(this.position, this.trackIdx).index;
       const gy = track.heightAt(this.position, this.trackIdx);
@@ -470,14 +510,17 @@ export class Kart {
 
     // --- throttle / brake ---
     const boosting = this.boostTimer > 0;
+    const drafting = this.slipstreamT > 0; // wake-burst pays like a boost
     const topSpeed =
-      KART.maxSpeed * (1 + this.paceAssist) + (boosting ? KART.boostSpeed : 0);
+      KART.maxSpeed * (1 + this.paceAssist) +
+      (boosting ? KART.boostSpeed : 0) +
+      (drafting ? KART.draftBoostSpeed : 0);
     if (input.throttle > 0) {
       // Launch surge: extra kick off the line, tapering out by launchSpeed.
       const surge =
         fwdSpeed < KART.launchSpeed ? THREE.MathUtils.lerp(KART.launchMul, 1, fwdSpeed / KART.launchSpeed) : 1;
       const a =
-        (boosting ? KART.boostAccel : KART.accel) *
+        (boosting || drafting ? KART.boostAccel : KART.accel) *
         surge *
         (1 + this.paceAssist * 0.5);
       this.velocity.addScaledVector(fwd, a * input.throttle * dt);
@@ -508,6 +551,9 @@ export class Kart {
     if (!drifting && input.drift && input.steer !== 0 && fwdSpeed > KART.driftEnterSpeed) {
       this.driftDir = Math.sign(input.steer);
       this.driftCharge = 0;
+      // MK drift-entry hop: the kart visibly pops as the slide starts.
+      // Visual-only (hopT drives a group-Y offset in syncVisual).
+      if (this.grounded) this.hopT = KART.driftHopTime;
     }
     if (drifting) {
       // Sustain needs real forward speed (kills parking-lot donuts) and the
@@ -515,13 +561,23 @@ export class Kart {
       const canSustain = input.drift && fwdSpeed > KART.driftSustainSpeed;
       if (canSustain) {
         if (input.brake === 0 && fwdSpeed > KART.driftChargeSpeed && Math.abs(this.slipAngle) > 0.1) {
-          this.driftCharge = Math.min(this.driftCharge + dt, KART.driftChargeTier[1] + 0.3);
+          const top = KART.driftChargeTier[KART.driftChargeTier.length - 1];
+          this.driftCharge = Math.min(this.driftCharge + dt, top + 0.3);
         }
       } else {
-        // Release → mini-turbo if a tier was charged.
-        const tier = this.driftCharge >= KART.driftChargeTier[1] ? 1 : this.driftCharge >= KART.driftChargeTier[0] ? 0 : -1;
-        if (tier === 1) this.boostTimer = KART.boostTime[1];
-        else if (tier === 0) this.boostTimer = KART.boostTime[0];
+        // Release → mini-turbo for the highest tier charged (3 tiers:
+        // blue → orange → violet ultra, longest sweeper holds only).
+        const tiers = KART.driftChargeTier;
+        let tier = -1;
+        for (let t = tiers.length - 1; t >= 0; t--) {
+          if (this.driftCharge >= tiers[t]) {
+            tier = t;
+            break;
+          }
+        }
+        if (tier >= 0) {
+          this.boostTimer = Math.max(this.boostTimer, KART.boostTime[tier]);
+        }
         this.driftDir = 0;
         this.driftCharge = 0;
       }
@@ -737,11 +793,76 @@ export class Kart {
       this.vfx.spinStar(this.position, a + Math.PI);
     }
 
+    // --- slipstream/drafting ---
+    this.slipstreamT = Math.max(0, this.slipstreamT - dt);
+    this.updateDraft(dt, simTime, traffic);
+    if (this.slipstreamT > 0 && Math.random() < 40 * dt) {
+      // Wind streaks whipping past — pale puffs flung off the flanks.
+      // slipstreamT is the flag the VFX stream hooks real speed-lines onto.
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const p = this.position
+        .clone()
+        .addScaledVector(right2, side * 0.9)
+        .setY(this.position.y + 0.7);
+      this.vfx.dust(p, this.velocity, 0xdfeeff);
+    }
+
     this.syncVisual();
+  }
+
+  /** Slipstream (MK8 drafting): sustained time inside a leading kart's
+   *  wake cone charges a speed burst. The cone is measured in the LEADER's
+   *  frame — draftGapMin..draftGapMax metres behind their bumper, |lat|
+   *  within draftLat, both karts above draftMinSpeed running roughly the
+   *  same direction. A fired burst locks that pair out for draftCooldown
+   *  seconds; drafting a different leader stays legal. Breaking the cone
+   *  resets the charge outright. */
+  private updateDraft(dt: number, simTime: number, traffic?: Kart[]): void {
+    if (!traffic) {
+      this.draftT = 0;
+      return;
+    }
+    let leader: Kart | null = null;
+    if (this.forwardSpeed > KART.draftMinSpeed) {
+      _draftFwdA.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
+      for (const other of traffic) {
+        if (other === this || other.isSpinning) continue;
+        if (other.forwardSpeed < KART.draftMinSpeed) continue;
+        _draftFwdB.set(-Math.sin(other.heading), 0, -Math.cos(other.heading));
+        if (_draftFwdA.dot(_draftFwdB) < KART.draftHeadingCos) continue;
+        _draftRel.copy(this.position).sub(other.position).setY(0);
+        const gap = -_draftRel.dot(_draftFwdB);
+        if (gap < KART.draftGapMin || gap > KART.draftGapMax) continue;
+        const lat = _draftRel.x * -_draftFwdB.z + _draftRel.z * _draftFwdB.x; // · right(B)
+        if (Math.abs(lat) > KART.draftLat) continue;
+        if (other === this.draftLeader && simTime < this.draftCdUntil) continue;
+        leader = other;
+        break;
+      }
+    }
+    if (leader) {
+      this.draftT += dt;
+      if (this.draftT >= KART.draftTime) {
+        this.slipstreamT = KART.draftBoostTime;
+        this.draftsFired++;
+        this.draftLeader = leader;
+        this.draftCdUntil = simTime + KART.draftCooldown;
+        this.draftT = 0;
+      }
+    } else {
+      this.draftT = 0;
+    }
   }
 
   private syncVisual(): void {
     this.group.position.copy(this.position);
+    // Drift-entry hop: sin-arc lift of the whole kart (~0.3 m apex over
+    // driftHopTime). Purely visual — position.y/velocity are untouched;
+    // landing feeds the impact-squash channel for the settle.
+    if (this.hopT >= 0) {
+      const k = Math.min(1, 1 - this.hopT / KART.driftHopTime);
+      this.group.position.y += Math.sin(k * Math.PI) * KART.driftHopHeight;
+    }
     this.group.rotation.order = 'YXZ'; // yaw-dominant: pitch/roll after heading
     this.group.rotation.y = this.heading;
     // Pitch/roll the whole kart to the road grade — sells the elevation.

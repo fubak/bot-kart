@@ -22,6 +22,12 @@ const MISSILE_SPEED = 34; // m/s along track
 const MISSILE_RANGE = 90; // m travelled before fizzle
 const MISSILE_HIT = 2.4; // hit radius, m
 const MISSILE_SLOW = 0.25; // victim keeps this fraction of velocity
+// Item roulette: the HUD slot spins ~1.2 s before the rolled item lands
+// (genre signature — instant grants read as a bug to kart players).
+const ROULETTE_S = 1.2;
+const ROULETTE_TICK_MIN = 0.055; // fastest icon flip (s)
+const ROULETTE_TICK_MAX = 0.24; // slowest flip, just before landing
+const ITEM_KINDS: ItemKind[] = ['boost', 'missile', 'slick', 'shield', 'ink', 'swap'];
 
 interface Box {
   mesh: THREE.Mesh;
@@ -138,6 +144,14 @@ export class Items {
   readonly group = new THREE.Group();
   /** Item each kart currently holds, parallel to the karts list passed to update. */
   readonly held: (ItemKind | null)[] = [];
+  /** Roulette state per kart: >0 while the slot spins (item unusable).
+   *  `rouletteIcon` is the icon currently shown; `rouletteTick` increments
+   *  on every flip — the audio-tick hook the SFX stream observes. */
+  readonly rouletteT: number[] = [];
+  readonly rouletteIcon: (ItemKind | null)[] = [];
+  readonly rouletteTick: number[] = [];
+  private readonly rouletteItem: (ItemKind | null)[] = []; // rolled result
+  private readonly rouletteNextFlip: number[] = []; // sim-time of next icon flip
 
   private readonly boxes: Box[] = [];
   private readonly missiles: Missile[] = [];
@@ -159,6 +173,11 @@ export class Items {
     this.karts = karts;
     this.held = karts.map(() => null);
     for (let i = 0; i < karts.length; i++) {
+      this.rouletteT.push(0);
+      this.rouletteIcon.push(null);
+      this.rouletteTick.push(0);
+      this.rouletteItem.push(null);
+      this.rouletteNextFlip.push(0);
       this.shieldUntil.push(0);
       const bubble = new THREE.Mesh(shieldGeo, shieldMat);
       bubble.visible = false;
@@ -255,7 +274,9 @@ export class Items {
     }[],
   ): ItemKind | null {
     const item = this.held[kartIdx];
-    if (!item) return null;
+    // No fire mid-roulette — held stays null during the spin anyway, but
+    // the explicit guard documents that the slot is locked until it lands.
+    if (!item || this.rouletteT[kartIdx] > 0) return null;
     this.held[kartIdx] = null;
     const kart = this.karts[kartIdx];
     // The launch cue fires for every successful use — swap/ink that find no
@@ -364,10 +385,26 @@ export class Items {
     return item;
   }
 
+  /** What kart `k`'s HUD slot should display right now: the cycling
+   *  roulette icon while spinning, the landed item after. */
+  slotItem(k: number): ItemKind | null {
+    return this.rouletteT[k] > 0 ? this.rouletteIcon[k] : this.held[k];
+  }
+
+  /** True while kart `k`'s slot is mid-roulette (item not yet usable). */
+  slotSpinning(k: number): boolean {
+    return this.rouletteT[k] > 0;
+  }
+
   /** Clear all in-flight item state for a race restart/quit: held items,
    *  active missiles/slicks, shields; restores every box + pad. */
   reset(): void {
     this.held.fill(null);
+    this.rouletteT.fill(0);
+    this.rouletteIcon.fill(null);
+    this.rouletteTick.fill(0);
+    this.rouletteItem.fill(null);
+    this.rouletteNextFlip.fill(0);
     for (const b of this.boxes) {
       b.respawnAt = 0;
       b.mesh.visible = true;
@@ -393,18 +430,55 @@ export class Items {
       }
       if (!active) continue;
       for (let k = 0; k < this.karts.length; k++) {
-        if (this.held[k]) continue; // one item at a time
+        if (this.held[k] || this.rouletteT[k] > 0) continue; // slot busy
         const p = this.karts[k].position;
         const dx = p.x - b.pos.x;
         const dz = p.z - b.pos.z;
         if (dx * dx + dz * dz < BOX_RADIUS * BOX_RADIUS) {
-          this.held[k] = this.roll(k);
+          // Start the roulette: the item is rolled NOW (position-weighted
+          // at pickup) but doesn't land until the spin finishes — the HUD
+          // slot cycles icons and the item is unusable meanwhile.
+          this.rouletteItem[k] = this.roll(k);
+          this.rouletteT[k] = ROULETTE_S;
+          this.rouletteNextFlip[k] = simTime + ROULETTE_TICK_MIN;
+          this.rouletteIcon[k] =
+            ITEM_KINDS[(Math.random() * ITEM_KINDS.length) | 0];
+          this.rouletteTick[k] = 1;
           b.respawnAt = simTime + RESPAWN_S;
           b.mesh.visible = false;
           this.fx?.pickupSparkle(b.pos);
           this.audio?.itemPickup(this.volOf(this.karts[k]));
           break;
         }
+      }
+    }
+    // Roulettes tick: the slot icon flips fast then slows (quadratic ease)
+    // and the pre-rolled item lands when the spin expires.
+    for (let k = 0; k < this.karts.length; k++) {
+      if (this.rouletteT[k] <= 0) continue;
+      this.rouletteT[k] -= dt;
+      if (this.rouletteT[k] <= 0) {
+        this.held[k] = this.rouletteItem[k];
+        this.rouletteItem[k] = null;
+        this.rouletteIcon[k] = null;
+        this.rouletteT[k] = 0;
+        continue;
+      }
+      if (simTime >= this.rouletteNextFlip[k]) {
+        const progress = 1 - this.rouletteT[k] / ROULETTE_S;
+        const interval = THREE.MathUtils.lerp(
+          ROULETTE_TICK_MIN,
+          ROULETTE_TICK_MAX,
+          progress * progress,
+        );
+        this.rouletteNextFlip[k] = simTime + interval;
+        // Never show the same icon twice in a row — a real slot spin.
+        let icon = this.rouletteIcon[k];
+        while (icon === this.rouletteIcon[k]) {
+          icon = ITEM_KINDS[(Math.random() * ITEM_KINDS.length) | 0];
+        }
+        this.rouletteIcon[k] = icon;
+        this.rouletteTick[k]++;
       }
     }
     // Boost pads pulse — the arrows throb to read "drive over me".

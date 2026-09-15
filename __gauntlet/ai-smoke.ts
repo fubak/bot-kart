@@ -134,7 +134,9 @@ function runTraffic(simSeconds: number) {
   for (let i = 0; i < steps; i++) {
     for (let k = 0; k < 3; k++) {
       const cs = drivers[k].update(karts[k], track, dt, karts);
-      karts[k].update(dt, cs, track, simTime);
+      // Traffic array doubles as the slipstream field — drafting probes
+      // exercise the same code path the game loop uses.
+      karts[k].update(dt, cs, track, simTime, karts);
     }
     if (i === tailMark) {
       for (let k = 0; k < 3; k++) tailSnapshot[k].copy(karts[k].position);
