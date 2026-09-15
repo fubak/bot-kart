@@ -1,6 +1,7 @@
 import type { Race } from '../game/Race';
 import type { Kart } from '../game/Kart';
 import { BIND_ACTIONS, BIND_LABELS, bindings, keyName, padConnected } from './Input';
+import { HUD } from '../config/tuning';
 
 export interface OptionsState {
   open: boolean;
@@ -54,11 +55,40 @@ const ITEM_GLYPHS: Record<string, [string, string]> = {
   swap: ['⇄', '#7dff8a'],
 };
 
+// Racer display names — shared by the live standings ticker and the
+// results table (matches the minimap dot order).
+const RACER_NAMES = ['YOU', 'BOT-B', 'BOT-C', 'BOT-A2'];
+const RACER_DOTS = ['#ffffff', '#ff9040', '#c070ff', '#ffd454'];
+
+// Countdown lamp rig states — [fill, boxShadow] applied only when the
+// rig's lit-set key changes, never per frame.
+const LAMP_OFF: [string, string] = [
+  '#232833',
+  'inset 0 3px 8px rgba(0,0,0,.7)',
+];
+const LAMP_RED: [string, string] = [
+  '#ff3b30',
+  '0 0 22px 6px rgba(255,64,48,.6), inset 0 2px 6px rgba(255,255,255,.35)',
+];
+const LAMP_GREEN: [string, string] = [
+  '#35e65c',
+  '0 0 24px 7px rgba(60,255,110,.65), inset 0 2px 6px rgba(255,255,255,.35)',
+];
+
 export class RaceHud {
   private readonly center: HTMLDivElement;
   private readonly lapEl: HTMLDivElement;
   private readonly timesEl: HTMLDivElement;
   private readonly warnEl: HTMLDivElement;
+  private readonly lightsEl: HTMLDivElement;
+  private readonly bannerEl: HTMLDivElement;
+  private readonly standEl: HTMLDivElement;
+  private readonly lamps: HTMLDivElement[] = [];
+  // lapEl children — updated via textContent so the badge span's animated
+  // transform/color are never rebuilt mid-pulse.
+  private readonly lapGpEl: HTMLSpanElement;
+  private readonly lapTextEl: HTMLSpanElement;
+  private readonly posEl: HTMLSpanElement;
 
   constructor() {
     const mk = (css: string) => {
@@ -75,6 +105,17 @@ export class RaceHud {
     this.lapEl = mk(
       'top:14px;right:18px;font-size:30px;font-weight:800;color:#fff',
     );
+    // Position badge: pill treatment so a place swap reads at speed; the
+    // pop pulse animates this span's transform/color (inline-block is
+    // required for transform to apply).
+    this.lapGpEl = document.createElement('span');
+    this.lapTextEl = document.createElement('span');
+    this.posEl = document.createElement('span');
+    this.posEl.style.cssText =
+      'display:inline-block;margin-left:16px;padding:1px 12px;border-radius:9px;' +
+      'background:rgba(8,14,24,.62);border:1px solid rgba(140,190,255,.3);' +
+      'transform-origin:center';
+    this.lapEl.append(this.lapGpEl, this.lapTextEl, this.posEl);
     this.timesEl = mk(
       'top:56px;right:18px;font-size:15px;color:#dfeeff;text-align:right;line-height:1.6',
     );
@@ -96,6 +137,36 @@ export class RaceHud {
       'STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; S reverse';
     this.itemEl = mk(
       'bottom:24px;right:18px;font-size:22px;font-weight:800;color:#7be8ff',
+    );
+    // Countdown light rig — MK-style gantry above the big number: three
+    // lamps fill red in sequence (one per count) then all green on GO.
+    // Lamp styles are only touched when the lit-set key changes.
+    this.lightsEl = mk(
+      'top:15.5%;left:50%;transform:translateX(-50%);display:none;gap:18px;' +
+      'padding:12px 22px;background:rgba(8,12,20,.8);border-radius:999px;' +
+      'border:2px solid rgba(0,0,0,.6);box-shadow:0 4px 18px rgba(0,0,0,.5)',
+    );
+    for (let i = 0; i < 3; i++) {
+      const lamp = document.createElement('div');
+      lamp.style.cssText =
+        'width:46px;height:46px;border-radius:50%;border:3px solid rgba(0,0,0,.45);' +
+        `background:${LAMP_OFF[0]};box-shadow:${LAMP_OFF[1]}`;
+      this.lightsEl.appendChild(lamp);
+      this.lamps.push(lamp);
+    }
+    // FINAL LAP banner — gold flash as the last lap starts (~1.5 s).
+    this.bannerEl = mk(
+      'top:23%;left:50%;transform:translate(-50%,-50%);font-size:58px;' +
+      'font-weight:900;letter-spacing:.1em;color:#ffd454;display:none;' +
+      'white-space:nowrap;text-shadow:0 0 24px rgba(255,190,60,.5),0 3px 8px rgba(0,0,0,.7)',
+    );
+    this.bannerEl.textContent = 'FINAL LAP';
+    // Live standings ticker — quiet left-edge leaderboard; rebuilt ≤4 Hz
+    // and only when the rendered order string actually changes.
+    this.standEl = mk(
+      'top:14px;left:16px;font-size:13px;line-height:1.6;color:#c9d8ec;' +
+      'background:rgba(8,14,24,.55);padding:7px 11px;border-radius:8px;' +
+      'border:1px solid rgba(140,190,255,.18);display:none',
     );
     this.resultsEl = mk(
       'top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;' +
@@ -181,6 +252,35 @@ export class RaceHud {
   private readonly recordEl: HTMLDivElement;
   private resultsRenderedAt = -1;
   private titlePulseAt = 0;
+  // Position-pop tracker — same diff source as the audio stinger: seeded
+  // while not racing so the GO transition can't fire a phantom move.
+  private lastPos = -1;
+  private posPopAt = -10;
+  private posPopGain = false;
+  private posPopped = false; // pop styles currently applied — reset once
+  // FINAL LAP banner tracker.
+  private lastLapSeen = 1;
+  private finalLapAt = -10;
+  // Standings ticker: last simTime rebuild + last rendered HTML (DOM diff).
+  private standAt = -10;
+  private lastStand = '';
+  // Countdown rig: last applied lit-set key + last opacity string.
+  private lastLampKey = '';
+  private lastLampOp = '';
+  // innerHTML/textContent caches — update() runs per frame; only touched
+  // nodes whose content actually changed (no per-frame layout thrash).
+  private lastCenterTxt = '';
+  private lastGpTxt = '';
+  private lastLapTxt = '';
+  private lastPosTxt = '';
+  private tRace = -1;
+  private tLap = -1;
+  private tLast = -1;
+  private tBest = -1;
+  private lastStuckBind = '';
+  private liItem: string | null | undefined = undefined;
+  private liSpin = false;
+  private liBind = '';
 
   update(
     race: Race,
@@ -289,13 +389,36 @@ export class RaceHud {
         press.style.opacity = a.toFixed(2);
       }
       this.center.textContent = '';
-      this.lapEl.textContent = '';
+      this.lastCenterTxt = '';
+      this.lapGpEl.textContent = '';
+      this.lapTextEl.textContent = '';
+      this.posEl.textContent = '';
+      this.lastGpTxt = this.lastLapTxt = this.lastPosTxt = '';
       this.timesEl.innerHTML = '';
+      this.tRace = this.tLap = this.tLast = this.tBest = -1;
       this.itemEl.textContent = '';
+      this.liItem = undefined;
       this.warnEl.style.display = 'none';
       this.resultsEl.style.display = 'none';
       this.pauseEl.style.display = 'none';
       this.recordEl.style.display = 'none';
+      this.standEl.style.display = 'none';
+      this.lastStand = '';
+      this.lightsEl.style.display = 'none';
+      this.lastLampKey = '';
+      this.bannerEl.style.display = 'none';
+      // Seed pop/banner trackers so a restart or re-entry can't fire
+      // phantom cues (posPopAt already latched far in the past).
+      this.lastPos = -1;
+      this.lastLapSeen = 1;
+      this.finalLapAt = -10;
+      this.posPopAt = -10;
+      this.posPopped = false;
+      // Pop styles are inline — the early return skips the pop-reset
+      // branch, so clear them here or a quit mid-pop sticks (critic-proof).
+      this.posEl.style.transform = '';
+      this.posEl.style.color = '';
+      this.posEl.style.textShadow = '';
       // Ink overlay lives past this early return — quitting to title while
       // inked left it stuck 'block' over the menu (spotted post-critic11).
       this.inkEl.style.display = 'none';
@@ -307,18 +430,107 @@ export class RaceHud {
       paused && !opts?.open && race.phase !== 'finished' ? 'block' : 'none';
     const justFinished =
       race.phase === 'finished' && simTime - race.player.finishTime < 1.5;
-    this.center.textContent =
+    const centerTxt =
       race.phase === 'finished'
         ? justFinished
           ? 'FINISH'
           : ''
         : race.countdownLabel;
+    if (centerTxt !== this.lastCenterTxt) {
+      this.lastCenterTxt = centerTxt;
+      this.center.textContent = centerTxt;
+      // GO! reads green to match the lamp rig's green flash.
+      this.center.style.color = centerTxt === 'GO!' ? '#7dff8a' : '#fff';
+    }
     const pos = race.positionOf(0);
-    this.lapEl.textContent =
-      race.phase === 'countdown'
+    // Position-change pop: same diff source as the audio stinger — seed
+    // while not racing so the GO transition can't fire a phantom move.
+    if (race.phase !== 'racing') {
+      this.lastPos = pos;
+    } else if (pos !== this.lastPos) {
+      if (this.lastPos >= 1) {
+        this.posPopGain = pos < this.lastPos;
+        this.posPopAt = simTime;
+      }
+      this.lastPos = pos;
+    }
+    // Lap readout as three cached spans — countdown hides the cluster
+    // (matches the old empty-string behavior), otherwise GP prefix + LAP
+    // + the position badge.
+    const inCountdown = race.phase === 'countdown';
+    const gpTxt =
+      !inCountdown && gp?.mode && !gp.done
+        ? `GP ${gp.leg + 1}/${gp.total} · `
+        : '';
+    const lapTxt = inCountdown
+      ? ''
+      : `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}`;
+    const posTxt = inCountdown ? '' : `P${pos}/${race.racers.length}`;
+    if (gpTxt !== this.lastGpTxt) {
+      this.lastGpTxt = gpTxt;
+      this.lapGpEl.textContent = gpTxt;
+    }
+    if (lapTxt !== this.lastLapTxt) {
+      this.lastLapTxt = lapTxt;
+      this.lapTextEl.textContent = lapTxt;
+    }
+    if (posTxt !== this.lastPosTxt) {
+      this.lastPosTxt = posTxt;
+      this.posEl.textContent = posTxt;
+    }
+    // Pop pulse (~0.3 s): scale overshoot + green/red flash for a gained/
+    // lost place. Reduced motion keeps the informative color tag but
+    // drops the scale and glow.
+    const popT = (simTime - this.posPopAt) / HUD.posPopTime;
+    if (popT >= 0 && popT < 1) {
+      const rm = !!opts?.reducedMotion;
+      const c = this.posPopGain ? '#7dff8a' : '#ff5a3c';
+      this.posEl.style.transform = rm
         ? ''
-        : `${gp?.mode && !gp.done ? `GP ${gp.leg + 1}/${gp.total} · ` : ''}` +
-          `LAP ${Math.min(race.lap, race.totalLaps)}/${race.totalLaps}   P${pos}/${race.racers.length}`;
+        : `scale(${(1 + 0.45 * Math.sin(Math.PI * popT)).toFixed(3)})`;
+      this.posEl.style.color = c;
+      this.posEl.style.textShadow = rm
+        ? ''
+        : `0 0 ${(16 * (1 - popT)).toFixed(0)}px ${
+            this.posPopGain ? 'rgba(125,255,138,.85)' : 'rgba(255,90,60,.85)'
+          }`;
+      this.posPopped = true;
+    } else if (this.posPopped) {
+      this.posPopped = false;
+      this.posEl.style.transform = '';
+      this.posEl.style.color = '';
+      this.posEl.style.textShadow = '';
+    }
+
+    // FINAL LAP banner — fires the frame the player's lap counter reaches
+    // the last lap (pairs with the audio finalLap flourish, same diff).
+    if (
+      race.phase === 'racing' &&
+      race.lap === race.totalLaps &&
+      race.lap !== this.lastLapSeen
+    ) {
+      this.finalLapAt = simTime;
+    }
+    this.lastLapSeen = race.lap;
+    const bannerT = simTime - this.finalLapAt;
+    if (
+      race.phase === 'racing' &&
+      bannerT >= 0 &&
+      bannerT < HUD.finalLapTime &&
+      !paused &&
+      !opts?.open
+    ) {
+      const rm = !!opts?.reducedMotion;
+      const aIn = Math.min(1, bannerT / 0.16);
+      const aOut = Math.min(1, (HUD.finalLapTime - bannerT) / 0.4);
+      const sc = rm ? 1 : 0.72 + 0.28 * (1 - (1 - aIn) * (1 - aIn));
+      this.bannerEl.style.display = 'block';
+      this.bannerEl.style.opacity = Math.min(aIn, aOut).toFixed(2);
+      this.bannerEl.style.transform =
+        `translate(-50%,-50%) scale(${sc.toFixed(3)})`;
+    } else {
+      this.bannerEl.style.display = 'none';
+    }
 
     const cur =
       race.phase === 'finished'
@@ -326,18 +538,34 @@ export class RaceHud {
         : race.phase === 'racing'
           ? simTime - race.lapStart
           : 0;
-    this.timesEl.innerHTML =
-      `TIME ${fmt(race.raceTime)}<br>` +
-      `LAP&nbsp;&nbsp;${fmt(cur)}<br>` +
-      `LAST&nbsp;${fmt(race.lastLapTime)}<br>` +
-      `BEST&nbsp;${fmt(race.bestLapTime)}`;
+    // Race clock: rebuild only on a numeric change — during countdown and
+    // post-finish the values are static, so this skips most frames.
+    if (
+      race.raceTime !== this.tRace ||
+      cur !== this.tLap ||
+      race.lastLapTime !== this.tLast ||
+      race.bestLapTime !== this.tBest
+    ) {
+      this.tRace = race.raceTime;
+      this.tLap = cur;
+      this.tLast = race.lastLapTime;
+      this.tBest = race.bestLapTime;
+      this.timesEl.innerHTML =
+        `TIME ${fmt(race.raceTime)}<br>` +
+        `LAP&nbsp;&nbsp;${fmt(cur)}<br>` +
+        `LAST&nbsp;${fmt(race.lastLapTime)}<br>` +
+        `BEST&nbsp;${fmt(race.bestLapTime)}`;
+    }
 
     this.warnEl.style.display =
       !paused && race.wrongWay && race.phase === 'racing' ? 'block' : 'none';
     // Hint text follows the live bindings — a remapped brake key must not
     // leave the hint telling the player to hold S (critic4).
-    this.stuckEl.innerHTML =
-      `STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; ${keyName(bindings.brake)} reverse`;
+    if (bindings.brake !== this.lastStuckBind) {
+      this.lastStuckBind = bindings.brake;
+      this.stuckEl.innerHTML =
+        `STUCK? &nbsp;⌫ respawn &nbsp;·&nbsp; ${keyName(bindings.brake)} reverse`;
+    }
     this.stuckEl.style.display =
       !paused && stuckHint && race.phase === 'racing' ? 'block' : 'none';
     this.recordEl.style.display =
@@ -346,16 +574,100 @@ export class RaceHud {
     // While the roulette spins the slot cycles icons without the use-key
     // hint (the item isn't usable until it lands).
     if (race.phase === 'racing' && heldItem) {
-      const [glyph, color] = ITEM_GLYPHS[heldItem] ?? ['●', '#fff'];
-      this.itemEl.innerHTML = itemSpinning
-        ? `<span style="color:${color};font-size:26px">${glyph}</span> ` +
-          `<span style="color:#8fa4c0">${heldItem.toUpperCase()}</span> ` +
-          `<span style="color:#5a6a80;font-size:14px">···</span>`
-        : `<span style="color:${color};font-size:26px">${glyph}</span> ` +
-          `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">` +
-          `[${keyName(bindings.item)}]</span>`;
-    } else {
+      if (
+        heldItem !== this.liItem ||
+        itemSpinning !== this.liSpin ||
+        bindings.item !== this.liBind
+      ) {
+        this.liItem = heldItem;
+        this.liSpin = itemSpinning;
+        this.liBind = bindings.item;
+        const [glyph, color] = ITEM_GLYPHS[heldItem] ?? ['●', '#fff'];
+        this.itemEl.innerHTML = itemSpinning
+          ? `<span style="color:${color};font-size:26px">${glyph}</span> ` +
+            `<span style="color:#8fa4c0">${heldItem.toUpperCase()}</span> ` +
+            `<span style="color:#5a6a80;font-size:14px">···</span>`
+          : `<span style="color:${color};font-size:26px">${glyph}</span> ` +
+            `${heldItem.toUpperCase()} <span style="color:#9fb4d0;font-size:14px">` +
+            `[${keyName(bindings.item)}]</span>`;
+      }
+    } else if (this.liItem !== null) {
+      this.liItem = null;
       this.itemEl.textContent = '';
+    }
+
+    // Live standings ticker — MK8's left-edge mini leaderboard. Rebuilt
+    // at ~4 Hz and only when the rendered order string actually changes,
+    // so steady-state frames cost two comparisons and no DOM work.
+    const showStand =
+      (race.phase === 'racing' || race.phase === 'countdown') &&
+      !paused &&
+      !opts?.open;
+    this.standEl.style.display = showStand ? 'block' : 'none';
+    if (showStand && simTime - this.standAt >= HUD.standingsTick) {
+      this.standAt = simTime;
+      const order = [...race.racers.keys()].sort(
+        (a, b) => race.positionOf(a) - race.positionOf(b) || a - b,
+      );
+      const html = order
+        .map((r) => {
+          const me = r === 0;
+          const dot = RACER_DOTS[r] ?? '#ff6080';
+          return (
+            `<div style="white-space:nowrap;${
+              me ? 'color:#7be8ff;font-weight:800' : ''
+            }">` +
+            `${me ? '▸' : '&nbsp;'} <span style="color:${dot}">●</span> ` +
+            `P${race.positionOf(r)} ${RACER_NAMES[r] ?? 'BOT-' + r}</div>`
+          );
+        })
+        .join('');
+      if (html !== this.lastStand) {
+        this.lastStand = html;
+        this.standEl.innerHTML = html;
+      }
+    }
+
+    // Countdown light rig — lamp n fills red on each count (the same ceil
+    // boundary the audio beeps on), all green through the GO flash, then
+    // the rig fades out over HUD.goFade. Opacity is a per-frame style
+    // write only while the rig is up; lamp fills only on a key change.
+    let lampKey = '';
+    let lampOp = -1;
+    if (race.phase === 'countdown') {
+      lampKey =
+        'r' + Math.min(3, Math.max(0, 4 - Math.ceil(race.countdownLeft)));
+    } else if (race.phase === 'racing' && race.goFlash > 0) {
+      lampKey = 'go';
+      lampOp = Math.min(1, race.goFlash / HUD.goFade);
+    }
+    if (lampKey) {
+      this.lightsEl.style.display = 'flex';
+      if (lampKey !== this.lastLampKey) {
+        this.lastLampKey = lampKey;
+        if (lampKey === 'go') {
+          for (const l of this.lamps) {
+            l.style.background = LAMP_GREEN[0];
+            l.style.boxShadow = LAMP_GREEN[1];
+          }
+        } else {
+          const lit = +lampKey[1];
+          for (let i = 0; i < 3; i++) {
+            const [bg, sh] = i < lit ? LAMP_RED : LAMP_OFF;
+            this.lamps[i].style.background = bg;
+            this.lamps[i].style.boxShadow = sh;
+          }
+        }
+      }
+      const op = lampOp < 0 ? '1' : lampOp.toFixed(2);
+      if (op !== this.lastLampOp) {
+        this.lastLampOp = op;
+        this.lightsEl.style.opacity = op;
+      }
+    } else {
+      this.lightsEl.style.display = 'none';
+      this.lastLampKey = '';
+      this.lastLampOp = '';
     }
 
     // Results table: re-renders at 2 Hz while finished so late finishers
@@ -368,7 +680,7 @@ export class RaceHud {
         const order = [...race.racers.keys()].sort(
           (a, b) => race.positionOf(a) - race.positionOf(b),
         );
-        const names = ['YOU', 'BOT-B', 'BOT-C', 'BOT-A2'];
+        const names = RACER_NAMES;
         // Grand Prix final leg: rank by cup points, crown the champion.
         const gpFinal = gp?.mode && gp.done;
         const dispOrder = gpFinal

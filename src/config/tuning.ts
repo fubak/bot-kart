@@ -135,6 +135,16 @@ export const RACE = {
   countdown: 3.0, // seconds of input-locked 3-2-1 before GO
 } as const;
 
+// Race HUD presentation (src/core/RaceHud.ts) — DOM-overlay animation
+// timings. All values in seconds on the fixed-timestep sim clock, so
+// pausing freezes every pulse/fade mid-flight.
+export const HUD = {
+  posPopTime: 0.3, // position-badge scale/color pulse on a place swap
+  finalLapTime: 1.5, // FINAL LAP banner: in ~0.16s, hold, out last ~0.4s
+  standingsTick: 0.25, // live-standings rebuild interval (~4 Hz)
+  goFade: 0.6, // countdown rig fade-out while the green GO lamps hold
+} as const;
+
 // Set dressing (src/game/Props.ts, driven from Track.ts) — per-theme scatter
 // density and the lateral band props live in. Everything is instanced;
 // counts below are per-track instance targets, tuned to ~2-3× the wave-6
