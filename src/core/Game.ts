@@ -417,13 +417,23 @@ export class Game {
       }
       // Respawn (Backspace): lakitu-style reset onto the racing line at the
       // nearest sample — recovers wall-pinned karts (critic D3).
+      // Results-screen aliases so a gamepad can drive it: pad A→Enter
+      // becomes the primary action (N = advance mid-cup, R = restart
+      // otherwise) and pad B→Escape quits like Q. Before this, no pad
+      // button could produce N/R/Q — pad players were trapped on every
+      // results screen (critic18 MED).
+      let code = e.code;
+      if (this.race.phase === 'finished') {
+        if (code === 'Enter') code = this.gpMode && !this.gpDone ? 'KeyN' : 'KeyR';
+        else if (code === 'Escape') code = 'KeyQ';
+      }
       if (e.code === 'Backspace' && this.race.phase === 'racing' && !this.paused) {
         const i = this.track.nearestIndexNear(this.kart.position, this.kart.trackIdx);
         const t = this.track.tangentAt(i);
         this.kart.reset(this.track.pointAt(i), Math.atan2(-t.x, -t.z));
       }
       // Quit to title (Q): regrid + title phase, no reload needed (D3).
-      if (e.code === 'KeyQ') {
+      if (code === 'KeyQ') {
         this.audio.uiBack();
         this.restartRace('title');
       }
@@ -431,7 +441,7 @@ export class Game {
       // loads the next circuit (last leg → final standings shown). Gated
       // on !paused — an advance under the PAUSED overlay carried it into
       // the next leg (critic D3: countdown froze behind PAUSED).
-      if (e.code === 'KeyN' && this.gpMode && this.race.phase === 'finished' && !this.gpDone && !this.paused) {
+      if (code === 'KeyN' && this.gpMode && this.race.phase === 'finished' && !this.gpDone && !this.paused) {
         const order = [...this.race.racers.keys()].sort(
           (a, b) => this.race.positionOf(a) - this.race.positionOf(b),
         );
@@ -454,7 +464,7 @@ export class Game {
         }
         this.paused = false; // a phase transition never carries pause over
       }
-      if (e.code === 'KeyR') {
+      if (code === 'KeyR') {
         if (this.gpDone) {
           // Final standings: restart = a fresh cup from leg 1 — replaying
           // a phantom "leg 4" kept the old points frozen on screen.
@@ -479,13 +489,20 @@ export class Game {
     this.postfx = new PostFX(this.renderer, this.scene, this.chaseCam.camera);
     this.hud = new DebugHud(this.renderer);
     // Apply persisted settings to live systems (loaded pre-buildWorld).
+    // The volume setters are guarded no-ops until unlock() builds the
+    // gain nodes — so they're re-applied on every unlock below (critic18:
+    // a persisted mute was ignored, unlock() hardcoded 0.55/0.8).
     this.audio.setMasterVolume(this.settings.masterVol);
     this.audio.setMusicVolume(this.settings.musicVol);
     this.chaseCam.reducedMotion = this.settings.reducedMotion;
 
     initInput();
     // AudioContext unlocks on first trusted gesture.
-    const unlock = () => this.audio.unlock();
+    const unlock = () => {
+      this.audio.unlock();
+      this.audio.setMasterVolume(this.settings.masterVol);
+      this.audio.setMusicVolume(this.settings.musicVol);
+    };
     window.addEventListener('keydown', unlock, { once: false });
     window.addEventListener('pointerdown', unlock, { once: false });
     window.addEventListener('resize', () => {

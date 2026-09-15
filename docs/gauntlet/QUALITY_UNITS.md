@@ -1004,3 +1004,22 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   unreachable without a contrived same-tick finish.
 - **Verified:** typecheck+build clean; smoke unaffected (resync path
   only reachable via swap/debug).
+
+### FIX-009 — Critic-18 defect batch (wave 18)
+
+- **Domain:** Audio / input / items
+- **Status:** Integrated
+- **Evidence:** `wave18/CRITIC18_REPORT.md` (7.6/10, 2M/1L).
+- **MED — persisted volume honored on unlock:** the options volume
+  setters ran before `unlock()` built the gain nodes (guarded no-ops),
+  then unlock hardcoded 0.55/0.8 — a persisted mute got full audio
+  every launch. Volumes now re-apply inside the unlock listener.
+- **MED — gamepad results dead-end:** no pad button could produce
+  N/R/Q and A(Enter)/B(Escape)/Start(P) were all gated no-ops on
+  'finished'. Results now alias Enter→primary action (N mid-cup,
+  R otherwise) and Escape→Q — pad A advances/restarts, pad B quits.
+- **LOW — post-finish swap neutralized:** finished racers are skipped
+  in swap targeting (frozen score read "ahead" but the victim's result
+  was locked — asymmetric free advancement for the swapper).
+- **Verified:** Enter on results → countdown (restart path); build
+  clean; smoke unaffected.

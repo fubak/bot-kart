@@ -249,7 +249,10 @@ export class Items {
     kartIdx: number,
     simTime: number,
     scores?: number[],
-    racers?: { resync(pos: THREE.Vector3, hint?: number): void }[],
+    racers?: {
+      resync(pos: THREE.Vector3, hint?: number): void;
+      finished?: boolean;
+    }[],
   ): ItemKind | null {
     const item = this.held[kartIdx];
     if (!item) return null;
@@ -266,6 +269,11 @@ export class Items {
       let target = -1;
       let bestGap = Infinity;
       for (let k = 0; k < this.karts.length; k++) {
+        // Finished racers aren't valid swap targets: their frozen score
+        // still reads "ahead" but their result is locked — the exchange
+        // costs them nothing while the swapper banks a near-free lap of
+        // advancement (critic18). Only swap with racers still racing.
+        if (racers?.[k]?.finished) continue;
         const gap = sc[k] - sc[kartIdx];
         if (k !== kartIdx && gap > 0 && gap < bestGap) {
           bestGap = gap;
