@@ -127,8 +127,14 @@ export class RacerProgress {
    *  onto a parallel foldback leg with a permanent wrongWay flap
    *  (critic6 D8). Keeps lap/history; rebinds position bookkeeping to
    *  where the kart actually is: progress follows the teleport (score
-   *  drops when sent backward — the swap really exchanges places) and
-   *  the gate mask resets so forward teleports can't skip gates. */
+   *  drops when sent backward — the swap really exchanges places).
+   *  Gate mask: mid-lap gates BEHIND the new index count as satisfied —
+   *  the swap is a sanctioned item, so the exchanged position is
+   *  legitimate (critic14 MED: mask=0 scheduled behind-gates for NEXT
+   *  lap, so fullMask could never fill on the swap lap and the line
+   *  crossing was silently denied — a backward swap stole ~a whole lap).
+   *  Gates ahead of i still must be driven: a backward-swapped kart
+   *  re-earns the gates it was placed in front of. */
   resync(pos: THREE.Vector3, hint = -1): void {
     const n = this.track.sampleCount;
     // Prefer the kart's own continuity hint (swap exchanges trackIdx too)
@@ -137,7 +143,11 @@ export class RacerProgress {
       hint >= 0 ? this.track.nearestIndexNear(pos, hint) : this.track.nearestIndex(pos);
     this.lastIdx = i;
     this.progressIdx = (this.lap - 1) * n + i;
+    const lineGate = this.gates.length - 1;
     this.mask = 0;
+    for (let k = 0; k < lineGate; k++) {
+      if (this.gates[k] <= i) this.mask |= 1 << k;
+    }
     this.nextCross = this.gates.map((g) =>
       g > i ? g + (this.lap - 1) * n : g + this.lap * n,
     );

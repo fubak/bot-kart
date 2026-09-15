@@ -912,3 +912,25 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Verified:** smoke exact ×3 (PG 22.69/19.22/18.12, SR
   26.42/22.46/21.62, NN 25.54/21.61/20.90, 0 hits, stalled 0);
   typecheck+build clean; console 0E/0W.
+
+### FIX-005 — Critic-14 defect batch (wave 14)
+
+- **Domain:** Race rules / GPU hygiene / HUD
+- **Status:** Integrated
+- **Evidence:** `wave14/CRITIC14_REPORT.md` (7.8/10, 1M/5L).
+- **MED — swap lap-theft FIXED:** `resync()` wiped the gate mask and
+  scheduled behind-gates for NEXT lap, so `fullMask` could never fill
+  on the swap lap and the line crossing was silently denied (~1.4
+  physical laps per counted lap; a final-lap swap could deny a finish).
+  Now mid-lap gates behind the teleported index count as satisfied —
+  the sanctioned swap grants the section; a backward-swapped kart still
+  re-earns gates ahead of its new spot. Verified live: resync at idx
+  307→mask 0b11→lap counts on the crossing; backward resync at
+  205→mask 0b1→lap counts after re-driving the mid section.
+- **LOWs fixed:** respawn now clears spinUntil/isSpinning (was
+  respawned mid-spin, controls dead); final standings render P# for
+  never-finished rows (was '…'); Track.dispose() now disposes every
+  texture slot + non-Mesh materials — GPU textures 39→36 across 6
+  rebuilds (was +11–18 per rebuild).
+- **Verified:** NN smoke exact (25.54/21.61/20.90, stalled 0);
+  typecheck+build clean.

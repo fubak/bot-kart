@@ -307,12 +307,26 @@ export class Track {
   }
 
   // Free GPU resources when the world is rebuilt (track select).
+  // material.dispose() alone leaves textures resident — ~11–18 leaked
+  // per rebuild (critic14). Dispose every texture slot; a shared map
+  // simply re-uploads on its next use, so this is safe for imports.
   dispose(): void {
+    const TEX_SLOTS = [
+      'map', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'normalMap',
+      'bumpMap', 'aoMap', 'alphaMap', 'specularMap', 'envMap', 'lightMap',
+    ] as const;
     this.group.traverse((o) => {
-      if (o instanceof THREE.Mesh) {
-        o.geometry.dispose();
-        const m = o.material;
-        for (const mm of Array.isArray(m) ? m : [m]) mm.dispose();
+      const withGeo = o as THREE.Mesh;
+      if (withGeo.geometry && withGeo.geometry.dispose) withGeo.geometry.dispose();
+      const m = (o as unknown as { material?: THREE.Material | THREE.Material[] })
+        .material;
+      if (!m) return;
+      for (const mm of Array.isArray(m) ? m : [m]) {
+        for (const slot of TEX_SLOTS) {
+          const t = (mm as unknown as Record<string, THREE.Texture | null>)[slot];
+          if (t && t.isTexture) t.dispose();
+        }
+        mm.dispose();
       }
     });
   }

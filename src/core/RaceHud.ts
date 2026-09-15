@@ -375,7 +375,7 @@ export class RaceHud {
             // to print a concrete "P#  +N → M pts" off live score order,
             // then the racer's real finish reordered it — the displayed
             // delta contradicted what the N-press actually awarded.
-            const pos = rr.finished ? `P${i + 1}` : '…';
+            const pos = rr.finished || gpFinal ? `P${i + 1}` : '…';
             const time = rr.finished ? fmt(rr.finishTime - race.raceStart) : '…';
             const best =
               fmt(rr.bestLapTime) +

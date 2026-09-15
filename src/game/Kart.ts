@@ -437,6 +437,8 @@ export class Kart {
     this.paceAssist = 0;
     this.inkedUntil = 0;
     this.inked = false;
+    this.spinUntil = 0;
+    this.isSpinning = false;
     this.celebrating = false;
     this.trackIdx = -1; // teleported — re-anchor globally on next update
     this.syncVisual();
