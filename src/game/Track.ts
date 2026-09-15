@@ -194,9 +194,11 @@ export const TRACKS: readonly TrackLayout[] = [
       hemiSky: 0x4a5e92,
       hemiGround: 0x2a3828,
       hemiIntensity: 1.35,
-      // Night sky: near-black zenith, teal glow at the horizon, full stars.
-      skyTop: 0x060a18,
-      skyHorizon: 0x1e3450,
+      // Night sky: deep-indigo zenith (post-square ≈0x080f21 — the old
+      // 0x060a18 squared to near-void, and 30-40% of NN frames read as
+      // black sky, critic11), teal glow at the horizon, full stars.
+      skyTop: 0x2c3e5c,
+      skyHorizon: 0x2a4a6e,
       cloud: 0x2e3c58,
       mountain: 0x101828,
       stars: 1,
@@ -970,12 +972,13 @@ export class Track {
     const banner = new THREE.Mesh(
       new THREE.BoxGeometry(hw * 1.2, 1.0, 0.1),
       // emissiveMap reuses the checker at low gain — the back/underside
-      // stops reading as a dark quad against the sky at night (critic10).
+      // stops reading as a dark quad against the sky at night (critic10;
+      // 0.22 was still dim edge-on at grazing title angles — critic11).
       new THREE.MeshStandardMaterial({
         map: bannerTex,
         emissiveMap: bannerTex,
         emissive: 0xffffff,
-        emissiveIntensity: 0.22,
+        emissiveIntensity: 0.34,
         roughness: 0.7,
       }),
     );

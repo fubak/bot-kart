@@ -97,12 +97,19 @@ export class Music {
   private theme: MusicTheme = THEMES[0];
   /** QA introspection — which TRACKS-index groove is armed. */
   themeIdx = 0;
+  // Cached hat noise buffer — a fresh AudioBuffer per 8th-note was ~8
+  // allocs/s of GC churn for nothing (critic11 LOW).
+  private hatBuf: AudioBuffer | null = null;
 
   attach(ctx: AudioContext, master: GainNode): void {
     this.ctx = ctx;
     this.out = ctx.createGain();
     this.out.gain.value = 0.16;
     this.out.connect(master);
+    const len = Math.floor(ctx.sampleRate * 0.04);
+    this.hatBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = this.hatBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
   }
 
   start(): void {
@@ -186,11 +193,7 @@ export class Music {
   private hat(t: number): void {
     const ctx = this.ctx!;
     const n = ctx.createBufferSource();
-    const len = Math.floor(ctx.sampleRate * 0.04);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    n.buffer = buf;
+    n.buffer = this.hatBuf;
     const f = ctx.createBiquadFilter();
     f.type = 'highpass';
     f.frequency.value = this.theme.hatFreq;

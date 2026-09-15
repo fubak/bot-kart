@@ -283,6 +283,9 @@ export class RaceHud {
       this.resultsEl.style.display = 'none';
       this.pauseEl.style.display = 'none';
       this.recordEl.style.display = 'none';
+      // Ink overlay lives past this early return — quitting to title while
+      // inked left it stuck 'block' over the menu (spotted post-critic11).
+      this.inkEl.style.display = 'none';
       return;
     }
     // PAUSED hides under the options panel and under the results table —

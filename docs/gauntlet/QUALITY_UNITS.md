@@ -867,3 +867,24 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
   frozen. Existing coverage confirmed complete: slope pitch/roll, slip
   lean, impact+landing squash, pedal work, celebrations, spin flail,
   blink, idle bob, gravel jitter, airborne tilt.
+
+### FIX-003 — Critic-11 defect batch (wave 11)
+
+- **Domain:** Whole-game
+- **Status:** Integrated
+- **Evidence:** `wave11/CRITIC11_REPORT.md` (7.5/10, 0H/2M/4L) +
+  `wave11/c11b-*.png`, `int-c11-*.png`.
+- **Fixed + verified:** dead-stop wall pin — `pivotSteer` player-only
+  flag + standstill pivot (0.4 authority under steerMinSpeed with drive
+  input; AI launch lines unaffected — first pass gave bots pivot and
+  drifted NN top bot +0.04 s, re-gated); AI wall-grind cycles — 4 s
+  careful-mode (85% pace) after wedge-escape/lakitu so re-entry
+  survives the next hairpin; NN sky lifted (0x2c3e5c/0x2a4a6e — deep
+  indigo post-square vs near-void); hat() per-note AudioBuffer alloc
+  → cached; banner emissiveMap 0.22→0.34; ink overlay stuck 'block'
+  after quit-while-inked (title early-return skipped the hide —
+  found in coordinator verification).
+- **Verified:** pivot live-probed (1.39 rad yaw @0 speed, player-only);
+  smoke identical ×3 after re-gate; typecheck+build clean.
+- **Remaining LOWs (accepted):** orange AI kart detail; SR strata
+  wedge residual.

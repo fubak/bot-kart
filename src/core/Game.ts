@@ -249,6 +249,7 @@ export class Game {
 
     // Build the kart field once (karts persist across track swaps — only
     // the world geometry/race/items/minimap are rebuilt by buildWorld).
+    this.kart.pivotSteer = true; // player gets standstill pivot (critic11)
     this.scene.add(this.kart.group, this.fx.object, this.sky.group);
     const tints = [0xff9040, 0xc070ff, 0xffd454]; // orange / violet / yellow rivals
     const bots = [botBUrl, botCUrl, undefined]; // Bot B heavy, Bot C speed, Bot A

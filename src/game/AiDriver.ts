@@ -45,6 +45,13 @@ export class AiDriver {
   private progAccum = 0; // net forward index travel (teleports skipped)
   private progMark = 0; // accum value at the last window boundary
   private progWindow = 0; // seconds into the current window
+  // Careful mode (critic11 D2): bots that escape a wedge/grind used to
+  // charge straight back to full pursuit speed and re-grind the NEXT
+  // hairpin — SR descents showed ~10% of samples <0.5 m/s in perpetual
+  // stall→recover cycles. After any ladder escape or lakitu, run a few
+  // seconds at reduced corner-entry pace so the re-entry is survivable.
+  // Never arms on a clean run → solo smoke baselines untouched.
+  private carefulTime = 0;
   // Wedge state: anchored once stuckTime trips; wedgeTime then runs on
   // wall-clock (not the displacement counter) so the reverse→forward
   // limit cycle can't reset the ladder — it only clears on a real
@@ -86,6 +93,7 @@ export class AiDriver {
     this.progAccum = 0;
     this.progMark = 0;
     this.progWindow = 0;
+    this.carefulTime = 0;
   }
 
   update(kart: Kart, track: Track, dt: number, traffic?: Kart[]): ControlState {
@@ -192,6 +200,7 @@ export class AiDriver {
         this.wedgeTime = -1;
         this.stuckTime = 0;
         this.grindTime = 0;
+        this.carefulTime = 4; // escaped — re-enter at reduced pace
       } else {
         const desired = Math.atan2(-tanNow.x, -tanNow.z);
         const err = wrapAngle(desired - kart.heading);
@@ -203,6 +212,7 @@ export class AiDriver {
           this.stuckTime = 0;
           this.wedgeTime = -1;
           this.recovering = false;
+          this.carefulTime = 4; // lakitu — re-enter at reduced pace
           return idle;
         }
         if (this.wedgeTime > 3) {
@@ -317,6 +327,11 @@ export class AiDriver {
       targetSpeed * this.skill,
       KART.maxSpeed * (1 + kart.paceAssist),
     );
+    // Careful mode: post-wedge/lakitu re-entry at 85% pace — arrives at
+    // the next hairpin slow enough to hold the line instead of grinding
+    // straight back onto it (critic11 D2).
+    this.carefulTime = Math.max(0, this.carefulTime - dt);
+    if (this.carefulTime > 0) targetSpeed *= 0.85;
 
     let throttle = 0;
     let brake = 0;

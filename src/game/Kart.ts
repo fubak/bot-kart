@@ -60,6 +60,11 @@ export class Kart {
   /** Spin-out state (item hits): yaw spins freely, controls dead, until this
    *  sim-time. Set by Items on missile/slick hits. */
   spinUntil = -1;
+  /** Player-only standstill pivot authority (critic11 dead-stop pin): AI
+   *  keeps its own wedge/recovery ladder, and giving bots launch-phase
+   *  pivot yaw nudged the NN top bot's line +0.04 s off the smoke
+   *  baseline — defaults off; Game arms it on the player kart. */
+  pivotSteer = false;
   private lastSimTime = 0;
   private readonly driver = new THREE.Group();
   private readonly driverPhase = Math.random() * Math.PI * 2;
@@ -533,15 +538,27 @@ export class Kart {
     this.steerSmooth += THREE.MathUtils.clamp(
       slewTarget - this.steerSmooth, -slewRate * dt, slewRate * dt,
     );
-    // Full effect up to steerFullSpeed, gentle fade above, none when parked.
+    // Full effect up to steerFullSpeed, gentle fade above. Parked used to
+    // mean zero authority (critic11 dead-stop pin): a kart nose-in at a
+    // wall could not turn at all — only S-reverse or ⌫ escaped. While the
+    // driver is applying drive input at near-zero speed, allow a slow
+    // pivot in place so a pin is escapable with W+steer (the normal kart
+    // move). Doesn't touch the speed range the smoke lines live in.
     const speedAbs = Math.abs(fwdSpeed);
     const speedFactor =
       THREE.MathUtils.smoothstep(speedAbs, KART.steerMinSpeed, KART.steerFullSpeed) *
       (1 - 0.35 * THREE.MathUtils.clamp(speedAbs / KART.maxSpeed, 0, 1));
+    const pivot =
+      this.pivotSteer &&
+      speedAbs < KART.steerMinSpeed &&
+      Math.abs(input.throttle) + Math.abs(input.brake) > 0.1
+        ? 0.4
+        : 0;
+    const steerAuthority = Math.max(speedFactor, pivot);
     const steerMul = drifting ? KART.driftSteerMul : 1;
     // Reverse steering when going backward.
     const dirSign = fwdSpeed >= 0 ? 1 : -1;
-    const yawDelta = -this.steerSmooth * KART.steerRate * steerMul * speedFactor * dirSign * dt;
+    const yawDelta = -this.steerSmooth * KART.steerRate * steerMul * steerAuthority * dirSign * dt;
     this.heading += yawDelta;
     // Drift arc model: the velocity vector follows a fraction of the yaw —
     // the kart carves a widening arc instead of spinning through its own
