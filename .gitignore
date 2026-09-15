@@ -47,3 +47,4 @@ nul
 #   .devin/                 (Devin project config)
 #   assets/blender/**/*.blend   (editable 3D source)
 #   assets/media/prompts/   (prompt provenance)
+__gauntlet/.chrome-profile/

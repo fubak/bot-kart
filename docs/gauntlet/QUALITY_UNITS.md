@@ -832,3 +832,26 @@ Performance, Loading, Automated QA, Visual regression, Whole-game cohesion.
 - **Remaining accepted nits:** banner underside dark edge-on;
   head still bright-ish at some NN angles; far item boxes read bright;
   kerb-beaching is mostly autopilot limitation; orange kart detail.
+
+### AUDIO-001 — Audio depth (wave 10)
+
+- **Domain:** Audio/Game
+- **Status:** Integrated
+- **Evidence:** `wave10/audio-*.png` + `int-audio-nn.png`; live SFX log
+  (pickup 633, launches, shieldPop, spinOut, inkHit, pad, fanfare ×4,
+  champion ×1, UI cues) across a full 3-leg GP.
+- **Shipped:** item SFX — pickup tick+ding, per-kind launch cues
+  (missile noise-swell+drop, boost ignition, shield glassy raise, ink
+  wet toss, swap shimmer, slick blub), spinOut siren, shieldPop,
+  inkHit, pad zap; volOf() distance-attenuates AI cues to 0 @55 m.
+  Music theme-table sequencer: PG 146bpm C-major / SR 134bpm E-minor
+  syncopated / NN 114bpm A-minor synthwave — gapless setTheme pivot on
+  track change (≤0.12 s carryover). Per-track ambience bus: PG crowd
+  murmur+breeze+bird chirps, SR rumble+gust wind, NN detuned saw hum+
+  city hiss+crackles — all ≤~0.05 gain, master-volume respecting.
+  UI move/tick/confirm/back blips on title+options. gpChampion()
+  5-note+triad on FINAL STANDINGS. live() gate keeps gesture-lock safe.
+- **Verified:** build clean; NN ~68 fps; themeIdx live-verified per
+  track (0/1/2); 0 console errors/warnings.
+- **Largest Gap:** all voices are oscillator/noise synthesis — no
+  samples; mixing is static (no sidechain ducking under SFX).

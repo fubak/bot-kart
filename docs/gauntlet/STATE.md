@@ -26,8 +26,17 @@ Workstreams (serial sub-gauntlets, file-owned):
    PRESS ENTER floor, headlight/item-box bloom, GP delta, flag masts,
    billboard z-fight, minimap alpha. Smoke identical ×3; NN live
    67.7 fps p95 15.3 ms.
-5. Next: WS-ANIM world animation → WS-MAT materials → critic 10 →
-   WS-CHAR / WS-AUDIO → final gate.
+5. WS-ANIM world animation — INTEGRATED (ANIM-001): crowd wave,
+   spin boards, canopy sway, windmill PG+SR, NN scanline pylon
+6. WS-MAT material richness — INTEGRATED (MAT-001): kart clearcoat,
+   RoomEnvironment IBL 0.3/0.22, road roughnessMap, gantry lamps,
+   checkShaderErrors off for benign X4122 noise
+7. Critic 10: 7.0/10 (1H/7M/6L) — `wave10/CRITIC10_REPORT.md`
+8. FIX-002 critic-10 batch — INTEGRATED: battered wall footings to
+   grade, kerbs 0.08, item-box under bloom gate, GP provisional rows,
+   rubber-band honored (gain 0.006/up 0.14), head matte-down, Q-quit
+   disarms cup. Smoke exact; NN 68.2 fps p95 15.4.
+9. Next: WS-CHAR (kart/char life) → WS-AUDIO → critic 11 → final gate.
 Critic after every 1–2 integrated streams; final critic ≥8.5/10 or two
 consecutive clean passes to ship.
 

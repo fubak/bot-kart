@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Kart } from './Kart';
 import type { Track } from './Track';
 import type { Fx } from './Fx';
+import type { Audio } from '../core/Audio';
 import { AI, KART } from '../config/tuning';
 import { chevronTexture, glowTexture } from '../core/Textures';
 
@@ -153,6 +154,7 @@ export class Items {
     private readonly track: Track,
     karts: Kart[],
     private readonly fx?: Fx,
+    private readonly audio?: Audio,
   ) {
     this.karts = karts;
     this.held = karts.map(() => null);
@@ -231,6 +233,14 @@ export class Items {
     return 'boost';
   }
 
+  /** One-shot loudness for a kart's event: the player (karts[0]) is the
+   *  listener — AI-side cues fade out to silence past ~55 m. */
+  private volOf(kart: Kart): number {
+    const listener = this.karts[0];
+    if (!listener || kart === listener) return 1;
+    return Math.max(0, 1 - kart.position.distanceTo(listener.position) / 55);
+  }
+
   /** Fire kart `k`'s held item. `scores` = race scores for ink targeting.
    *  `racers` = RacerProgress list so teleports (swap) can re-anchor the
    *  continuity trackers they bypass (critic6 D8).
@@ -245,6 +255,9 @@ export class Items {
     if (!item) return null;
     this.held[kartIdx] = null;
     const kart = this.karts[kartIdx];
+    // The launch cue fires for every successful use — swap/ink that find no
+    // victim still spent the item, so the fizzle keeps its signature.
+    this.audio?.itemLaunch(item, this.volOf(kart));
     if (item === 'swap') {
       // Swap positions/velocities with the racer directly ahead — chaotic
       // but bounded (no one ahead → fizzle, same as leading-ink).
@@ -289,8 +302,10 @@ export class Items {
         if (k === kartIdx || sc[k] <= sc[kartIdx]) continue;
         if (simTime < this.shieldUntil[k]) {
           this.shieldUntil[k] = 0; // shield absorbs it, consumed
+          this.audio?.shieldPop(this.volOf(this.karts[k]));
         } else {
           this.karts[k].inkedUntil = simTime + AI.inkDuration;
+          this.audio?.inkHit(this.volOf(this.karts[k]));
         }
       }
       return item;
@@ -379,6 +394,7 @@ export class Items {
           b.respawnAt = simTime + RESPAWN_S;
           b.mesh.visible = false;
           this.fx?.pickupSparkle(b.pos);
+          this.audio?.itemPickup(this.volOf(this.karts[k]));
           break;
         }
       }
@@ -395,6 +411,7 @@ export class Items {
         if (dx * dx + dz * dz < 4.5) {
           kart.boostTimer = Math.max(kart.boostTimer, KART.boostTime[0]);
           p.cooldownUntil = simTime + 1.0;
+          this.audio?.padBoost(this.volOf(kart));
           break;
         }
       }
@@ -423,11 +440,13 @@ export class Items {
         if (d < MISSILE_HIT) {
           if (simTime < this.shieldUntil[k]) {
             this.shieldUntil[k] = 0; // shield absorbs the hit, consumed
+            this.audio?.shieldPop(this.volOf(kart));
           } else {
             kart.velocity.multiplyScalar(MISSILE_SLOW);
             kart.lastWallHit = simTime;
             kart.lastWallImpact = 0.7;
             kart.spinUntil = simTime + 0.9;
+            this.audio?.spinOut(this.volOf(kart));
           }
           hit = true;
           break;
@@ -457,12 +476,14 @@ export class Items {
           if (simTime < this.shieldUntil[k]) {
             this.shieldUntil[k] = 0; // shield absorbs the hit, consumed
             this.fx?.splat(kart.position.clone().setY(kart.position.y + 0.8), 0x60d0ff);
+            this.audio?.shieldPop(this.volOf(kart));
           } else {
             kart.velocity.multiplyScalar(0.3);
             kart.lastWallHit = simTime;
             kart.lastWallImpact = 0.55;
             kart.spinUntil = simTime + 1.1;
             this.fx?.splat(kart.position.clone().setY(kart.position.y + 0.5));
+            this.audio?.spinOut(this.volOf(kart));
           }
           this.group.remove(s.mesh);
           this.slicks.splice(i, 1);

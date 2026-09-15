@@ -121,19 +121,26 @@ export class Game {
     const s = this.settings;
     if (code === 'ArrowUp') {
       s.sel = (s.sel + Game.MENU_ROWS - 1) % Game.MENU_ROWS;
+      this.audio.uiMove();
     } else if (code === 'ArrowDown') {
       s.sel = (s.sel + 1) % Game.MENU_ROWS;
+      this.audio.uiMove();
     } else if (s.sel >= 5 && s.sel <= 10) {
       if (code === 'ArrowRight' || code === 'Enter' || code === 'Space') {
         this.bindingCapture = BIND_ACTIONS[s.sel - 5];
+        this.audio.uiConfirm();
       }
     } else if (s.sel === 11) {
       if (code === 'ArrowRight' || code === 'Enter' || code === 'Space') {
         resetBindings();
+        this.audio.uiConfirm();
       }
     } else {
       const dir = code === 'ArrowLeft' ? -1 : code === 'ArrowRight' ? 1 : 0;
-      if (dir !== 0) this.adjustSetting(dir);
+      if (dir !== 0) {
+        this.adjustSetting(dir);
+        this.audio.uiTick();
+      }
     }
   }
 
@@ -295,13 +302,16 @@ export class Game {
         e.preventDefault();
         if (e.code === 'Escape') {
           this.bindingCapture = null;
+          this.audio.uiBack();
         } else if (!Game.RESERVED_CODES.has(e.code)) {
           bindKey(this.bindingCapture, e.code);
           this.bindingCapture = null;
+          this.audio.uiConfirm();
         } else {
           // Reserved key — flash a denial so the wait doesn't read as a
           // hang (critic4: rejection was silent).
           this.captureDeniedAt = this.simTime;
+          this.audio.uiBack();
         }
         return;
       }
@@ -312,6 +322,7 @@ export class Game {
         // armed since its circuit order is fixed (PG → SR → NN).
         if (e.code === 'KeyT' && !this.settings.open && !this.gpMode) {
           this.buildWorld((this.trackIdx + 1) % TRACKS.length);
+          this.audio.uiTick();
           return;
         }
         // G toggles Grand Prix: the cup always starts at leg 0 on the
@@ -320,15 +331,19 @@ export class Game {
           this.gpMode = !this.gpMode;
           this.resetCup();
           if (this.gpMode) this.buildWorld(0);
+          this.audio.uiConfirm();
           return;
         }
         if (e.code === 'KeyO' || (e.code === 'Escape' && this.settings.open)) {
           this.settings.open = !this.settings.open;
+          if (this.settings.open) this.audio.uiConfirm();
+          else this.audio.uiBack();
         }
         // M toggles reduced motion on the title too — the hint lists it
         // (critic4: advertised but dead there).
         if (e.code === 'KeyM' && !this.settings.open) {
           this.toggleMotion();
+          this.audio.uiTick();
           return;
         }
         if (this.settings.open) {
@@ -343,7 +358,10 @@ export class Game {
           'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
           ...BIND_ACTIONS.map((a) => bindings[a]),
         ]);
-        if (START_KEYS.has(e.code)) this.race.beginCountdown(this.simTime);
+        if (START_KEYS.has(e.code)) {
+          this.audio.uiConfirm();
+          this.race.beginCountdown(this.simTime);
+        }
         return;
       }
       // Options menu is MODAL in every play phase (critic D1: it opened
@@ -352,6 +370,7 @@ export class Game {
       if (this.settings.open) {
         if (e.code === 'KeyO' || e.code === 'Escape' || e.code === 'KeyP') {
           this.settings.open = false;
+          this.audio.uiBack();
         } else {
           this.menuKey(e.code);
         }
@@ -360,14 +379,19 @@ export class Game {
       if (e.code === 'KeyO') {
         this.settings.open = true;
         this.paused = true; // opening pauses in ANY play phase
+        this.audio.uiConfirm();
         return;
       }
       // Pause works in any play phase (not title — nothing to freeze there).
       // Critic: gating to 'racing' + paused surviving restart = P→R soft-lock.
       if ((e.code === 'KeyP' || e.code === 'Escape') && this.race.phase !== 'title') {
         this.paused = !this.paused;
+        this.audio.uiBack();
       }
-      if (e.code === 'KeyM') this.toggleMotion();
+      if (e.code === 'KeyM') {
+        this.toggleMotion();
+        this.audio.uiTick();
+      }
       if (e.code === bindings.item && !this.paused && this.race.phase === 'racing') {
         this.items.use(
           0,
@@ -385,6 +409,7 @@ export class Game {
       }
       // Quit to title (Q): regrid + title phase, no reload needed (D3).
       if (e.code === 'KeyQ') {
+        this.audio.uiBack();
         this.restartRace('title');
       }
       // Grand Prix advance: N on the results screen scores the leg and
@@ -402,9 +427,12 @@ export class Game {
         if (this.gpLeg >= TRACKS.length) {
           this.gpDone = true; // stay on results — final standings
           this.paused = false;
+          // Champion fanfare — longer than the per-leg finish arpeggio.
+          this.audio.gpChampion();
         } else {
           this.buildWorld(this.gpLeg);
           this.race.beginCountdown(this.simTime);
+          this.audio.uiConfirm();
         }
         this.paused = false; // a phase transition never carries pause over
       }
@@ -415,9 +443,11 @@ export class Game {
           this.resetCup();
           this.buildWorld(0);
           this.paused = false;
+          this.audio.uiConfirm();
           this.race.beginCountdown(this.simTime);
         } else {
           this.restartRace();
+          this.audio.uiConfirm();
         }
       }
     });
@@ -516,9 +546,12 @@ export class Game {
     }
     this.race = new Race(this.track, undefined, 1 + AI_COUNT);
     this.race.restart(spawnPositions, 0, 'title');
-    this.items = new Items(this.track, [this.kart, ...this.aiKarts], this.fx);
+    this.items = new Items(this.track, [this.kart, ...this.aiKarts], this.fx, this.audio);
     this.scene.add(this.items.group);
     this.minimap = new Minimap(this.track);
+    // Per-track soundscape: retunes the groove + swaps the ambience bed.
+    // Stored pre-unlock and applied when the AudioContext comes up.
+    this.audio.setTrack(idx);
     this.celebrated.length = 0;
     // A rebuilt world is a new race context — the ★REC badge must not
     // leak across GP legs / cup abandons (critic5 D2).
