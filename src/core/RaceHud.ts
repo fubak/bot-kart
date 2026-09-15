@@ -610,15 +610,18 @@ export class RaceHud {
         (a, b) => race.positionOf(a) - race.positionOf(b) || a - b,
       );
       const html = order
-        .map((r) => {
+        .map((r, i) => {
           const me = r === 0;
           const dot = RACER_DOTS[r] ?? '#ff6080';
+          // Countdown: all scores tie → shared positionOf stamps P1 on
+          // every row; the honest label is grid order (critic21 D1).
+          const pos = race.phase === 'countdown' ? i + 1 : race.positionOf(r);
           return (
             `<div style="white-space:nowrap;${
               me ? 'color:#7be8ff;font-weight:800' : ''
             }">` +
             `${me ? '▸' : '&nbsp;'} <span style="color:${dot}">●</span> ` +
-            `P${race.positionOf(r)} ${RACER_NAMES[r] ?? 'BOT-' + r}</div>`
+            `P${pos} ${RACER_NAMES[r] ?? 'BOT-' + r}</div>`
           );
         })
         .join('');
