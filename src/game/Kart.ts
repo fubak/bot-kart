@@ -439,10 +439,18 @@ export class Kart {
     return new THREE.Vector3(-f.z, 0, f.x);
   }
 
+  /** Bumped on every reset/teleport — observers diff it to re-seed their
+   *  transition memory instead of firing phantom cues (critic20 D1-D4). */
+  resetCount = 0;
+
   reset(position: THREE.Vector3, heading: number): void {
     this.position.copy(position);
     this.heading = heading;
     this.velocity.set(0, 0, 0);
+    this.vy = 0;
+    this.airTime = 0;
+    this.grounded = true;
+    this.resetCount++;
     this.driftDir = 0;
     this.driftCharge = 0;
     this.boostTimer = 0;

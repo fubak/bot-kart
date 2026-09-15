@@ -54,6 +54,7 @@ export class Audio {
   private lastBumps = 0;
   private bumpAudioAt = -10; // ctx.currentTime of last thock (rate limit)
   private lastPos = 1;
+  private lastResetCount = 0; // kart.reset() bumps — re-seeds every diff
   private readonly music = new Music();
   private rivalEngines: { osc: OscillatorNode; gain: GainNode }[] = [];
   // Ambience bed: looping sources + a sparse-event timer, rebuilt per track.
@@ -773,6 +774,22 @@ export class Audio {
     if (!this.ctx || this.ctx.state === 'suspended') return;
     const now = this.ctx.currentTime;
 
+    // Kart resets (respawn/restart/quit/swap-regrid) teleport state — every
+    // transition memory re-seeds so no phantom cue fires off the jump.
+    if (kart.resetCount !== this.lastResetCount) {
+      this.lastResetCount = kart.resetCount;
+      this.wasGrounded = kart.grounded;
+      this.airPeak = 0;
+      this.lastWallT = kart.lastWallHit;
+      this.lastDriftDir = kart.driftDir;
+      this.lastDriftCharge = kart.driftCharge;
+      this.lastDriftTier = -1;
+      this.lastDrafts = kart.draftsFired;
+      this.lastBumps = bumps;
+      this.rouletteWasSpinning = (items?.rouletteT[0] ?? 0) > 0;
+      this.lastRouletteTick = items?.rouletteTick[0] ?? 0;
+    }
+
     // --- countdown beeps → GO chord ---
     if (race.phase === 'countdown') {
       const c = Math.ceil(race.countdownLeft);
@@ -860,6 +877,7 @@ export class Audio {
       // tier (lastDriftCharge is the pre-reset sample — release zeroes it).
       if (
         this.lastDriftDir !== 0 &&
+        !kart.isSpinning && // spin-out clears drift but isn't a release
         kart.boostTimer > 0 &&
         this.lastDriftCharge >= KART.driftChargeTier[0]
       ) {
@@ -878,10 +896,11 @@ export class Audio {
     this.lastDriftCharge = dChg;
 
     // --- slipstream: wind-rush one-shot on the burst + sustained layer ---
-    if (kart.draftsFired !== this.lastDrafts) {
-      this.lastDrafts = kart.draftsFired;
+    // (increment-only — a reset to 0 isn't a draft).
+    if (kart.draftsFired > this.lastDrafts) {
       this.draftWhoosh();
     }
+    this.lastDrafts = kart.draftsFired;
     const slipT = Number.isFinite(kart.slipstreamT) ? kart.slipstreamT : 0;
     const windT =
       !paused && slipT > 0 ? Math.min(AUDIO.windGain, 0.04 + slipT * 0.06) : 0;
@@ -907,8 +926,9 @@ export class Audio {
     this.rumble!.filter.frequency.setTargetAtTime(160 + spd * 4, now, 0.1);
 
     // --- item roulette: a tick per icon flip on the player's slot + a
-    // landing ding when the spin resolves (rivals' slots stay silent). ---
-    if (items) {
+    // landing ding when the spin resolves (rivals' slots stay silent).
+    // Racing-gated like the HUD — post-finish pickups spin silently. ---
+    if (items && race.phase === 'racing') {
       const spinning = items.rouletteT[0] > 0;
       if (spinning) {
         const tick = items.rouletteTick[0] ?? 0;
@@ -918,7 +938,9 @@ export class Audio {
           this.rouletteTickSfx(progress);
         }
       } else {
-        if (this.rouletteWasSpinning) this.rouletteLand();
+        // Ding only when the spin resolved naturally into a held item —
+        // a reset mid-spin (restart/quit) clears the slot silently.
+        if (this.rouletteWasSpinning && items.held[0]) this.rouletteLand();
         this.lastRouletteTick = 0;
       }
       this.rouletteWasSpinning = spinning;

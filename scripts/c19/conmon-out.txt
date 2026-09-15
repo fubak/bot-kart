@@ -161,3 +161,104 @@ debug: [vite] connecting...
 debug: [vite] connected.
 debug: [vite] connecting...
 debug: [vite] connected.
+log: [vite] server connection lost. Polling for restart...
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+log: [ai-smoke] {
+  "track": "PROVING GROUNDS",
+  "solo": [
+    {
+      "skill": 0.85,
+      "simSeconds": 71.56,
+      "phase": "finished",
+      "lapsCompleted": 3,
+      "lapTimes": [
+        23.17,
+        22.69,
+        22.69
+      ],
+      "bestLap": 22.69,
+      "wallHits": 0,
+      "wallHitIdx": [],
+      "wallHitSpeed": [],
+      "firstHitTrace": [],
+      "maxLateral": 4.12,
+      "driftPct": 7.8,
+      "avgSpeed": 15.58,
+      "topSpeed": 24,
+      "wrongWaySeen": 0
+    },
+    {
+      "ski
+debug: [vite] connected.
+debug: [vite] connecting...
+log: [ai-smoke] {
+  "track": "SWITCHBACK RIDGE",
+  "solo": [
+    {
+      "skill": 0.85,
+      "simSeconds": 82.63,
+      "phase": "finished",
+      "lapsCompleted": 3,
+      "lapTimes": [
+        26.78,
+        26.42,
+        26.42
+      ],
+      "bestLap": 26.42,
+      "wallHits": 0,
+      "wallHitIdx": [],
+      "wallHitSpeed": [],
+      "firstHitTrace": [],
+      "maxLateral": 4.2,
+      "driftPct": 3.5,
+      "avgSpeed": 19.07,
+      "topSpeed": 24.02,
+      "wrongWaySeen": 0
+    },
+    {
+      "
+debug: [vite] connected.
+debug: [vite] connecting...
+log: [ai-smoke] {
+  "track": "NEON NIGHT",
+  "solo": [
+    {
+      "skill": 0.85,
+      "simSeconds": 80.02,
+      "phase": "finished",
+      "lapsCompleted": 3,
+      "lapTimes": [
+        25.92,
+        25.54,
+        25.55
+      ],
+      "bestLap": 25.54,
+      "wallHits": 0,
+      "wallHitIdx": [],
+      "wallHitSpeed": [],
+      "firstHitTrace": [],
+      "maxLateral": 3.83,
+      "driftPct": 7,
+      "avgSpeed": 18.66,
+      "topSpeed": 24.01,
+      "wrongWaySeen": 0
+    },
+    {
+      "skill":
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
+debug: [vite] connecting...
+debug: [vite] connected.
