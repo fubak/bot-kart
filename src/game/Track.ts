@@ -19,6 +19,12 @@ const _qB = new THREE.Quaternion();
 const _v3 = new THREE.Vector3();
 const _sv = new THREE.Vector3();
 const _ax = new THREE.Vector3();
+// Per-call-site scratches for the query family — each method owns its own
+// out object so constrain()→query() nesting never aliases (hot path is
+// called ~30×/frame; the literals were a measurable GC feed).
+const _qRel = new THREE.Vector3();
+const _surfaceQ = { lateral: 0, tangent: new THREE.Vector3(), index: 0, surface: 'road' as const };
+const _constrainQ = { lateral: 0, tangent: new THREE.Vector3(), index: 0, surface: 'road' as 'road' | 'gravel' };
 const UP_Y = new THREE.Vector3(0, 1, 0);
 
 // Test track: a closed Catmull-Rom circuit ("Proving Grounds").
@@ -398,6 +404,12 @@ export class Track {
   query(
     pos: THREE.Vector3,
     hint?: number,
+    out?: {
+      lateral: number;
+      tangent: THREE.Vector3;
+      index: number;
+      surface: 'road' | 'gravel';
+    },
   ): {
     lateral: number;
     tangent: THREE.Vector3;
@@ -421,12 +433,17 @@ export class Track {
       }
     }
     const s = this.samples[bestI];
-    const rel = pos.clone().sub(s.point);
+    const rel = _qRel.copy(pos).sub(s.point);
     const lateral = rel.dot(s.left);
     const z = this.zoneAt(bestI);
     const surface: 'road' | 'gravel' =
       z && lateral * z.side > TRACK.roadHalfWidth - 0.5 ? 'gravel' : 'road';
-    return { lateral, tangent: s.tangent, index: bestI, surface };
+    const r = out ?? { lateral: 0, tangent: s.tangent, index: 0, surface: 'road' };
+    r.lateral = lateral;
+    r.tangent = s.tangent;
+    r.index = bestI;
+    r.surface = surface;
+    return r;
   }
 
   /** Gravel zone containing a sample index, or null. `margin` shrinks the
@@ -477,7 +494,7 @@ export class Track {
         : this.nearestIndexNear(pos, hint);
     const z = this.zoneAt(i);
     if (!z) return 'road';
-    const { lateral } = this.query(pos, i);
+    const { lateral } = this.query(pos, i, _surfaceQ);
     return lateral * z.side > TRACK.roadHalfWidth - 0.5 ? 'gravel' : 'road';
   }
 
@@ -487,23 +504,30 @@ export class Track {
   constrain(
     pos: THREE.Vector3,
     hint?: number,
+    out?: { lateral: number; clamped: boolean; index: number },
   ): { lateral: number; clamped: boolean; index: number } {
     const i =
       hint === undefined
         ? this.nearestIndex(pos)
         : this.nearestIndexNear(pos, hint);
-    const { lateral, index } = this.query(pos, i);
+    const { lateral, index } = this.query(pos, i, _constrainQ);
     const roadLimit = TRACK.roadHalfWidth - 0.75; // kart half-width → wall face
     const z = this.zoneAt(index);
     // Zone-side edge extends onto gravel; the other edge stays the wall.
     const limit =
       z && Math.sign(lateral) === z.side ? roadLimit + TRACK.gravelWidth : roadLimit;
+    const r = out ?? { lateral: 0, clamped: false, index: 0 };
+    r.index = index;
     if (Math.abs(lateral) <= limit) {
-      return { lateral, clamped: false, index };
+      r.lateral = lateral;
+      r.clamped = false;
+      return r;
     }
     const s = this.samples[index];
     pos.copy(s.point).addScaledVector(s.left, Math.sign(lateral) * limit);
-    return { lateral: Math.sign(lateral) * limit, clamped: true, index };
+    r.lateral = Math.sign(lateral) * limit;
+    r.clamped = true;
+    return r;
   }
 
   /**
@@ -526,6 +550,7 @@ export class Track {
     pos: THREE.Vector3,
     aheadMeters: number,
     hint?: number,
+    out?: { point: THREE.Vector3; index: number },
   ): { point: THREE.Vector3; index: number } {
     const n = this.samples.length;
     const start =
@@ -548,7 +573,10 @@ export class Track {
       segLen > 1e-6
         ? THREE.MathUtils.clamp(1 - (acc - aheadMeters) / segLen, 0, 1)
         : 1;
-    return { point: prev.clone().lerp(cur, t), index: i };
+    const r = out ?? { point: new THREE.Vector3(), index: 0 };
+    r.point.copy(prev).lerp(cur, t);
+    r.index = i;
+    return r;
   }
 
   /** Unit tangent of the travel direction at a centerline sample index. */
@@ -558,9 +586,10 @@ export class Track {
   }
 
   /** Centerline point at a sample index (wrapped). */
-  pointAt(index: number): THREE.Vector3 {
+  pointAt(index: number, out?: THREE.Vector3): THREE.Vector3 {
     const n = this.samples.length;
-    return this.samples[((index % n) + n) % n].point.clone();
+    const p = this.samples[((index % n) + n) % n].point;
+    return out ? out.copy(p) : p.clone();
   }
 
   /** Road-left unit vector at a sample index (wrapped). */

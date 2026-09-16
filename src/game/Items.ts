@@ -39,6 +39,10 @@ const ITEM_GLOW: Record<ItemKind, THREE.Color> = {
   ink: new THREE.Color(0xc070ff),
   swap: new THREE.Color(0x7dff8a),
 };
+// Missile update scratches — per-missile per-frame allocs (perf pass).
+const _missWp = new THREE.Vector3();
+const _missTan = new THREE.Vector3();
+const _missUp = new THREE.Vector3(0, 1, 0);
 
 interface Box {
   mesh: THREE.Mesh;
@@ -237,6 +241,14 @@ export class Items {
       this.group.add(mesh);
       this.pads.push({ mesh, pos, cooldownUntil: 0 });
     }
+    // Prewarm stand-ins: one of each lazily-spawned mesh lives in the
+    // scene (invisible) so renderer.compile() warms their programs at
+    // buildWorld — a mid-race first-fire used to hitch ~10-30 ms on the
+    // shader compile (perf gauntlet).
+    const prewarm = new THREE.Group();
+    prewarm.visible = false;
+    prewarm.add(buildMissile(), new THREE.Mesh(slickGeo, slickMat));
+    this.group.add(prewarm);
   }
 
   /** Roll a random item, weighted by race position — trailing racers draw
@@ -525,16 +537,16 @@ export class Items {
       const step = (m.speed * dt) / this.track.sampleSpacing;
       m.progressIdx += step;
       m.travelled += m.speed * dt;
-      const wp = this.track.pointAt(Math.floor(m.progressIdx));
+      const wp = this.track.pointAt(Math.floor(m.progressIdx), _missWp);
       wp.y += 0.55 + Math.sin(simTime * 9 + m.travelled) * 0.06; // hover wobble
       m.mesh.position.copy(wp);
       const t = this.track.tangentAt(Math.floor(m.progressIdx));
       m.mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        t.clone(), // missile +Y nose points along travel
+        _missUp,
+        _missTan.copy(t), // missile +Y nose points along travel
       );
       m.mesh.rotateY(simTime * 14); // barrel roll on its own axis
-      this.fx?.missileTrail(m.mesh.position, t.clone().multiplyScalar(m.speed * 0.4));
+      this.fx?.missileTrail(m.mesh.position, _missTan.copy(t).multiplyScalar(m.speed * 0.4));
       let hit = false;
       for (let k = 0; k < this.karts.length; k++) {
         const kart = this.karts[k];

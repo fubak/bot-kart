@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FX, KART } from '../config/tuning';
 import type { ControlState } from '../core/Input';
 import type { Track } from './Track';
@@ -19,6 +20,17 @@ const UP = new THREE.Vector3(0, 1, 0);
 const _draftRel = new THREE.Vector3();
 const _draftFwdA = new THREE.Vector3();
 const _draftFwdB = new THREE.Vector3();
+// Scratch vectors for update()'s hot path — the sim runs this at 120 Hz
+// across 4 karts; clone()s here were a steady GC feed.
+const _fwd = new THREE.Vector3();
+const _fwd2 = new THREE.Vector3();
+const _fwd3 = new THREE.Vector3();
+const _rt = new THREE.Vector3();
+const _lat = new THREE.Vector3();
+const _nrm = new THREE.Vector3();
+const _ptmp = new THREE.Vector3();
+const _rear = new THREE.Vector3();
+const _constrainOut = { lateral: 0, clamped: false, index: 0 };
 
 export class Kart {
   readonly group = new THREE.Group();
@@ -262,6 +274,7 @@ export class Kart {
     });
     for (const o of this.proceduralBody) o.visible = false;
     for (const w of this.wheels) w.visible = false;
+    this.mergeStaticMeshes(model);
     this.glossMaterials(model);
     if (this.tint) this.tintModel(model);
     this.body.add(model);
@@ -349,19 +362,106 @@ export class Kart {
    * their authored color — tinting a glow mat just browns the neon.
    */
   private tintModel(root: THREE.Object3D): void {
+    const cache = new Map<THREE.Material, THREE.Material>();
     root.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       const cloned = mats.map((m) => {
+        const hit = cache.get(m);
+        if (hit) return hit;
         const c = m.clone();
         if ('color' in c && !/glow|tire|visor|windshield|glass|lens/i.test(c.name ?? '')) {
           Kart.hueShift(c.color as THREE.Color, this.tint!);
         }
+        cache.set(m, c);
         return c;
       });
       o.material = Array.isArray(o.material) ? cloned : cloned[0];
     });
   }
+
+  /**
+   * Merge every mesh that never animates — bakes each static part's
+   * transform into per-material geometries so a ~125-mesh GLB renders as
+   * ~15 draws instead of ~125 draws ×2 passes. Animated nodes (wheels,
+   * limbs, head, eyes — the only nodes update() touches) keep their own
+   * transforms; static descendants of a hot node merge relative to it so
+   * they ride its rotation. Runs BEFORE gloss/tint so merged meshes share
+   * the GLB's shared material instances and the per-kart clone count drops
+   * from ~120 to ~15.
+   */
+  private mergeStaticMeshes(root: THREE.Object3D): void {
+    root.updateWorldMatrix(true, true);
+    // Buckets: merge-space container × material × attribute signature.
+    const buckets = new Map<THREE.Object3D, Map<THREE.Material, Map<string, THREE.Mesh[]>>>();
+    root.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || o === root) return;
+      if (Array.isArray(o.material)) return; // grouped materials: rare — skip
+      // Nearest hot ancestor-or-self under root picks the merge space.
+      let hot: THREE.Object3D | null = null;
+      for (let n: THREE.Object3D | null = o; n && n !== root; n = n.parent) {
+        if (Kart.HOT_NODE.test(n.name)) {
+          hot = n;
+          break;
+        }
+      }
+      if (hot === o) return; // the node itself animates — leave it alone
+      const container = hot ?? root;
+      const g = o.geometry;
+      const sig =
+        Object.keys(g.attributes).sort().join(',') +
+        (g.index ? '+i' : '') +
+        Object.keys(g.morphAttributes).sort().join(',');
+      let matMap = buckets.get(container);
+      if (!matMap) buckets.set(container, (matMap = new Map()));
+      let sigMap = matMap.get(o.material);
+      if (!sigMap) matMap.set(o.material, (sigMap = new Map()));
+      let list = sigMap.get(sig);
+      if (!list) sigMap.set(sig, (list = []));
+      list.push(o);
+    });
+    const inv = new THREE.Matrix4();
+    const rel = new THREE.Matrix4();
+    const merged = new Set<THREE.Mesh>();
+    for (const [container, matMap] of buckets) {
+      inv.copy(container.matrixWorld).invert();
+      for (const [mat, sigMap] of matMap) {
+        for (const meshes of sigMap.values()) {
+          if (meshes.length < 2) continue; // single mesh — nothing to save
+          const geos = meshes.map((m) => {
+            const g = m.geometry.clone();
+            g.applyMatrix4(rel.copy(inv).multiply(m.matrixWorld));
+            return g;
+          });
+          // mergeGeometries needs index parity across the bucket.
+          const norm = geos.some((g) => !g.index)
+            ? geos.map((g) => (g.index ? g.toNonIndexed() : g))
+            : geos;
+          const geo = mergeGeometries(norm, false);
+          if (!geo) continue; // parity slipped through — keep originals
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.name = 'merged_' + (mat.name || 'mat');
+          mesh.castShadow = true;
+          mesh.receiveShadow = meshes[0].receiveShadow;
+          container.add(mesh);
+          for (const m of meshes) merged.add(m);
+        }
+      }
+    }
+    // Detach merged-away originals; dispose geometries nothing else uses.
+    const stillUsed = new Set<THREE.BufferGeometry>();
+    for (const m of merged) m.parent?.remove(m);
+    root.traverse((o) => {
+      if (o instanceof THREE.Mesh && !merged.has(o)) stillUsed.add(o.geometry);
+    });
+    for (const m of merged) {
+      if (!stillUsed.has(m.geometry)) m.geometry.dispose();
+    }
+  }
+
+  /** Nodes whose local transform animates at runtime — merge spaces. */
+  private static readonly HOT_NODE =
+    /^(wheel_(fl|fr|rl|rr)|arm_l|arm_r|head|leg_l|leg_r|eye_l|eye_r)$/;
 
   private static hueShift(col: THREE.Color, tint: THREE.Color): void {
     const hsl = { h: 0, s: 0, l: 0 };
@@ -397,6 +497,7 @@ export class Kart {
         bot.traverse((o) => {
           if (o instanceof THREE.Mesh) o.castShadow = true;
         });
+        this.mergeStaticMeshes(bot);
         this.glossMaterials(bot); // bot shells read as glossy plastic
         // Matte the head dome down (critic10): the physical clearcoat +
         // env response clipped the whole head to a white orb under the
@@ -567,13 +668,13 @@ export class Kart {
       this.slipstreamT = 0; // getting tagged kills the draft burst too
       this.draftT = 0;
       this.position.addScaledVector(this.velocity, dt);
-      this.trackIdx = track.constrain(this.position, this.trackIdx).index;
+      this.trackIdx = track.constrain(this.position, this.trackIdx, _constrainOut).index;
       const gy = track.heightAt(this.position, this.trackIdx);
       if (this.position.y < gy) this.position.y = gy;
       this.syncVisual();
       return;
     }
-    const fwd = this.forward();
+    const fwd = _fwd.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
     const fwdSpeed = this.velocity.dot(fwd);
     // Pedal work for the driver rig: right leg presses with throttle,
     // left with brake (CHAR: static legs were the last rig gap).
@@ -612,7 +713,7 @@ export class Kart {
 
     // Speed handling: cap forward speed; above topSpeed (boost end) BLEED back
     // at overSpeedDecay rather than hard-clamping in one step (critic jolt).
-    const lateral = this.velocity.clone().addScaledVector(fwd, -this.velocity.dot(fwd));
+    const lateral = _lat.copy(this.velocity).addScaledVector(fwd, -this.velocity.dot(fwd));
     let newFwd = this.velocity.dot(fwd);
     if (newFwd > topSpeed) newFwd = Math.max(topSpeed, newFwd - KART.overSpeedDecay * dt);
     newFwd = Math.max(newFwd, -KART.reverseSpeed);
@@ -650,8 +751,8 @@ export class Kart {
         if (tier >= 0) {
           this.boostTimer = Math.max(this.boostTimer, KART.boostTime[tier]);
           // Mini-turbo release: one-shot tailpipe burst in the tier color.
-          const pipe = this.position
-            .clone()
+          const pipe = _ptmp
+            .copy(this.position)
             .addScaledVector(fwd, -(KART.length / 2 - 0.55));
           pipe.y = this.position.y + 0.5;
           this.vfx.turboBurst(pipe, this.velocity, tier);
@@ -719,11 +820,11 @@ export class Kart {
 
     // --- grip: exp decay of lateral velocity ---
     const grip = drifting ? KART.driftGrip : KART.grip;
-    const fwd2 = this.forward();
+    const fwd2 = _fwd2.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
     const fAmt = this.velocity.dot(fwd2);
-    const lAmt = this.velocity.clone().addScaledVector(fwd2, -fAmt).length();
+    const lDir = _lat.copy(this.velocity).addScaledVector(fwd2, -fAmt);
+    const lAmt = lDir.length();
     const lKeep = Math.exp(-grip * dt);
-    const lDir = this.velocity.clone().addScaledVector(fwd2, -fAmt);
     if (lAmt > 1e-5) lDir.normalize();
     this.velocity.copy(fwd2.multiplyScalar(fAmt)).addScaledVector(lDir, lAmt * lKeep);
 
@@ -731,7 +832,7 @@ export class Kart {
     // Impact penalty fires once per wall ENTRY (scaled by impact speed), not
     // per step — sustained contact slides with a light scrub (critic tar-pit).
     this.position.addScaledVector(this.velocity, dt);
-    const c = track.constrain(this.position, this.trackIdx);
+    const c = track.constrain(this.position, this.trackIdx, _constrainOut);
     this.trackIdx = c.index;
     if (c.clamped) {
       // Inward wall normal from the TRACK FRAME — not the position delta.
@@ -739,7 +840,7 @@ export class Kart {
       // delta-derived normal vanished and the whole response was skipped
       // while throttle kept integrating: nose-in read top speed/FOV/revs,
       // defeated the stuck hint, and stored a free launch (critic4 HIGH).
-      const normal = track.leftAt(c.index).clone().multiplyScalar(-Math.sign(c.lateral));
+      const normal = _nrm.copy(track.leftAt(c.index)).multiplyScalar(-Math.sign(c.lateral));
       const out = this.velocity.dot(normal);
       if (out < 0) {
         // Remove outward velocity with restitution.
@@ -788,7 +889,7 @@ export class Kart {
         this.lastWallHit = simTime;
         this.lastWallImpact = Math.min(1, this.airTime * 0.5);
         this.vfx.landingDust(
-          this.position.clone().setY(groundY),
+          _ptmp.copy(this.position).setY(groundY),
           this.velocity,
           Math.min(1, this.airTime * 0.5),
         );
@@ -800,22 +901,22 @@ export class Kart {
       this.airTime += dt;
     }
     // Slope gravity (grounded only): uphill bleeds speed, downhill adds it.
-    const fwdE = this.forward();
-    const hA = track.heightAt(this.position.clone().addScaledVector(fwdE, 1.4), this.trackIdx);
-    const hB = track.heightAt(this.position.clone().addScaledVector(fwdE, -1.4), this.trackIdx);
+    const fwdE = _fwd3.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
+    const hA = track.heightAt(_ptmp.copy(this.position).addScaledVector(fwdE, 1.4), this.trackIdx);
+    const hB = track.heightAt(_ptmp.copy(this.position).addScaledVector(fwdE, -1.4), this.trackIdx);
     this.slopePitch = Math.atan2(hA - hB, 2.8);
     if (this.grounded) {
       this.velocity.addScaledVector(fwdE, -Math.sin(this.slopePitch) * KART.slopeForce * dt);
     }
-    const rE = this.right();
-    const hR = track.heightAt(this.position.clone().addScaledVector(rE, 0.9), this.trackIdx);
-    const hL = track.heightAt(this.position.clone().addScaledVector(rE, -0.9), this.trackIdx);
+    const rE = _rt.set(-fwdE.z, 0, fwdE.x);
+    const hR = track.heightAt(_ptmp.copy(this.position).addScaledVector(rE, 0.9), this.trackIdx);
+    const hL = track.heightAt(_ptmp.copy(this.position).addScaledVector(rE, -0.9), this.trackIdx);
     this.slopeRoll = Math.atan2(hR - hL, 1.8);
 
     // Actual slip angle (velocity vs heading) drives the drift visual.
-    const fAmt2 = this.velocity.dot(this.forward());
-    const lat = this.velocity.clone().addScaledVector(this.forward(), -fAmt2);
-    const latSigned = lat.dot(this.right());
+    const fAmt2 = this.velocity.dot(fwdE);
+    const lat = _lat.copy(this.velocity).addScaledVector(fwdE, -fAmt2);
+    const latSigned = lat.dot(rE);
     this.slipAngle = this.speed > 0.5 ? Math.atan2(latSigned, Math.abs(fAmt2)) : 0;
 
     // Off-road surface: gravel aprons (shortcut zones) — heavy drag, hard
@@ -831,7 +932,7 @@ export class Kart {
       }
       if (this.speed > 8 && Math.random() < 0.7) {
         this.vfx.dust(
-          this.position.clone().setY(this.position.y + 0.15),
+          _ptmp.copy(this.position).setY(this.position.y + 0.15),
           this.velocity,
         );
       }
@@ -850,23 +951,25 @@ export class Kart {
     }
 
     // --- VFX emission (world space) ---
-    const right2 = this.right();
-    const fwd3 = this.forward();
-    const rearC = this.position.clone().addScaledVector(fwd3, -(KART.length / 2 - 0.55)).setY(0.25);
+    // heading may have been re-clamped by the driftMaxSlip block above —
+    // recompute rather than reusing fwdE/rE (they predate the clamp).
+    const fwdVfx = _fwd3.set(-Math.sin(this.heading), 0, -Math.cos(this.heading));
+    const right2 = _rt.set(-fwdVfx.z, 0, fwdVfx.x);
+    const rearC = _rear.copy(this.position).addScaledVector(fwdVfx, -(KART.length / 2 - 0.55)).setY(0.25);
     if (this.driftDir !== 0) {
       // Sparks at both rear wheels — tier color is the player's charge readout.
       const wx = KART.width / 2 + 0.08;
       if (Math.random() < 60 * dt) {
-        this.vfx.driftSparks(rearC.clone().addScaledVector(right2, -wx), this.velocity, this.driftCharge);
-        this.vfx.driftSparks(rearC.clone().addScaledVector(right2, wx), this.velocity, this.driftCharge);
+        this.vfx.driftSparks(_ptmp.copy(rearC).addScaledVector(right2, -wx), this.velocity, this.driftCharge);
+        this.vfx.driftSparks(_ptmp.copy(rearC).addScaledVector(right2, wx), this.velocity, this.driftCharge);
       }
     }
     if (this.boostTimer > 0) {
-      if (Math.random() < 90 * dt) this.vfx.boostFlame(rearC.clone().setY(0.55), this.velocity);
+      if (Math.random() < 90 * dt) this.vfx.boostFlame(_ptmp.copy(rearC).setY(0.55), this.velocity);
     }
     if (c.clamped && Math.random() < 30 * dt) {
-      const inward = track.leftAt(c.index).clone().multiplyScalar(-Math.sign(c.lateral)).setY(0);
-      this.vfx.wallChips(this.position.clone().setY(0.3), inward);
+      const inward = _nrm.copy(track.leftAt(c.index)).multiplyScalar(-Math.sign(c.lateral)).setY(0);
+      this.vfx.wallChips(_ptmp.copy(this.position).setY(0.3), inward);
     }
     // Spin-out stars — orbiting four-point stars while controls are dead.
     if (this.isSpinning) {

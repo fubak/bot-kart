@@ -187,8 +187,8 @@ export function pollInput(): ControlState {
 // Pad buttons → keyboard action codes. Held-set diffing in Game turns
 // these into real keydown/keyup events, so every existing action (item,
 // pause, menu nav, title start, GP advance, respawn) works from a pad.
-export function pollPadCodes(): Set<string> {
-  const out = new Set<string>();
+export function pollPadCodes(out: Set<string> = new Set<string>()): Set<string> {
+  out.clear();
   const gp = firstPad();
   if (!gp) return out;
   const b = (i: number) => gp.buttons[i]?.pressed ?? false;

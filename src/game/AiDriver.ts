@@ -59,6 +59,19 @@ export class AiDriver {
   private readonly wedgeAnchor = new THREE.Vector3();
   private wedgeTime = -1; // <0 = not wedged
   private grindTime = 0; // sustained low-speed wall contact
+  // Per-instance scratches — update() runs at 120 Hz × 3 bots; the query/
+  // lookahead literals + vector clones were a steady GC feed (perf pass).
+  private readonly _q = {
+    lateral: 0,
+    tangent: new THREE.Vector3(),
+    index: 0,
+    surface: 'road' as 'road' | 'gravel',
+  };
+  private readonly _la = { point: new THREE.Vector3(), index: 0 };
+  private readonly _la2 = { point: new THREE.Vector3(), index: 0 };
+  private readonly _aiFwd = new THREE.Vector3();
+  private readonly _aiRt = new THREE.Vector3();
+  private readonly _aiRel = new THREE.Vector3();
 
   constructor(
     skill = 1.0,
@@ -101,7 +114,7 @@ export class AiDriver {
     const fwdSpeed = kart.forwardSpeed;
 
     // Local track frame: lateral offset + travel-direction tangent.
-    const { lateral, tangent: tanNow } = track.query(kart.position, kart.trackIdx);
+    const { lateral, tangent: tanNow } = track.query(kart.position, kart.trackIdx, this._q);
 
     // --- progress watchdog: net forward centerline-index gain per ~8 s
     // window. Jumps ≥90 samples are teleports (lakitu/swap), not progress —
@@ -255,7 +268,7 @@ export class AiDriver {
     // Inked: vision denied — short sight + steering wander (see below).
     if (kart.inked) look *= 0.55;
 
-    const la = track.lookahead(kart.position, look, kart.trackIdx);
+    const la = track.lookahead(kart.position, look, kart.trackIdx, this._la);
     const target = la.point;
     // Grind assist (critic12 D2): wall-pressed at <8 m/s, the normal
     // lookahead target sits behind the hairpin's inside wall — steering
@@ -265,7 +278,7 @@ export class AiDriver {
     // and off the pin on its own. Recovery-path only: a clean solo run
     // never satisfies the condition → baselines unchanged.
     if (this.grindTime > 0.5 && this.wedgeTime < 0) {
-      const laFar = track.lookahead(kart.position, look * 2.5, kart.trackIdx);
+      const laFar = track.lookahead(kart.position, look * 2.5, kart.trackIdx, this._la2);
       target.copy(laFar.point);
     }
     // Shift the pursuit point onto this bot's preferred line — plus a
@@ -304,7 +317,7 @@ export class AiDriver {
     let minRadius = Infinity;
     for (const f of AI.curveSampleFracs) {
       const d = Math.max(horizon * f, 1);
-      const p = track.lookahead(kart.position, d, kart.trackIdx);
+      const p = track.lookahead(kart.position, d, kart.trackIdx, this._la2);
       const tan = track.tangentAt(p.index);
       const ang = Math.abs(signedAngle(tanNow, tan));
       if (ang > 1e-4) minRadius = Math.min(minRadius, d / ang);
@@ -312,7 +325,7 @@ export class AiDriver {
 
     // Near-lookahead corner: drives drift entry/exit (radius + direction).
     const nearD = Math.max(look * 0.6, 6);
-    const nearLa = track.lookahead(kart.position, nearD, kart.trackIdx);
+    const nearLa = track.lookahead(kart.position, nearD, kart.trackIdx, this._la2);
     const tanNear = track.tangentAt(nearLa.index);
     const turnNear = signedAngle(tanNow, tanNear); // <0 = right-hand corner
     const radiusNow =
@@ -362,11 +375,11 @@ export class AiDriver {
     // collision minDist (critic: two bots welded together for 91% of a race).
     let blocked = false;
     if (traffic && fwdSpeed > 4) {
-      const fwd = kart.forward();
-      const right = kart.right();
+      const fwd = this._aiFwd.set(-Math.sin(kart.heading), 0, -Math.cos(kart.heading));
+      const right = this._aiRt.set(-fwd.z, 0, fwd.x);
       for (const other of traffic) {
         if (other === kart) continue;
-        const rel = other.position.clone().sub(kart.position);
+        const rel = this._aiRel.copy(other.position).sub(kart.position);
         const along = rel.dot(fwd);
         if (along < 1.5 || along > AI.blockAhead) continue;
         const side = rel.dot(right);

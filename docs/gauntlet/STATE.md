@@ -251,6 +251,17 @@ None.
   (9e50551 — GO camera settle 10.5→0.18 m, per-field settings
   validation, blur auto-pause, footer pad-alias hints, sky mountain
   disposal kills ~2 geo/rebuild leak).
+- Domain master gauntlet (waves 20–21): SG-11..15 shipped
+  roulette/drafting/hop/UMT, streak+tier VFX, 15 SFX cues, HUD
+  ticker/lamps, hero AI karts + NN mid-band; critic-21 **8.5 CLEAN**
+  (d58111f docs).
+- Wave-22 **performance gauntlet CLOSED**: >30 fps + no-stutter met at
+  68 fps flat — p99 15.6 ms / worst ≤15.9 ms / 0 frames >25 ms on all
+  three tracks racing. Fixes: GLB kart static-mesh merge (1043→~390
+  draws), per-frame alloc elimination (324→~0 KB/frame GC churn),
+  shader/texture prewarm at buildWorld + item prewarm group (no
+  mid-race compiles). 4× CPU throttle: 47.6 fps. Evidence in
+  PERFORMANCE_BUDGET.md + RELEASE_EVIDENCE.md.
 
 ---
 

@@ -49,6 +49,10 @@ export class Game {
    *  samples this RT's texture (disposing the RT frees the texture). */
   private envRT!: THREE.WebGLRenderTarget;
   private readonly chaseCam: ChaseCamera;
+  // Shader-prewarm camera for renderer.compile() in buildWorld — runs
+  // before chaseCam exists (ctor order); camera params don't affect
+  // program keys, so a static placeholder is correct.
+  private readonly compileCam = new THREE.PerspectiveCamera();
   private readonly hud: DebugHud;
   private track!: Track;
   // Shared world systems — one particle pool set + one sky, themed per
@@ -161,6 +165,12 @@ export class Game {
   private bindingCapture: BindAction | null = null;
   private captureDeniedAt = -10; // simTime of last reserved-key denial
   private padPrev = new Set<string>(); // pad codes held last frame
+  private padCodes = new Set<string>(); // polled this frame — ping-pongs with padPrev
+  // Preallocated frame-loop containers — the sim step used to spread/
+  // map fresh arrays and option literals ~120×/s into the GC (perf pass).
+  private readonly allKarts: Kart[] = [];
+  private readonly kartPositions: THREE.Vector3[] = [];
+  private readonly stepScores: number[] = [];
   // Per-track best-lap records (seconds) — persisted; a beaten record
   // flashes mid-race and stars the results screen.
   private readonly records: Record<number, number> = {};
@@ -184,6 +194,26 @@ export class Game {
   private readonly gpPoints: number[] = [0, 0, 0, 0];
   private gpDone = false;
   private static readonly GP_POINTS = [10, 7, 5, 3];
+  // Cached per-frame HUD option objects — mutated in place instead of
+  // building fresh literals every frame (perf pass: GC feed reduction).
+  private readonly hudSettings = {
+    ...this.settings,
+    binds: bindings,
+    capture: null as BindAction | null,
+    denied: false,
+  };
+  private readonly hudGp = {
+    mode: false,
+    leg: 0,
+    total: TRACKS.length,
+    points: this.gpPoints,
+    done: false,
+  };
+  private readonly hudRecord = {
+    time: undefined as number | undefined,
+    flash: false,
+    setThisRace: false,
+  };
 
   /** Cup progress only exists while racing it — title returns and restarts
    *  from final standings always present a fresh cup (critic: the title
@@ -268,6 +298,9 @@ export class Game {
       this.aiDrivers.push(new AiDriver(this.baseSkills[i], lines[i], i === 1));
       this.scene.add(aiKart.group);
     }
+    // Stable sim-step containers — kart objects never change identity.
+    this.allKarts.push(this.kart, ...this.aiKarts);
+    for (const k of this.allKarts) this.kartPositions.push(k.position);
     // Restore persisted settings + last-played track.
     try {
       const s = JSON.parse(localStorage.getItem('grok-kart-settings') ?? '{}');
@@ -623,6 +656,21 @@ export class Game {
     // A rebuilt world is a new race context — the ★REC badge must not
     // leak across GP legs / cup abandons (critic5 D2).
     this.recordSetThisRace = false;
+    // Prewarm: compile every program + upload every texture while the
+    // race isn't live. First-use shader compiles (missile, slick, shield
+    // pop, the NN headlight light-count change) showed up as 10-40 ms
+    // render hitches mid-race (perf gauntlet); buildWorld only runs at
+    // title/countdown transitions where a one-shot compile is invisible.
+    this.renderer.compile(this.scene, this.compileCam);
+    this.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+      if (!m || Array.isArray(m)) return;
+      const rec = m as unknown as Record<string, THREE.Texture | null>;
+      for (const slot of ['map', 'emissiveMap', 'roughnessMap', 'normalMap', 'alphaMap']) {
+        const t = rec[slot];
+        if (t?.isTexture) this.renderer.initTexture(t);
+      }
+    });
     this.saveSettings();
   }
 
@@ -670,7 +718,7 @@ export class Game {
     // dispatches real keydown/keyup so item/pause/menu/GP/respawn all
     // work from a pad with zero parallel handling (critic-adjacent gap:
     // "gamepad support is a later unit").
-    const padCodes = pollPadCodes();
+    const padCodes = pollPadCodes(this.padCodes);
     for (const c of padCodes) {
       if (!this.padPrev.has(c)) {
         window.dispatchEvent(new KeyboardEvent('keydown', { code: c }));
@@ -681,7 +729,10 @@ export class Game {
         window.dispatchEvent(new KeyboardEvent('keyup', { code: c }));
       }
     }
+    // Ping-pong the sets — polled set becomes next frame's "prev".
+    const padTmp = this.padPrev;
     this.padPrev = padCodes;
+    this.padCodes = padTmp;
     if (!this.paused) this.accumulator += frameDt;
     const canDrive = this.race.allowsDrive && !this.paused;
     // Wall-pin discovery aid: throttle held but no real displacement for
@@ -708,9 +759,10 @@ export class Game {
       this.stuckFor = 0;
     }
     while (!this.paused && this.accumulator >= SIM.fixedDt) {
-      const allKarts = [this.kart, ...this.aiKarts];
+      const allKarts = this.allKarts;
       this.kart.update(SIM.fixedDt, canDrive ? input : IDLE, this.track, this.simTime, allKarts);
-      const scores = this.race.racers.map((r) => r.score);
+      const scores = this.stepScores;
+      for (let i = 0; i < this.race.racers.length; i++) scores[i] = this.race.racers[i].score;
       const racing = this.race.phase === 'racing';
       for (let i = 0; i < this.aiKarts.length; i++) {
         // Rubber-band: trailing AI get a small real pace edge vs the player,
@@ -731,8 +783,7 @@ export class Game {
       }
       this.collideKarts();
       this.items.update(this.simTime, SIM.fixedDt, scores);
-      const positions = [this.kart.position, ...this.aiKarts.map((k) => k.position)];
-      this.race.update(positions, this.simTime, SIM.fixedDt);
+      this.race.update(this.kartPositions, this.simTime, SIM.fixedDt);
       // Lap record: the player's bestLapTime improves on lap completion —
       // beating the stored record flashes a toast and stars the results.
       const bt = this.race.bestLapTime;
@@ -743,7 +794,7 @@ export class Game {
         localStorage.setItem('grok-kart-records', JSON.stringify(this.records));
       }
       // Finish celebration: confetti fountain the moment each racer crosses.
-      const karts = [this.kart, ...this.aiKarts];
+      const karts = this.allKarts;
       for (let i = 0; i < this.race.racers.length; i++) {
         if (this.race.racers[i].finished && !this.celebrated[i]) {
           this.celebrated[i] = true;
@@ -780,36 +831,33 @@ export class Game {
     this.chaseCam.update(frameDt, this.kart, this.race);
     this.hud.tick(frameDt * 1000);
     this.hud.update(this.kart);
+    const hs = this.hudSettings;
+    Object.assign(hs, this.settings);
+    hs.capture = this.bindingCapture;
+    hs.denied = this.simTime - this.captureDeniedAt < 1.2;
+    const hg = this.hudGp;
+    hg.mode = this.gpMode;
+    hg.leg = this.gpLeg;
+    hg.done = this.gpDone;
+    const hr = this.hudRecord;
+    hr.time = this.records[this.trackIdx];
+    hr.flash = this.simTime - this.recordFlashAt < 2.5;
+    hr.setThisRace = this.recordSetThisRace;
     this.raceHud.update(
       this.race,
       this.kart,
       this.simTime,
       this.items.slotItem(0),
       this.paused,
-      {
-        ...this.settings,
-        binds: bindings,
-        capture: this.bindingCapture,
-        denied: this.simTime - this.captureDeniedAt < 1.2,
-      },
+      hs,
       this.track.name,
-      {
-        mode: this.gpMode,
-        leg: this.gpLeg,
-        total: TRACKS.length,
-        points: this.gpPoints,
-        done: this.gpDone,
-      },
+      hg,
       this.stuckFor > 2,
-      {
-        time: this.records[this.trackIdx],
-        flash: this.simTime - this.recordFlashAt < 2.5,
-        setThisRace: this.recordSetThisRace,
-      },
+      hr,
       this.items.slotSpinning(0),
     );
     this.minimap.update(
-      [this.kart, ...this.aiKarts],
+      this.allKarts,
       this.race.phase !== 'title' && this.settings.minimap,
     );
     this.audio.update(

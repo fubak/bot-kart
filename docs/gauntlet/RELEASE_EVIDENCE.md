@@ -416,3 +416,37 @@ Critics: 20 → 8.0 (4 phantom-cue defects, fixed FIX-011) →
 on NN; smoke baselines identical on all 3 tracks; console 0E/0W;
 GP end-to-end verified. Reports: `evidence/wave20/CRITIC20_REPORT.md`,
 `evidence/wave21/CRITIC21_REPORT.md`.
+
+---
+
+## Performance gauntlet (wave 22) — CLOSED
+
+Goal: >30 fps with no stuttering/hesitation. Achieved with a wide margin:
+68+ fps and a *flat* frame-time distribution on all three tracks.
+
+**Before:** 72.9 fps avg but p99 26.7 ms / worst 40 ms racing (26-27 ms
+cadence gaps + occasional 40 ms hitches); ~324 KB/frame of GC churn;
+1043 draw calls; ~439 materials.
+
+**After:** 68 fps at 75 Hz vsync with worst frame 15.6-15.9 ms and zero
+frames over 25 ms across 1200-1500-frame racing samples on all three
+tracks, incl. NN with item fires. 4× CPU throttle: 47.6 fps — still
+above the 30 fps floor.
+
+**Fixes:**
+- GLB kart static-mesh merge: AI kart 125→51 meshes / 120→17 materials;
+  scene draws 1043→~390, tris ~88-99k.
+- Hot-path allocation elimination: Track query/constrain/lookahead
+  out-params, Kart/AiDriver/ChaseCamera scratch temps (no per-frame
+  clones), preallocated Game arrays/objects, reusable pad-code set,
+  missile update temps → ~0 KB/frame heap churn (was 324 KB).
+- Shader/texture prewarm at every buildWorld (`renderer.compile` +
+  `initTexture` over scene materials) + invisible prewarm group in Items
+  (missile/slick) — no mid-race program compiles or texture uploads;
+  covers the NN headlight light-count variant.
+- Shadow map 2048→1536 (carried from wave-15, verified visually neutral).
+
+**Regression:** typecheck + build clean; smoke baselines healthy on all
+3 tracks (all racers finish, 0 wall hits, 0 stalled); console 0E/0W;
+live-verified PG/SR/NN racing. Docs: PERFORMANCE_BUDGET.md wave-22
+section records the numbers + the dual-client measurement caveat.

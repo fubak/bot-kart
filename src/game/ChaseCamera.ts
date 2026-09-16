@@ -22,18 +22,24 @@ export class ChaseCamera {
     this.camera = new THREE.PerspectiveCamera(CAMERA.fovBase, aspect, 0.1, 500);
   }
 
+  private readonly _fwd = new THREE.Vector3();
+  private readonly _lead = new THREE.Vector3();
+  private readonly _target = new THREE.Vector3();
+  private readonly _orbit = new THREE.Vector3();
+  private readonly _wantLook = new THREE.Vector3();
+
   update(dt: number, kart: Kart, race?: Race): void {
-    const fwd = kart.forward();
+    const fwd = this._fwd.set(-Math.sin(kart.heading), 0, -Math.cos(kart.heading));
     const speedT = THREE.MathUtils.clamp(kart.speed / KART.maxSpeed, 0, 1);
     const dist = CAMERA.distance - CAMERA.distanceSpeedTrim * speedT;
     // Velocity lead compensates posDamp lag — without it the follow point
     // trails ~v/posDamp behind and the kart shrinks at speed (critic: 9.9 m
     // effective stand-off at 28 m/s despite the trim).
-    const lead = kart.position.clone().addScaledVector(kart.velocity, CAMERA.speedLead);
-    let targetPos = lead
-      .clone()
+    const lead = this._lead.copy(kart.position).addScaledVector(kart.velocity, CAMERA.speedLead);
+    const targetPos = this._target
+      .copy(lead)
       .addScaledVector(fwd, -dist)
-      .add(new THREE.Vector3(0, CAMERA.height, 0));
+      .add(this._orbit.set(0, CAMERA.height, 0));
 
     // Title + countdown: slow orbit that sweeps toward the chase position
     // and hands over smoothly at GO (the normal lerp lands it behind).
@@ -55,9 +61,10 @@ export class ChaseCamera {
       // lateral) and inside the prop scatter band (trees/rocks ≥ hw+3) —
       // the old r=8.5 swept past a post dead-center every ~11 s and let
       // Switchback's rock mounds bury the kart mid-orbit (critic8).
-      targetPos = kart.position
-        .clone()
-        .add(new THREE.Vector3(Math.sin(a) * 5.2, 3.35, Math.cos(a) * 5.2));
+      this._target
+        .copy(kart.position)
+        .add(this._orbit.set(Math.sin(a) * 5.2, 3.35, Math.cos(a) * 5.2));
+      // targetPos is this._target already — the const above aliases it.
       this.initialized = false;
     } else if (!this.initialized) {
       // Hard-seed only on a genuine teleport (>12 m out) — at GO the orbit
@@ -79,8 +86,8 @@ export class ChaseCamera {
       // Aim above the kart so it drops into the lower quarter of frame —
       // center-frame put it behind the PRESS ENTER/menu text (critic8),
       // while aiming low framed the gantry banner across the top.
-      ? kart.position.clone().add(new THREE.Vector3(0, 1.95, 0))
-      : kart.position.clone().addScaledVector(fwd, CAMERA.lookAhead).add(new THREE.Vector3(0, 1.0, 0));
+      ? this._wantLook.copy(kart.position).add(this._orbit.set(0, 1.95, 0))
+      : this._wantLook.copy(kart.position).addScaledVector(fwd, CAMERA.lookAhead).add(this._orbit.set(0, 1.0, 0));
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
 
