@@ -134,32 +134,38 @@ Blender sources live under `assets/blender/<category>/`; runtime exports under
   blur or tread texture if it reads static).
 
 - **Category:** characters
-- **Status:** Production
-- **Owner:** Blender Asset Builder subagent
-- **Critic:** pending (in-game critic review happens later)
-- **Quality Unit:** character visuals (replaces placeholder icosahedron bot)
-- **Blender Source:** `assets/blender/characters/grokbot-a.blend`
+- **Status:** Integrated (avatar redesign — wave 23)
+- **Owner:** Blender Asset Builder session
+- **Quality Unit:** character visuals — xAI Grok Bot avatar identity
+- **Blender Source:** `assets/blender/characters/grokbot-avatars.blend`
+  (build script `scripts/assets/build_grokbot_avatars.py`; supersedes
+  `grokbot-a.blend`)
 - **Runtime Export:** `assets/exported/characters/grokbot-a.glb`
-- **Art-Direction Notes:** seated pose per `grokbot-explore-A.png`: cream
-  capsule body #F0E6D2, coral #E8634F belt/collar/cuffs/knees/ear pods/
-  chest-panel frame, dark glossy dome visor #141E28 with two cyan emissive
-  eyes + smile arc, coral dome stripe, candy-stripe antenna with cyan glow
-  tip, coral-soled feet.
-- **Triangles:** 6,208 | **Materials:** 4 (cream, coral, cyan_glow,
-  visor_dark) | **Textures:** 0 (flat-color materials)
-- **Animation:** none — `head` node (17 children) pivots at the neck for
-  future head animation | **Collision:** none (cockpit-mounted) | **LOD:** none
-- **Performance Notes:** 62 nodes, 111.5 KB; same optimize settings as kart-a
-  (`KHR_mesh_quantization` only). Origin at seat base; faces -Z. Seated height
-  ~1.28 m to head top / ~1.53 m including antenna appendage.
-- **Critic Result:** not yet reviewed in-game
-- **Biggest Gap:** minor surface interpenetration where limb capsules meet the
-  torso; smile curve hugs the visor — watch for z-fighting at grazing angles.
+- **Art-Direction Notes:** remodeled after the Grok Bot avatar
+  (x.ai/bot): oversized white gloss `shell` dome head carrying ~60% of the
+  silhouette, two tall black `eye_lens` ovals with tops tilted inward,
+  dark `joint` collar/chin ring/ear pods, xAI `x_mark` emblem on the dome
+  back (the chase-cam signature), thin `antenna` + cyan `tip_glow` beacon,
+  white pod torso with `accent_a` cyan chest bar/dot/cuff rings/knee dots.
+  Seated pose, origin at seat base.
+- **Triangles:** 4,332 | **Materials:** 5 (shell, joint, eye_lens,
+  accent_a, tip_glow) | **Textures:** 0 (flat-color materials)
+- **Animation:** runtime empties — `head` look-around/blink squash on
+  `eye_l`/`eye_r` scale.y, `arm_l/r` celebration/flail, `leg_l/r` pedal
+  press | **Collision:** none (cockpit-mounted) | **LOD:** none
+- **Performance Notes:** 50 nodes pre-merge → ~20 draws after runtime
+  static-merge, 156 KB. Faces -Z; seated height ~1.2 m to dome top.
+- **Critic Result:** verified in-game — dome + oval eyes read at chase
+  distance; X emblem visible from behind; blink verified (scale.y 1→0.12)
+- **Biggest Gap:** eyes are opaque lenses — no emissive variant for night
+  pop (deliberate: matches the matte-black avatar look).
 
 ### grokbot-b — Grok Bot B Rival (heavy/power, standing)
 
 - **Category:** characters
-- **Status:** Exported
+- **Status:** Deprecated (wave-23 avatar redesign — game loads the new
+  `grokbot-b-seated.glb` dome-bot; this standing export is retained as
+  source history only)
 - **Owner:** Blender Asset Builder subagent
 - **Critic:** pending (in-game critic review happens later)
 - **Quality Unit:** character visuals (rival roster)
@@ -196,32 +202,30 @@ Blender sources live under `assets/blender/<category>/`; runtime exports under
 ### grokbot-b-seated — Grok Bot B Rival (kart-driving pose)
 
 - **Category:** characters
-- **Status:** Exported
-- **Owner:** Blender Asset Builder subagent
-- **Critic:** pending (in-game critic review happens later)
-- **Quality Unit:** character visuals (rival in-kart driver)
-- **Blender Source:** `assets/blender/characters/grokbot-b.blend`
-  (collection `bot_b_seated`; same build script — seated pose is a separate
-  hierarchy inside the one .blend, objects carry `_seat` suffix in source)
+- **Status:** Integrated (avatar redesign — wave 23)
+- **Owner:** Blender Asset Builder session
+- **Quality Unit:** character visuals — xAI Grok Bot avatar identity (heavy)
+- **Blender Source:** `assets/blender/characters/grokbot-avatars.blend`
+  (collection `avatar_b`; build script `build_grokbot_avatars.py`;
+  supersedes `grokbot-b.blend` seated hierarchy)
 - **Runtime Export:** `assets/exported/characters/grokbot-b-seated.glb`
-- **Art-Direction Notes:** same palette/silhouette as standing B; torso
-  dropped 0.17 m, knees folded forward, feet forward toe-up on pedals,
-  hands forward inboard to wheel height — mirrors grokbot-a seating
-  convention. Root node `grokbot_b_seated`; all child node names identical
-  to the standing rig (`head`, `foot_l`, `hand_r`, …).
-- **Triangles:** 4,848 | **Materials:** 5 | **Textures:** 0
-- **Animation:** none | **Collision:** none (cockpit-mounted) | **LOD:** none
-- **Performance Notes:** 56 nodes, 76.0 KB; same quantize pass. Origin at
-  seat base, faces -Z; seated height ~1.29 m to beacon tip, feet reach
-  ~0.52 m forward.
-- **Critic Result:** not yet reviewed in-game
-- **Biggest Gap:** seat fit vs kart-b cockpit unverified — may need hip-y
-  trim when a kart-b exists.
+- **Art-Direction Notes:** same Grok-Bot-avatar identity as A (white dome,
+  black oval eyes, X emblem) with heavy reads: thicker limbs, squared
+  `shoulderpad_l/r` with `accent_b` stripes, three chest `vent_*` slats,
+  no antenna. Orange `accent_b` hue-shifts with team tint.
+- **Triangles:** 4,972 | **Materials:** 4 (shell, joint, eye_lens,
+  accent_b) | **Textures:** 0
+- **Animation:** same runtime-empty scheme as A | **Collision:** none |
+  **LOD:** none
+- **Performance Notes:** 55 nodes pre-merge → ~20 draws after runtime
+  merge, 203 KB. Origin at seat base, faces -Z.
+- **Critic Result:** verified in-game (shoulder pods + vents read at speed)
+- **Biggest Gap:** none flagged — silhouette distinct from A/C via pads.
 
 ### grokbot-c — Grok Bot C Rival (speed, standing)
 
 - **Category:** characters
-- **Status:** Exported
+- **Status:** Deprecated (wave-23 avatar redesign — see grokbot-c-seated)
 - **Owner:** Blender Asset Builder subagent
 - **Critic:** pending (in-game critic review happens later)
 - **Quality Unit:** character visuals (rival roster)
@@ -255,22 +259,21 @@ Blender sources live under `assets/blender/<category>/`; runtime exports under
 ### grokbot-c-seated — Grok Bot C Rival (kart-driving pose)
 
 - **Category:** characters
-- **Status:** Exported
-- **Owner:** Blender Asset Builder subagent
-- **Critic:** pending (in-game critic review happens later)
-- **Quality Unit:** character visuals (rival in-kart driver)
-- **Blender Source:** `assets/blender/characters/grokbot-c.blend`
-  (collection `bot_c_seated`; `_seat` suffix in source)
+- **Status:** Integrated (avatar redesign — wave 23)
+- **Owner:** Blender Asset Builder session
+- **Quality Unit:** character visuals — xAI Grok Bot avatar identity (speed)
+- **Blender Source:** `assets/blender/characters/grokbot-avatars.blend`
+  (collection `avatar_c`; build script `build_grokbot_avatars.py`;
+  supersedes `grokbot-c.blend` seated hierarchy)
 - **Runtime Export:** `assets/exported/characters/grokbot-c-seated.glb`
-- **Art-Direction Notes:** same palette/silhouette as standing C; torso
-  dropped 0.15 m, knees folded forward, feet forward toe-up on pedals,
-  hands forward to wheel. Root node `grokbot_c_seated`; child node names
-  identical to the standing rig.
-- **Triangles:** 3,204 | **Materials:** 5 | **Textures:** 0
-- **Animation:** none | **Collision:** none (cockpit-mounted) | **LOD:** none
-- **Performance Notes:** 44 nodes, 57.6 KB; same quantize pass. Origin at
-  seat base, faces -Z; seated height ~1.27 m to fin tip, feet reach ~0.52 m
-  forward.
-- **Critic Result:** not yet reviewed in-game
-- **Biggest Gap:** dorsal fin may poke through a kart-b/c-style seat back
-  if one is added later — check clearance at integration.
+- **Art-Direction Notes:** same Grok-Bot-avatar identity with speed reads:
+  swept `fin_top` wedge on the dome crown with `accent_c` violet leading
+  edge, slim limbs, violet knee dots/cuff rings/chest accents.
+- **Triangles:** 4,252 | **Materials:** 4 (shell, joint, eye_lens,
+  accent_c) | **Textures:** 0
+- **Animation:** same runtime-empty scheme as A | **Collision:** none |
+  **LOD:** none
+- **Performance Notes:** 50 nodes pre-merge → ~20 draws after runtime
+  merge, 153 KB. Origin at seat base, faces -Z.
+- **Critic Result:** verified in-game
+- **Biggest Gap:** none flagged — dorsal fin clears the kart-c seat back.

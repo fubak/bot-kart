@@ -524,7 +524,7 @@ export class Kart {
         // head node so it rides the look-around/celebration motion.
         if (this.tint && this.botUrl === botGlbUrl && headNode) {
           const crest = new THREE.Mesh(
-            new THREE.BoxGeometry(0.05, 0.14, 0.32),
+            new THREE.BoxGeometry(0.05, 0.22, 0.34),
             new THREE.MeshStandardMaterial({
               color: new THREE.Color(this.tint).lerp(new THREE.Color(0xffffff), 0.2),
               emissive: new THREE.Color(this.tint),
@@ -533,8 +533,8 @@ export class Kart {
               roughness: 0.5,
             }),
           );
-          // Half-embedded in the dome top, swept back behind the antenna.
-          crest.position.set(0, 0.46, 0.18);
+          // Half-embedded in the dome crown, swept back behind the antenna.
+          crest.position.set(0, 0.62, -0.08);
           crest.rotation.x = 0.3;
           headNode.add(crest);
         }
