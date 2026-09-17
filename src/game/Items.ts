@@ -35,7 +35,7 @@ const ITEM_KINDS: ItemKind[] = ['boost', 'missile', 'slick', 'shield', 'ink', 's
 const ITEM_GLOW: Record<ItemKind, THREE.Color> = {
   boost: new THREE.Color(0xffd454),
   missile: new THREE.Color(0xff5a3c),
-  slick: new THREE.Color(0x8a8f96),
+  slick: new THREE.Color(0xf7d020),
   shield: new THREE.Color(0x7be8ff),
   ink: new THREE.Color(0xc070ff),
   swap: new THREE.Color(0x7dff8a),
@@ -50,6 +50,11 @@ const _missTq = {
   index: 0,
   surface: 'road' as 'road' | 'gravel',
 };
+// Pad-orientation scratches — build-time only, but keeps the constructor
+// allocation-free like the rest of the file.
+const _padNormal = new THREE.Vector3();
+const _padCross = new THREE.Vector3();
+const _padBasis = new THREE.Matrix4();
 
 interface Box {
   mesh: THREE.Mesh;
@@ -79,7 +84,7 @@ interface Missile {
 }
 
 interface Slick {
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D; // banana group — spins/bobs like the old disc
   pos: THREE.Vector3;
   owner: Kart;
   spawnedAt: number; // owner-immune for the first beat
@@ -140,12 +145,61 @@ function buildMissile(): THREE.Group {
   g.add(body, nose, finL, finR, glow);
   return g;
 }
-const slickGeo = new THREE.CylinderGeometry(0.7, 0.9, 0.22, 10);
-const slickMat = new THREE.MeshStandardMaterial({
+// Dropped banana — the classic peel hazard, readable at speed: an
+// upright yellow crescent standing on its tips, three peel strips
+// flopped onto the tarmac around the base.
+const bananaMat = new THREE.MeshStandardMaterial({
   color: 0xf7d020,
-  emissive: 0x7a5c00,
+  emissive: 0x6a5200,
+  emissiveIntensity: 0.5,
+  roughness: 0.6,
   flatShading: true,
 });
+const bananaTipMat = new THREE.MeshStandardMaterial({
+  color: 0x5a3a18,
+  roughness: 0.7,
+  flatShading: true,
+});
+const bananaPeelMat = new THREE.MeshStandardMaterial({
+  color: 0xffe878,
+  emissive: 0x5a4a00,
+  emissiveIntensity: 0.4,
+  roughness: 0.65,
+  flatShading: true,
+});
+const bananaBodyGeo = new THREE.TorusGeometry(0.5, 0.15, 8, 16, 2.4);
+const bananaTipGeo = new THREE.SphereGeometry(0.09, 8, 6);
+const bananaPeelGeo = new THREE.BoxGeometry(0.14, 0.5, 0.05);
+const BANANA_ARC = 2.4;
+function buildBanana(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(bananaBodyGeo, bananaMat);
+  body.castShadow = true;
+  // Crescent standing on one tip — the classic dropped-banana lean. The
+  // arc is rotated off-center so one end lands on the road and the other
+  // curls up; a slight forward tilt sells the organic flop.
+  body.rotation.z = -0.2;
+  body.rotation.x = 0.18;
+  body.position.y = 0.25;
+  g.add(body);
+  for (const a of [-0.2, -0.2 + BANANA_ARC]) {
+    // Brown stem tips cap both ends of the crescent.
+    const tip = new THREE.Mesh(bananaTipGeo, bananaTipMat);
+    tip.position.set(Math.cos(a) * 0.5, 0.25 + Math.sin(a) * 0.5, 0);
+    g.add(tip);
+  }
+  for (let i = 0; i < 3; i++) {
+    // Peel strips flopped outward on the road — sells "hazard" and gives
+    // the hazard a footprint bigger than the slim crescent.
+    const peel = new THREE.Mesh(bananaPeelGeo, bananaPeelMat);
+    const yaw = (i / 3) * Math.PI * 2 + 0.4;
+    peel.position.set(Math.sin(yaw) * 0.32, 0.05, Math.cos(yaw) * 0.32);
+    peel.rotation.y = yaw;
+    peel.rotateX(1.75); // flop the strip outward along its own direction
+    g.add(peel);
+  }
+  return g;
+}
 const shieldGeo = new THREE.SphereGeometry(1.9, 16, 12);
 const shieldMat = new THREE.MeshStandardMaterial({
   color: 0x60d0ff,
@@ -249,18 +303,20 @@ export class Items {
       pos.y = track.surfaceYAt(idx, lat) + 0.03;
       const mesh = new THREE.Mesh(padGeo, padMat);
       mesh.position.copy(pos);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.rotation.z = -Math.atan2(
-        track.tangentAt(idx).x,
-        track.tangentAt(idx).z,
+      // Basis from the surface itself: local X = cross-slope direction,
+      // Y = travel tangent (the chevron texture's arrows point +Y),
+      // Z = cambered surface normal. Euler guesses used to leave the
+      // arrows pointing off-line or backwards on anything but a
+      // Z-aligned straight.
+      const tan = track.tangentAt(idx);
+      const nrm = _padNormal
+        .set(0, 1, 0)
+        .addScaledVector(track.leftAt(idx), -Math.tan(track.bankAngleAt(idx)))
+        .normalize();
+      _padCross.crossVectors(tan, nrm);
+      mesh.quaternion.setFromRotationMatrix(
+        _padBasis.makeBasis(_padCross, tan, nrm),
       );
-      // Lie flat on the camber — roll the plane about the travel axis.
-      const bank = track.bankAngleAt(idx);
-      if (bank !== 0) {
-        mesh.quaternion.premultiply(
-          new THREE.Quaternion().setFromAxisAngle(track.tangentAt(idx), bank),
-        );
-      }
       this.group.add(mesh);
       this.pads.push({ mesh, pos, cooldownUntil: 0 });
     }
@@ -270,7 +326,7 @@ export class Items {
     // shader compile (perf gauntlet).
     const prewarm = new THREE.Group();
     prewarm.visible = false;
-    prewarm.add(buildMissile(), new THREE.Mesh(slickGeo, slickMat));
+    prewarm.add(buildMissile(), buildBanana());
     this.group.add(prewarm);
   }
 
@@ -399,12 +455,13 @@ export class Items {
     }
     if (item === 'slick') {
       // Drop hazard behind the kart — persists ~18 s, spins whoever clips it.
-      const mesh = new THREE.Mesh(slickGeo, slickMat);
+      const mesh = buildBanana();
       const pos = kart.position
         .clone()
         .addScaledVector(kart.forward(), -2.6);
-      pos.y = this.track.heightAt(pos, kart.trackIdx) + 0.11;
+      pos.y = this.track.heightAt(pos, kart.trackIdx) + 0.02;
       mesh.position.copy(pos);
+      mesh.rotation.y = Math.random() * Math.PI * 2; // random flop yaw
       this.group.add(mesh);
       this.slicks.push({
         mesh,

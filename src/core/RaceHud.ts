@@ -49,7 +49,7 @@ function fmt(t: number): string {
 const ITEM_GLYPHS: Record<string, [string, string]> = {
   boost: ['⚡', '#ffd454'],
   missile: ['✹', '#ff5a3c'],
-  slick: ['◍', '#8a8f96'],
+  slick: ['🍌', '#f7d020'],
   shield: ['◯', '#7be8ff'],
   ink: ['✦', '#c070ff'],
   swap: ['⇄', '#7dff8a'],

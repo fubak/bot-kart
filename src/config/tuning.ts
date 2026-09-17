@@ -128,6 +128,10 @@ export const TRACK = {
   samples: 1024, // centerline lookup resolution
   wallHeight: 0.55,
   gravelWidth: 3.4, // gravel apron extends this far past the road edge
+  // Field/skirt/apron-drop grade — sits BELOW the deepest banked road
+  // edge (NN's left-drop apron dips to ≈-1.0) so the flat field plane
+  // never paints over dipped road edges or gravel aprons.
+  gradeY: -1.1,
 } as const;
 
 export const RACE = {

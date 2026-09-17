@@ -914,7 +914,7 @@ export class Track {
       new THREE.MeshStandardMaterial({ map: grassTex, color: grassTint, roughness: 1 }),
     );
     grass.rotation.x = -Math.PI / 2;
-    grass.position.y = -0.1; // clear of the road plane — avoids z-fighting
+    grass.position.y = TRACK.gradeY; // below the deepest banked edge — never covers dipped road/aprons
     grass.receiveShadow = true;
     this.group.add(grass);
 
@@ -1058,7 +1058,7 @@ export class Track {
         const wy = s.point.y + side * off * bt;
         const ft = Math.min((offFoot - (hw - 0.1)) / 6, 1);
         const fy =
-          THREE.MathUtils.lerp(s.point.y + side * (hw - 0.1) * bt, -0.1, ft) - 0.08;
+          THREE.MathUtils.lerp(s.point.y + side * (hw - 0.1) * bt, TRACK.gradeY, ft) - 0.08;
         const base = wallPos.length / 3;
         const rbase = railPos.length / 3;
         wallPos.push(fx, fy, fz, bx, wy - 0.02, bz, bx, wy + h, bz);
@@ -1130,7 +1130,7 @@ export class Track {
         // banked edge height. Continuing the camber across 3.6 m raised the
         // drop face ~1 m past the edge on the high side — a dirt cliff.
         const edgeY = s.point.y + z.side * hw * bt;
-        const dy = THREE.MathUtils.lerp(edgeY, -0.1, dt) - 0.06;
+        const dy = THREE.MathUtils.lerp(edgeY, TRACK.gradeY, dt) - 0.06;
         gPos.push(
           s.point.x + s.left.x * z.side * inner, s.point.y + z.side * inner * bt - 0.015, s.point.z + s.left.z * z.side * inner,
           s.point.x + s.left.x * z.side * flat, edgeY - 0.03, s.point.z + s.left.z * z.side * flat,
@@ -1172,7 +1172,7 @@ export class Track {
         const bl = drop + 0.6;
         const bt = Math.min((bl - (hw - 0.1)) / 6, 1);
         const by =
-          THREE.MathUtils.lerp(s.point.y + z.side * hw * this.bankTan[si], -0.1, bt) + 0.06;
+          THREE.MathUtils.lerp(s.point.y + z.side * hw * this.bankTan[si], TRACK.gradeY, bt) + 0.06;
         bm.compose(
           s.point.clone().addScaledVector(s.left, z.side * bl).setY(by),
           bq,
@@ -1206,13 +1206,23 @@ export class Track {
         // Inner edge seats on the banked road edge, not the centerline —
         // otherwise a cambered section leaves a wedge of skirt showing
         // on the low side and a gap on the high side.
-        const edgeY = s.point.y + side * inner * bt;
+        // On a gravel-zone side the apron + drop face already fill
+        // road-edge→grade — the grass ribbon must start at the drop toe,
+        // or it covers the drivable apron (box-on-grass bug).
+        const z = this.zoneAt(i % n);
+        const onZone = z !== null && z.side === side;
+        const innerLat = onZone
+          ? hw + TRACK.gravelWidth + 1.8 // apron drop-face toe
+          : inner;
+        const innerY = onZone
+          ? TRACK.gradeY - 0.06 // matches the apron drop's end height
+          : s.point.y + side * inner * bt;
         skPos.push(
-          s.point.x + s.left.x * side * inner, edgeY, s.point.z + s.left.z * side * inner,
-          // Outer edge meets the grade plane (-0.1) exactly — the old -0.35
+          s.point.x + s.left.x * side * innerLat, innerY, s.point.z + s.left.z * side * innerLat,
+          // Outer edge meets the grade plane exactly — the old -0.35
           // dipped under the field so flat legs showed a ditch ring instead
           // of a shoulder that reaches grade (critic10 D1).
-          s.point.x + s.left.x * side * outer, -0.1, s.point.z + s.left.z * side * outer,
+          s.point.x + s.left.x * side * outer, TRACK.gradeY, s.point.z + s.left.z * side * outer,
         );
         const v = (i * spacing) / 5;
         skUv.push(0, v, 1.2, v);
@@ -1585,10 +1595,9 @@ export class Track {
       0,
       1,
     );
-    // Grade target -0.1 matches the skirt's outer edge / field plane; the
-    // +0.1 keeps prop bases ~0.1 proud (identical to the old formula at both
-    // ends — -0.35+0.35 = -0.1+0.1 = 0 — only mid-slope seats tighter).
-    return THREE.MathUtils.lerp(edgeY, -0.1, t) + 0.1;
+    // Grade target matches the skirt's outer edge / field plane; the +0.1
+    // keeps prop bases ~0.1 proud of the field instead of flush with it.
+    return THREE.MathUtils.lerp(edgeY, TRACK.gradeY, t) + 0.1;
   }
 
   /** Straightest sample index within frac range [f0,f1] passing `ok` —
