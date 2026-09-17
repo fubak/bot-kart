@@ -984,9 +984,11 @@ export class Track {
     for (let c = 0; c < curbCount; c++) {
       const ci = (c * 8) % n;
       const s = this.samples[ci];
-      // Yaw then roll about the tangent by the camber so the plank lies
-      // flat on a banked surface instead of knifing into it.
-      q.setFromAxisAngle(up, Math.atan2(s.tangent.x, s.tangent.z) + Math.PI / 2);
+      // Curb plank runs ALONG the edge: local Z (the 2.4 m length) maps
+      // to the tangent — yaw is the plain track yaw. Yaw then roll about
+      // the tangent by the camber so the plank lies flat on a banked
+      // surface instead of knifing into it.
+      q.setFromAxisAngle(up, Math.atan2(s.tangent.x, s.tangent.z));
       curbRoll.setFromAxisAngle(s.tangent, Math.atan(this.bankTan[ci]));
       q.premultiply(curbRoll);
       for (const [mesh, side] of [
@@ -1251,7 +1253,9 @@ export class Track {
       new THREE.MeshStandardMaterial({ map: checker, roughness: 0.7 }),
     );
     stripe.rotation.x = -Math.PI / 2;
-    stripe.rotation.z = -Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
+    // Track yaw: local X (the stripe's full-width axis) maps to `left` —
+    // the finish line spans the road, not runs down it.
+    stripe.rotation.z = Math.atan2(s0.tangent.x, s0.tangent.z);
     // If sample 0 ever sits inside a bank zone, tilt the stripe onto the
     // camber (authored zones avoid frac 0, so this is a robustness guard).
     if (this.bankTan[0] !== 0) {
@@ -1292,7 +1296,9 @@ export class Track {
     }
     const beam = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 2.8, 0.5, 0.5), beamMat);
     beam.position.copy(s0.point).setY(s0.point.y + 5.5);
-    beam.rotation.y = Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
+    // Track yaw maps the beam's local X (its span) to `left` — the gantry
+    // crosses the road instead of running down it.
+    beam.rotation.y = Math.atan2(s0.tangent.x, s0.tangent.z);
     this.group.add(beam);
     const bannerTex = checkerTexture();
     bannerTex.repeat.set(1.5, 1);

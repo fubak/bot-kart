@@ -657,7 +657,7 @@ export function dressRidge(ctx: ScatterCtx): DressResult {
     lintel.castShadow = true;
     arch.add(lintel);
     arch.position.copy(s.point);
-    arch.rotation.y = Math.atan2(s.left.x, s.left.z); // +X spans the road
+    arch.rotation.y = Math.atan2(s.tangent.x, s.tangent.z); // +X spans the road
     ctx.avoid(s.point, hw + 5);
     objects.push(arch);
     animated.push({
@@ -751,7 +751,9 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
   let pi = 0;
   gateSpots.forEach((ai, g) => {
     const s = ctx.samples[ai];
-    const yaw = Math.atan2(s.left.x, s.left.z);
+    // Track yaw maps the bar's local X (its span) to `left` — gates
+    // cross the road instead of running down it.
+    const yaw = Math.atan2(s.tangent.x, s.tangent.z);
     const rot = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
     const barY = s.point.y + 4.75; // underside ≈4.55 m over centerline
     for (const side of [1, -1]) {
