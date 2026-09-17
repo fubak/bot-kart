@@ -19,9 +19,10 @@ export type ItemKind = 'boost' | 'missile' | 'slick' | 'shield' | 'ink' | 'swap'
 const BOX_RADIUS = 1.6; // pickup distance, m
 const RESPAWN_S = 7;
 const MISSILE_SPEED = 34; // m/s along track
-const MISSILE_RANGE = 90; // m travelled before fizzle
+const MISSILE_RANGE = 130; // m travelled before fizzle — homing needs reach
 const MISSILE_HIT = 2.4; // hit radius, m
 const MISSILE_SLOW = 0.25; // victim keeps this fraction of velocity
+const MISSILE_LAT_RATE = 10; // m/s lateral steering while homing
 // Item roulette: the HUD slot spins ~1.2 s before the rolled item lands
 // (genre signature — instant grants read as a bug to kart players).
 // Exported: Audio pitches the tick cue by spin progress off the same clock.
@@ -43,6 +44,12 @@ const ITEM_GLOW: Record<ItemKind, THREE.Color> = {
 const _missWp = new THREE.Vector3();
 const _missTan = new THREE.Vector3();
 const _missUp = new THREE.Vector3(0, 1, 0);
+const _missTq = {
+  lateral: 0,
+  tangent: new THREE.Vector3(),
+  index: 0,
+  surface: 'road' as 'road' | 'gravel',
+};
 
 interface Box {
   mesh: THREE.Mesh;
@@ -61,9 +68,13 @@ interface Pad {
 interface Missile {
   mesh: THREE.Group; // body + nose + fins + exhaust glow
   progressIdx: number; // unwrapped centerline index — travels the racing line
+  lat: number; // lateral offset from the centerline while homing
   speed: number;
   travelled: number;
   owner: Kart;
+  /** Homing lock — the kart directly ahead on score at fire time, or null
+   *  for a leader's wasted shell (it just runs the racing line). */
+  target: Kart | null;
   active: boolean;
 }
 
@@ -199,38 +210,43 @@ export class Items {
       this.group.add(bubble);
       this.shieldMeshes.push(bubble);
     }
-    // Rows of 3 boxes at ~1/8-lap intervals, staggered across the road.
+    // Item boxes: authored per-layout rows at decision points (corner
+    // entries, shortcut mouths); falls back to a uniform 8×3 grid. A row
+    // may put a box on a gravel apron inside a same-side zone — only the
+    // cut line reaches it.
     const n = track.sampleCount;
-    const spreads = [-3, 0, 3];
-    for (let row = 0; row < 8; row++) {
-      const idx = Math.floor(((row + 0.5) / 8) * n);
-      for (let s = 0; s < 3; s++) {
-        const pos = track.pointAt(idx).addScaledVector(
-          track.leftAt(idx),
-          spreads[(s + row) % 3],
-        );
-        pos.y += 0.46; // low hover — 0.55 read as a floating white cube (critic9)
+    const rows =
+      track.itemRows ??
+      Array.from({ length: 8 }, (_, row) => ({
+        frac: (row + 0.5) / 8,
+        lats: [0, 1, 2].map((s) => [-3, 0, 3][(s + row) % 3]),
+      }));
+    let boxOrd = 0;
+    for (const row of rows) {
+      const idx = Math.floor(row.frac * n);
+      for (const lat of row.lats) {
+        const pos = track
+          .pointAt(idx)
+          .addScaledVector(track.leftAt(idx), lat);
+        pos.y = track.surfaceYAt(idx, lat) + 0.46; // low hover over the cambered surface
         const mesh = new THREE.Mesh(boxGeo, boxMat);
         mesh.position.copy(pos);
-        mesh.rotation.set(0.5, (row + s) * 0.7, 0.4);
+        mesh.rotation.set(0.5, boxOrd * 0.7, 0.4);
         mesh.castShadow = true;
         this.group.add(mesh);
-        this.boxes.push({ mesh, idx, pos, respawnAt: 0, phase: (row + s) * 1.3 });
+        this.boxes.push({ mesh, idx, pos, respawnAt: 0, phase: boxOrd * 1.3 });
+        boxOrd++;
       }
     }
-    // Boost pads: glowing arrows placed OFF the ideal line — a route decision
-    // (wide line for free boost vs. tight line). Outside of the crest corner,
-    // inside of the hairpin exit, mid straight.
-    const padSpots: Array<[number, number]> = [
-      [0.22, -4.2], // outside on the climb into the crest
-      [0.30, 4.4],  // outside at crest exit — the dive
-      [0.62, -4.0], // inside of the ridge S
-      [0.88, 3.8],  // outside hairpin exit
-    ];
+    // Boost pads: authored per-layout [frac, lateral] spots off the ideal
+    // line — a route decision (wide line for free boost vs. tight line).
+    const padSpots =
+      track.pads ??
+      ([[0.22, -4.2], [0.3, 4.4], [0.62, -4.0], [0.88, 3.8]] as const);
     for (const [frac, lat] of padSpots) {
       const idx = Math.floor(frac * n);
       const pos = track.pointAt(idx).addScaledVector(track.leftAt(idx), lat);
-      pos.y += 0.03;
+      pos.y = track.surfaceYAt(idx, lat) + 0.03;
       const mesh = new THREE.Mesh(padGeo, padMat);
       mesh.position.copy(pos);
       mesh.rotation.x = -Math.PI / 2;
@@ -238,6 +254,13 @@ export class Items {
         track.tangentAt(idx).x,
         track.tangentAt(idx).z,
       );
+      // Lie flat on the camber — roll the plane about the travel axis.
+      const bank = track.bankAngleAt(idx);
+      if (bank !== 0) {
+        mesh.quaternion.premultiply(
+          new THREE.Quaternion().setFromAxisAngle(track.tangentAt(idx), bank),
+        );
+      }
       this.group.add(mesh);
       this.pads.push({ mesh, pos, cooldownUntil: 0 });
     }
@@ -392,19 +415,37 @@ export class Items {
       });
       return item;
     }
-    // Missile: spawn at kart nose, travels the centerline forward.
+    // Missile: spawn at kart nose, then homes onto the racer directly
+    // ahead on score — the red-shell rule. A leader's shell has nobody
+    // ahead: it just runs the racing line and fizzles.
     const mesh = buildMissile();
     mesh.position.copy(kart.position).setY(0.5);
     this.group.add(mesh);
+    let target: Kart | null = null;
+    const msc = scores ?? this.scores;
+    if (msc.length) {
+      let bestGap = Infinity;
+      for (let k = 0; k < this.karts.length; k++) {
+        if (k === kartIdx) continue;
+        const gap = msc[k] - msc[kartIdx];
+        if (gap > 0 && gap < bestGap) {
+          bestGap = gap;
+          target = this.karts[k];
+        }
+      }
+    }
+    const spawnIdx =
+      kart.trackIdx >= 0
+        ? this.track.nearestIndexNear(kart.position, kart.trackIdx)
+        : this.track.nearestIndex(kart.position);
     this.missiles.push({
       mesh,
-      progressIdx:
-        kart.trackIdx >= 0
-          ? this.track.nearestIndexNear(kart.position, kart.trackIdx)
-          : this.track.nearestIndex(kart.position),
+      progressIdx: spawnIdx,
+      lat: this.track.query(kart.position, spawnIdx, _missTq).lateral,
       speed: Math.max(MISSILE_SPEED, kart.speed + 8),
       travelled: 0,
       owner: kart,
+      target,
       active: true,
     });
     void simTime;
@@ -531,16 +572,43 @@ export class Items {
         }
       }
     }
-    // Missiles: advance along centerline, check hits
+    // Missiles: advance along centerline, steer laterally toward the lock,
+    // check hits
+    const nSamp = this.track.sampleCount;
     for (const m of this.missiles) {
       if (!m.active) continue;
       const step = (m.speed * dt) / this.track.sampleSpacing;
       m.progressIdx += step;
       m.travelled += m.speed * dt;
-      const wp = this.track.pointAt(Math.floor(m.progressIdx), _missWp);
-      wp.y += 0.55 + Math.sin(simTime * 9 + m.travelled) * 0.06; // hover wobble
+      const mIdx = Math.floor(m.progressIdx);
+      // Homing: chase the locked target's live lateral. dAhead is the
+      // modulo forward distance missile→target in samples, so wrapping and
+      // lap differences can't corrupt it. The lock drops when the shell
+      // overshoots (dAhead ≈ nSamp) or the target is beyond practical reach
+      // (a red shell can't close more ground than its range) — it then
+      // settles back to the racing line like a spent shell.
+      let wantLat = 0;
+      if (m.target) {
+        const dAhead =
+          ((m.target.trackIdx - m.progressIdx) % nSamp + nSamp) % nSamp;
+        if (dAhead > nSamp * 0.22) {
+          m.target = null;
+        } else {
+          wantLat = this.track.query(
+            m.target.position,
+            m.target.trackIdx,
+            _missTq,
+          ).lateral;
+        }
+      }
+      const lim = this.track.roadLimitAt(mIdx, m.lat || wantLat);
+      m.lat += THREE.MathUtils.clamp(wantLat - m.lat, -MISSILE_LAT_RATE * dt, MISSILE_LAT_RATE * dt);
+      m.lat = THREE.MathUtils.clamp(m.lat, -lim, lim);
+      const wp = this.track.pointAt(mIdx, _missWp);
+      wp.addScaledVector(this.track.leftAt(mIdx), m.lat);
+      wp.y = this.track.surfaceYAt(mIdx, m.lat) + 0.55 + Math.sin(simTime * 9 + m.travelled) * 0.06;
       m.mesh.position.copy(wp);
-      const t = this.track.tangentAt(Math.floor(m.progressIdx));
+      const t = this.track.tangentAt(mIdx);
       m.mesh.quaternion.setFromUnitVectors(
         _missUp,
         _missTan.copy(t), // missile +Y nose points along travel

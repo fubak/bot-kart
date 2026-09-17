@@ -15,6 +15,7 @@ export class ChaseCamera {
   private shake = 0;
   private readonly shakeOffset = new THREE.Vector3();
   private introAngle = Math.PI * 0.5; // countdown orbit angle
+  private bankRoll = 0; // damped camber roll applied post-lookAt
   /** Reduced motion: kills shake + speed FOV for motion-sensitive players. */
   reducedMotion = false;
 
@@ -90,6 +91,16 @@ export class ChaseCamera {
       : this._wantLook.copy(kart.position).addScaledVector(fwd, CAMERA.lookAhead).add(this._orbit.set(0, 1.0, 0));
     this.lookTarget.lerp(wantLook, kl);
     this.camera.lookAt(this.lookTarget);
+    // Bank roll: tilt the view with the camber the kart is riding — subtle
+    // (30%) so banked sweepers read as banked without disorienting.
+    if (!inCountdown) {
+      this.bankRoll = THREE.MathUtils.lerp(
+        this.bankRoll,
+        -kart.slopeRoll * 0.3,
+        kl,
+      );
+      this.camera.rotateZ(this.bankRoll);
+    }
 
     // Wall-impact shake: fresh lastWallHit starts a jitter burst scaled by
     // impact severity (a glancing tap shudders; a head-on thumps).

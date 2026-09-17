@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SCENERY } from '../config/tuning';
 import { TEX } from '../core/Textures';
+import type { SetPiece } from './Track';
 
 // Set-dressing prop factories (WS-DRESS). Everything here is procedural and
 // instanced — flat-shaded low-poly matching the existing scenery. Each theme
@@ -80,6 +81,9 @@ export interface ScatterCtx {
   /** Terrain height under a world point — resolves the leg actually under
    *  the prop so nothing floats on elevated/terraced sections. */
   fieldY(p: THREE.Vector3): number;
+  /** Banked road-surface height at a sample index + lateral — props that
+   *  stand on or span the road (gate posts, arch pillars) seat on this. */
+  surfaceYAt(index: number, lateral: number): number;
   /** +1 when the loop interior lies to this sample's left, else -1 — used
    *  to weight 'inner' scatter into the infield. */
   innerSide(s: ScatterSample): number;
@@ -87,6 +91,9 @@ export interface ScatterCtx {
    *  [f0, f1] that passes the optional predicate — used to site road-
    *  spanning set pieces (stone arch, neon gates) on real straights. */
   straightSpot(f0: number, f1: number, ok?: (i: number) => boolean): number;
+  /** Authored set-piece data from the layout — each dress function reads
+   *  the entries for its kind and falls back to built-in defaults. */
+  setPieces?: ReadonlyArray<SetPiece>;
 }
 
 export interface DressResult {
@@ -598,7 +605,12 @@ export function dressRidge(ctx: ScatterCtx): DressResult {
   // Stone arch over the straightest post-start stretch — the ridge's big
   // authored landmark. Lintel underside sits ~4.5 m over the road surface;
   // pillars stand well outside the walls.
-  const ai = ctx.straightSpot(0.05, 0.16, (i) => {
+  const archWindow =
+    ctx.setPieces?.find(
+      (p): p is SetPiece & { window: readonly [number, number] } =>
+        p.kind === 'stoneArch' && 'window' in p,
+    )?.window ?? ([0.05, 0.16] as const);
+  const ai = ctx.straightSpot(archWindow[0], archWindow[1], (i) => {
     const s = ctx.samples[i];
     for (const side of [1, -1]) {
       const p = s.point.clone().addScaledVector(s.left, side * (hw + 2.6));
@@ -633,7 +645,14 @@ export function dressRidge(ctx: ScatterCtx): DressResult {
       new THREE.BoxGeometry(2 * (hw + 2.6) + 1.6, 1.0, 1.7),
       archMat,
     );
-    lintel.position.y = 5.1; // road-relative — underside ≈4.6 m clearance
+    // Level over the HIGHER road edge — on a banked straight the cambered
+    // surface rises toward one side; clearance is measured from the tall
+    // edge so the underside still guarantees ~4.6 m.
+    const edgeHi = Math.max(
+      ctx.surfaceYAt(ai, hw),
+      ctx.surfaceYAt(ai, -hw),
+    );
+    lintel.position.y = edgeHi - s.point.y + 4.6;
     lintel.rotation.z = 0.02;
     lintel.castShadow = true;
     arch.add(lintel);
@@ -698,12 +717,13 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
   // walls + an emissive bar overhead (≥4.5 m clearance). Instanced posts,
   // bars split cyan/magenta because instanceColor can't tint emissive.
   const gateSpots: number[] = [];
-  for (const [f0, f1] of [
-    [0.08, 0.16],
-    [0.3, 0.4],
-    [0.55, 0.65],
-    [0.8, 0.9],
-  ] as const) {
+  const gateWindows =
+    ctx.setPieces?.find(
+      (p): p is SetPiece & { windows: ReadonlyArray<readonly [number, number]> } =>
+        p.kind === 'neonGates' && 'windows' in p,
+    )?.windows ??
+    ([[0.08, 0.16], [0.3, 0.4], [0.55, 0.65], [0.8, 0.9]] as const);
+  for (const [f0, f1] of gateWindows) {
     const i = ctx.straightSpot(f0, f1, (idx) => {
       const s = ctx.samples[idx];
       for (const side of [1, -1]) {
@@ -733,18 +753,24 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
     const s = ctx.samples[ai];
     const yaw = Math.atan2(s.left.x, s.left.z);
     const rot = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
+    const barY = s.point.y + 4.75; // underside ≈4.55 m over centerline
     for (const side of [1, -1]) {
       const p = s.point.clone().addScaledVector(s.left, side * (hw + 1.0));
       ctx.avoid(p, 1.2);
+      // Post seats on the cambered surface at its own lateral and stretches
+      // to reach the level bar — on a banked gate the two posts differ in
+      // height like a real gantry over a cambered road.
+      const baseY = ctx.surfaceYAt(ai, side * (hw + 1.0)) - 0.05;
+      const ph = barY + 0.2 - baseY; // top embeds 0.2 into the bar
       M.compose(
-        p.setY(s.point.y + 2.75), // base embeds ~5 cm into the skirt
+        p.setY(baseY + ph * 0.5),
         rot,
-        new THREE.Vector3(1, 1, 1),
+        new THREE.Vector3(1, Math.max(ph / 5.6, 0.3), 1),
       );
       gatePosts.setMatrixAt(pi++, M);
     }
     M.compose(
-      s.point.clone().setY(s.point.y + 4.75), // underside ≈4.55 m over road
+      s.point.clone().setY(barY),
       rot,
       new THREE.Vector3(1, 1, 1),
     );
@@ -1156,7 +1182,12 @@ export function dressNeon(ctx: ScatterCtx): DressResult {
     const s = ctx.samples[Math.floor(nSamples * 0.6)];
     return ctx.innerSide(s);
   })();
-  const railStart = ctx.straightSpot(0.52, 0.66, (i) => {
+  const railWindow =
+    ctx.setPieces?.find(
+      (p): p is SetPiece & { window: readonly [number, number] } =>
+        p.kind === 'rail' && 'window' in p,
+    )?.window ?? ([0.52, 0.66] as const);
+  const railStart = ctx.straightSpot(railWindow[0], railWindow[1], (i) => {
     const s = ctx.samples[i];
     const p = s.point.clone().addScaledVector(s.left, railSide * (ctx.hw + 5.5));
     return !ctx.excluded(p) && ctx.roadClearance(p) > 2.5;

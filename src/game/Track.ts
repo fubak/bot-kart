@@ -34,6 +34,17 @@ const UP_Y = new THREE.Vector3(0, 1, 0);
 
 // A track layout: closed Catmull-Rom control points (X, Y, Z — meters) plus
 // gravel shortcut zones (index-range aprons extending the drivable edge).
+//
+// Authored set-pieces — the landmark moments each circuit declares. Sites
+// are [frac, side] candidates: the builder tries them in order and the first
+// with real clearance wins (deterministic, no scatter-RNG draws). Windows
+// are frac ranges handed to straightSpot() for road-spanning pieces.
+export type SetPiece =
+  | { kind: 'windmill' | 'holoPylon'; sites: ReadonlyArray<readonly [number, number]> }
+  | { kind: 'stoneArch' | 'rail'; window: readonly [number, number] }
+  | { kind: 'neonGates'; windows: ReadonlyArray<readonly [number, number]> }
+  | { kind: 'billboards'; spots: ReadonlyArray<number> };
+
 export interface TrackLayout {
   readonly name: string;
   readonly points: ReadonlyArray<readonly [number, number, number]>;
@@ -42,6 +53,26 @@ export interface TrackLayout {
    *  circuit feel authored, not re-skinned: flower meadows (pastoral),
    *  rock outcrops (ridge), neon pylons (neon). */
   readonly signature?: 'pastoral' | 'ridge' | 'neon';
+  /** Banked-corner zones: frac range + degrees of camber. deg is a positive
+   *  magnitude — the sign is derived from the net turn direction inside the
+   *  zone, so the road always tilts INTO the corner. The surface is a tilt
+   *  about the centerline: surfaceY(i, lat) = point.y + lat·tan(bank). */
+  readonly banks?: ReadonlyArray<{ i0: number; i1: number; deg: number }>;
+  /** Authored item-box rows — each entry is one transverse row at `frac`
+   *  with boxes at the listed lateral offsets (m from centerline). Put rows
+   *  where they create decisions: corner entries, shortcut mouths. Lat on a
+   *  gravel apron (~hw+1.6) inside a same-side zone makes a cut-only box.
+   *  Falls back to a uniform 8×3 grid when absent. */
+  readonly itemRows?: ReadonlyArray<{
+    frac: number;
+    lats: ReadonlyArray<number>;
+  }>;
+  /** Authored boost pads [frac, lateral] — off the ideal line so they're a
+   *  route decision, not free speed. Falls back to four generic spots. */
+  readonly pads?: ReadonlyArray<readonly [number, number]>;
+  /** Authored set-pieces — landmark siting data for the signature builders.
+   *  Absent kinds fall back to the builders' built-in candidate lists. */
+  readonly setPieces?: ReadonlyArray<SetPiece>;
   /** Palette overrides — gives each circuit its own visual identity. */
   readonly theme?: {
     sky: number;    // scene background + fog
@@ -102,6 +133,31 @@ export const TRACKS: readonly TrackLayout[] = [
       { i0: 0.352, i1: 0.382, side: 1 },
     ],
     signature: 'pastoral',
+    // Banked corners — deg is magnitude; the sign follows the measured
+    // turn inside the zone so authoring can't bank against the corner.
+    banks: [
+      { i0: 0.33, i1: 0.4, deg: 8 },   // crest bend
+      { i0: 0.58, i1: 0.68, deg: 14 }, // hairpin
+    ],
+    itemRows: [
+      { frac: 0.14, lats: [-3, 0, 3] },    // back straight
+      { frac: 0.32, lats: [-2.5, 2.5] },   // crest approach — inside vs outside line
+      { frac: 0.47, lats: [-3, 0, 3] },    // S-curve exit
+      { frac: 0.575, lats: [-3.5, 0, 3.5] }, // hairpin entry — wide row
+      { frac: 0.63, lats: [7.2] },         // apron box — only the hairpin cut reaches it
+      { frac: 0.8, lats: [-3, 0, 3] },     // run home
+      { frac: 0.93, lats: [-2.5, 2.5] },
+    ],
+    pads: [
+      [0.22, -4.2], // outside on the climb into the crest
+      [0.3, 4.4],   // outside at crest exit — the dive
+      [0.62, -4.0], // inside of the hairpin complex
+      [0.88, 3.8],  // outside final bend
+    ],
+    setPieces: [
+      { kind: 'windmill', sites: [[0.22, -1], [0.5, 1], [0.78, -1], [0.36, 1]] },
+      { kind: 'billboards', spots: [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95] },
+    ],
   },
   {
     name: 'SWITCHBACK RIDGE',
@@ -127,14 +183,41 @@ export const TRACKS: readonly TrackLayout[] = [
       [-32, 0, -2],
     ],
     gravel: [
-      // Switchback at ~0.50 bends RIGHT (-0.51 rad) — inside is the right
-      // edge (-1). Tight apex cut through the S-sequence.
-      { i0: 0.485, i1: 0.535, side: -1 },
-      // Ridge dive at ~0.71 bends LEFT (+0.76 rad, sharpest on course) —
-      // inside is the left edge (+1).
-      { i0: 0.68, i1: 0.73, side: 1 },
+      // Switchback sweeper at ~0.50 bends LEFT (+1.73 rad measured) —
+      // the inside/apex cut is the LEFT edge (+1). Was -1, which put the
+      // apron on the outside of the sweeper.
+      { i0: 0.485, i1: 0.535, side: 1 },
+      // Ridge dive at ~0.71 bends RIGHT (-1.79 rad measured) — inside is
+      // the right edge (-1). Was +1.
+      { i0: 0.68, i1: 0.73, side: -1 },
     ],
     signature: 'ridge',
+    // Banked corners — deg is magnitude; sign follows the measured turn
+    // (the switchback sweeps LEFT ~120°, the dive bends right — verified
+    // by unwrapped heading deltas + cross.y on the samples).
+    banks: [
+      { i0: 0.47, i1: 0.55, deg: 16 }, // switchback sweeper (left)
+      { i0: 0.66, i1: 0.75, deg: 12 }, // ridge-dive bend (right)
+    ],
+    itemRows: [
+      { frac: 0.1, lats: [-3, 0, 3] },
+      { frac: 0.45, lats: [-3, 0, 3] },  // pre-switchback
+      { frac: 0.505, lats: [7.2] },      // apron box — left-side cut only
+      { frac: 0.7, lats: [-3, 0, 3] },   // dive entry
+      { frac: 0.71, lats: [-7.2] },      // apron box — right-side dive cut
+      { frac: 0.87, lats: [-3, 0, 3] },
+    ],
+    pads: [
+      [0.3, -4.2],  // outside the plateau climb
+      [0.52, 3.8],  // inside the switchback sweeper (left apex)
+      [0.7, 4.0],   // outside the dive entry (inside is right/-1)
+      [0.9, -4.0],  // return leg
+    ],
+    setPieces: [
+      { kind: 'stoneArch', window: [0.05, 0.16] },
+      { kind: 'windmill', sites: [[0.22, -1], [0.5, 1], [0.78, -1], [0.36, 1]] },
+      { kind: 'billboards', spots: [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95] },
+    ],
     // Golden-hour palette — dry ridge country vs Proving Grounds' blue day.
     theme: {
       sky: 0xe8b490,
@@ -180,13 +263,42 @@ export const TRACKS: readonly TrackLayout[] = [
       [-25, 0, -6],
     ],
     gravel: [
-      // Left drop after the crest (~0.56, -0.68 rad) — inside cut left.
-      // Ends before the right-lean at ~0.58 (its inside is the far side).
-      { i0: 0.53, i1: 0.565, side: 1 },
-      // Dive-to-hairpin complex (~0.72-0.78, +0.25 rad) — inside cut left.
-      { i0: 0.7, i1: 0.8, side: 1 },
+      // The real left drop is at 0.60-0.66 (+0.34 rad/8-sample peak) —
+      // the apron cuts its inside/left edge. The old 0.53-0.565 range sat
+      // on a mild RIGHT lean, so the "inside cut" was on the outside.
+      { i0: 0.585, i1: 0.66, side: 1 },
+      // Dive-to-hairpin complex bends RIGHT (-2.38 rad measured) —
+      // inside is the right edge (-1). Was +1.
+      { i0: 0.7, i1: 0.8, side: -1 },
     ],
     signature: 'neon',
+    // Banked sweepers — the speed circuit's signature: opening sweeper
+    // (right), the left drop, and the dive-to-hairpin complex (right).
+    banks: [
+      { i0: 0.13, i1: 0.24, deg: 10 }, // opening sweeper (right)
+      { i0: 0.58, i1: 0.67, deg: 12 }, // left drop — was mis-sited on a straight
+      { i0: 0.68, i1: 0.8, deg: 12 },  // dive complex (right)
+    ],
+    itemRows: [
+      { frac: 0.08, lats: [-3, 0, 3] },
+      { frac: 0.5, lats: [-3, 0, 3] },   // pre-drop
+      { frac: 0.62, lats: [7.2] },       // apron box — left-drop cut
+      { frac: 0.68, lats: [-3, 0, 3] },  // pre-dive
+      { frac: 0.75, lats: [-7.2] },      // apron box — dive cut (inside right)
+      { frac: 0.9, lats: [-3, 0, 3] },
+    ],
+    pads: [
+      [0.2, -4.0],  // outside the first sweeper
+      [0.62, 4.2],  // inside the left drop
+      [0.74, -4.0], // inside the dive (right apex)
+      [0.9, -4.0],  // home stretch
+    ],
+    setPieces: [
+      { kind: 'neonGates', windows: [[0.08, 0.16], [0.3, 0.4], [0.55, 0.65], [0.8, 0.9]] },
+      { kind: 'rail', window: [0.52, 0.66] },
+      { kind: 'holoPylon', sites: [[0.44, 1], [0.31, -1], [0.62, 1]] },
+      { kind: 'billboards', spots: [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95] },
+    ],
     // Night palette: navy sky, dim grass, dark pines, cool moonlight.
     theme: {
       sky: 0x141c30,
@@ -284,6 +396,12 @@ export class Track {
   private readonly samples: Sample[] = [];
   private readonly gravelZones: TrackLayout['gravel'];
   private readonly signature: TrackLayout['signature'];
+  private readonly layout: TrackLayout;
+  /** tan(bank angle) per sample — banked-corner cross-slope. The road
+   *  surface at lateral L is point.y + L·bankTan[i]: positive banks the
+   *  left edge up (right-hand corner). Authored via layout.banks with the
+   *  sign auto-derived from the turn direction inside each zone. */
+  private readonly bankTan = new Float32Array(TRACK.samples);
   // Exclusion anchors for prop scatter: the grandstand footprint and the
   // title-camera orbit ring around the player spawn. `avoidPts` collects
   // authored-prop footprints (billboards, arches, gate posts) so scattered
@@ -294,6 +412,7 @@ export class Track {
 
   constructor(layout: TrackLayout = TRACKS[0]) {
     this.name = layout.name;
+    this.layout = layout;
     this.gravelZones = layout.gravel;
     this.signature = layout.signature;
     this.theme = layout.theme ?? {
@@ -349,6 +468,80 @@ export class Track {
       const left = new THREE.Vector3(tangent.z, 0, -tangent.x);
       this.samples.push({ point, tangent, left });
     }
+    this.buildBankTan();
+  }
+
+  /** Resolve layout.banks into per-sample tan(bank). The zone's `deg` is a
+   *  magnitude — the sign comes from the net heading change inside the
+   *  zone (unwrapped atan2 deltas: positive = left turn → inside/left edge
+   *  dips → negative tan), so an authored zone always banks INTO its corner
+   *  even if control points move later. Zone edges get a ~15-sample
+   *  smoothstep ramp so the surface never creases. */
+  private buildBankTan(): void {
+    const n = this.samples.length;
+    const banks = this.layout.banks;
+    if (!banks?.length) return;
+    const ramp = Math.floor(n * 0.015);
+    const seen = new Uint8Array(n);
+    const unwrap = (i: number) =>
+      Math.atan2(
+        this.samples[((i % n) + n) % n].tangent.x,
+        this.samples[((i % n) + n) % n].tangent.z,
+      );
+    for (const z of banks) {
+      const i0 = Math.floor(z.i0 * n);
+      const i1 = Math.ceil(z.i1 * n);
+      if (i1 - i0 < ramp * 2 + 2 || z.i0 < 0.04 || z.deg > 20) {
+        console.warn(`[track] skipped invalid bank zone`, z);
+        continue;
+      }
+      // Net turn: sum wrapped heading deltas across the zone.
+      let turn = 0;
+      let prev = unwrap(i0);
+      for (let i = i0 + 1; i <= i1; i++) {
+        const a = unwrap(i);
+        let d = a - prev;
+        if (d > Math.PI) d -= Math.PI * 2;
+        if (d < -Math.PI) d += Math.PI * 2;
+        turn += d;
+        prev = a;
+      }
+      // left = +z of the tangent frame; a left turn (turn > 0) dips the
+      // inside/left edge → negative tan; right turn → positive.
+      const tan = Math.tan(THREE.MathUtils.degToRad(turn > 0 ? -z.deg : z.deg));
+      for (let i = i0; i <= i1; i++) {
+        const idx = ((i % n) + n) % n;
+        if (seen[idx]) continue; // first zone wins — overlaps mis-authored
+        seen[idx] = 1;
+        const w = Math.min(
+          THREE.MathUtils.smoothstep(i - i0, 0, ramp),
+          THREE.MathUtils.smoothstep(i1 - i, 0, ramp),
+        );
+        this.bankTan[idx] = tan * w;
+      }
+    }
+  }
+
+  /** Signed bank angle (rad) at a sample index — flat meshes that must lie
+   *  on the camber roll about the local tangent by this. */
+  bankAngleAt(index: number): number {
+    const n = this.samples.length;
+    const i = ((index % n) + n) % n;
+    return Math.atan(this.bankTan[i]);
+  }
+
+  /** Banked road-surface height at sample `index`, `lateral` metres from
+   *  the centerline (positive = road-left). The camber breaks at the road
+   *  edge on apron sides — the apron is level at edge height. */
+  surfaceYAt(index: number, lateral: number): number {
+    const n = this.samples.length;
+    const i = ((index % n) + n) % n;
+    const z = this.zoneAt(i);
+    const lat =
+      z && Math.sign(lateral) === z.side && Math.abs(lateral) > TRACK.roadHalfWidth
+        ? z.side * TRACK.roadHalfWidth
+        : lateral;
+    return this.samples[i].point.y + lat * this.bankTan[i];
   }
 
   /** Nearest centerline sample index — linear scan, cheap at 1024 samples. */
@@ -486,6 +679,25 @@ export class Track {
     return z.side * (TRACK.roadHalfWidth + TRACK.gravelWidth * 0.35);
   }
 
+  /** Drivable lateral limit (m from centerline) at a sample index on the
+   *  given side — the wall face normally, extended onto the apron inside
+   *  a same-side gravel zone. Same rule constrain() applies. */
+  roadLimitAt(index: number, side: number): number {
+    const z = this.zoneAt(index);
+    const base = TRACK.roadHalfWidth - 0.75;
+    return z && Math.sign(side) === z.side ? base + TRACK.gravelWidth : base;
+  }
+
+  /** Authored item-box rows (falls back to a uniform grid when absent). */
+  get itemRows(): TrackLayout['itemRows'] {
+    return this.layout.itemRows;
+  }
+
+  /** Authored boost pads (falls back to generic spots when absent). */
+  get pads(): TrackLayout['pads'] {
+    return this.layout.pads;
+  }
+
   /** Surface under a position: 'gravel' on shortcut aprons, else 'road'. */
   surfaceAt(pos: THREE.Vector3, hint?: number): 'road' | 'gravel' {
     const i =
@@ -617,7 +829,9 @@ export class Track {
   }
 
   /** Road surface height at a world position — projects onto the two
-   *  centerline segments adjacent to the nearest sample and interpolates. */
+   *  centerline segments adjacent to the nearest sample and interpolates.
+   *  Bank-aware: adds lateral·tan(bank) measured from the projected point,
+   *  so the cambered surface height is exact across the road width. */
   heightAt(pos: THREE.Vector3, hint?: number): number {
     const n = this.samples.length;
     const i =
@@ -626,6 +840,9 @@ export class Track {
         : this.nearestIndexNear(pos, hint);
     let bestY = this.samples[i].point.y;
     let bestD = Infinity;
+    let bestLat = 0;
+    let bestTan = 0;
+    let bestSeg = i;
     for (const [a, b] of [
       [i, (i + 1) % n],
       [(i - 1 + n) % n, i],
@@ -644,9 +861,28 @@ export class Track {
       if (d < bestD) {
         bestD = d;
         bestY = pa.y + (pb.y - pa.y) * t;
+        // Lateral from the projected point onto the interpolated left dir.
+        const lx = this.samples[a].left.x + (this.samples[b].left.x - this.samples[a].left.x) * t;
+        const lz = this.samples[a].left.z + (this.samples[b].left.z - this.samples[a].left.z) * t;
+        bestLat = (pos.x - px) * lx + (pos.z - pz) * lz;
+        bestTan = this.bankTan[a] + (this.bankTan[b] - this.bankTan[a]) * t;
+        bestSeg = a;
       }
     }
-    return bestY;
+    // Camber breaks at the road edge on an apron side — past it the real
+    // surface is level at edge height, so a kart on the gravel doesn't
+    // ride the extrapolated slope into the air (or under it on the low
+    // side). Off-apron overshoot keeps the slope: the embankment skirt
+    // follows it visually, so the contact height stays plausible there.
+    const z =
+      Math.abs(bestLat) > TRACK.roadHalfWidth
+        ? this.zoneAt(bestSeg) ?? this.zoneAt((bestSeg + 1) % n)
+        : null;
+    const effLat =
+      z && Math.sign(bestLat) === z.side
+        ? z.side * TRACK.roadHalfWidth
+        : bestLat;
+    return bestY + effLat * bestTan;
   }
 
   /** Grid slot: `backSamples` behind the start line, `lateral` offset (m). */
@@ -691,9 +927,10 @@ export class Track {
     const vTile = 6;
     for (let i = 0; i <= n; i++) {
       const s = this.samples[i % n];
+      const bt = this.bankTan[i % n]; // camber: surfaceY = point.y + lat·bt
       roadPos.push(
-        s.point.x + s.left.x * hw, s.point.y, s.point.z + s.left.z * hw,
-        s.point.x - s.left.x * hw, s.point.y, s.point.z - s.left.z * hw,
+        s.point.x + s.left.x * hw, s.point.y + hw * bt, s.point.z + s.left.z * hw,
+        s.point.x - s.left.x * hw, s.point.y - hw * bt, s.point.z - s.left.z * hw,
       );
       const v = (i * spacing) / vTile;
       roadUv.push(0, v, 1, v);
@@ -743,15 +980,25 @@ export class Track {
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
+    const curbRoll = new THREE.Quaternion();
     for (let c = 0; c < curbCount; c++) {
-      const s = this.samples[(c * 8) % n];
+      const ci = (c * 8) % n;
+      const s = this.samples[ci];
+      // Yaw then roll about the tangent by the camber so the plank lies
+      // flat on a banked surface instead of knifing into it.
       q.setFromAxisAngle(up, Math.atan2(s.tangent.x, s.tangent.z) + Math.PI / 2);
+      curbRoll.setFromAxisAngle(s.tangent, Math.atan(this.bankTan[ci]));
+      q.premultiply(curbRoll);
       for (const [mesh, side] of [
         [curbsL, 1],
         [curbsR, -1],
       ] as const) {
+        const lat = side * (hw - 0.4);
         m.compose(
-          s.point.clone().addScaledVector(s.left, side * (hw - 0.4)).setY(s.point.y + 0.03),
+          s.point
+            .clone()
+            .addScaledVector(s.left, lat)
+            .setY(s.point.y + lat * this.bankTan[ci] + 0.03),
           q,
           new THREE.Vector3(1, 1, 1),
         );
@@ -798,20 +1045,24 @@ export class Track {
       const railIdx: number[] = [];
       for (let i = 0; i <= n; i++) {
         const s = this.samples[i % n];
+        const bt = this.bankTan[i % n];
         const z = this.zoneAt(i % n);
         const gapped = !!z && z.side === side;
         const bx = s.point.x + s.left.x * side * off;
         const bz = s.point.z + s.left.z * side * off;
         const fx = s.point.x + s.left.x * side * offFoot;
         const fz = s.point.z + s.left.z * side * offFoot;
-        // Embankment surface at the footing lateral (same slope the skirt
-        // ribbons draw): lerp roadY → grade over the 6 m shoulder band.
+        // Wall base rides the cambered surface at its own lateral; the
+        // footing still dives to grade over the shoulder band, now from
+        // the banked edge height rather than the centerline.
+        const wy = s.point.y + side * off * bt;
         const ft = Math.min((offFoot - (hw - 0.1)) / 6, 1);
-        const fy = THREE.MathUtils.lerp(s.point.y, -0.1, ft) - 0.08;
+        const fy =
+          THREE.MathUtils.lerp(s.point.y + side * (hw - 0.1) * bt, -0.1, ft) - 0.08;
         const base = wallPos.length / 3;
         const rbase = railPos.length / 3;
-        wallPos.push(fx, fy, fz, bx, s.point.y - 0.02, bz, bx, s.point.y + h, bz);
-        railPos.push(bx, s.point.y + h - 0.16, bz, bx, s.point.y + h, bz);
+        wallPos.push(fx, fy, fz, bx, wy - 0.02, bz, bx, wy + h, bz);
+        railPos.push(bx, wy + h - 0.16, bz, bx, wy + h, bz);
         // Emit quads only when this AND the next sample are both ungapped.
         if (i < n) {
           const zNext = this.zoneAt((i + 1) % n);
@@ -872,12 +1123,17 @@ export class Track {
       const drop = hw + TRACK.gravelWidth + 1.8;
       for (let i = i0; i <= i1; i++) {
         const s = this.samples[i];
+        const bt = this.bankTan[i];
         const a = (i - i0) * 3;
         const dt = Math.min((drop - (hw - 0.1)) / 6, 1);
-        const dy = THREE.MathUtils.lerp(s.point.y, -0.1, dt) - 0.06;
+        // Camber breaks at the road edge: the apron runs out level at the
+        // banked edge height. Continuing the camber across 3.6 m raised the
+        // drop face ~1 m past the edge on the high side — a dirt cliff.
+        const edgeY = s.point.y + z.side * hw * bt;
+        const dy = THREE.MathUtils.lerp(edgeY, -0.1, dt) - 0.06;
         gPos.push(
-          s.point.x + s.left.x * z.side * inner, s.point.y - 0.015, s.point.z + s.left.z * z.side * inner,
-          s.point.x + s.left.x * z.side * flat, s.point.y - 0.03, s.point.z + s.left.z * z.side * flat,
+          s.point.x + s.left.x * z.side * inner, s.point.y + z.side * inner * bt - 0.015, s.point.z + s.left.z * z.side * inner,
+          s.point.x + s.left.x * z.side * flat, edgeY - 0.03, s.point.z + s.left.z * z.side * flat,
           s.point.x + s.left.x * z.side * drop, dy, s.point.z + s.left.z * z.side * drop,
         );
         const v = (i * spacing) / 3;
@@ -907,13 +1163,16 @@ export class Track {
       const bq = new THREE.Quaternion();
       const bup = new THREE.Vector3(0, 1, 0);
       for (let c = 0; c < bermCount; c++) {
-        const s = this.samples[i0 + c * 4];
+        const si = i0 + c * 4;
+        const s = this.samples[si];
         bq.setFromAxisAngle(bup, Math.atan2(s.tangent.x, s.tangent.z) + Math.PI / 2);
         // Seat at the apron drop-face toe (critic10 D1): the old
-        // s.point.y+0.05 left berms floating beside elevated legs.
+        // s.point.y+0.05 left berms floating beside elevated legs. Banked:
+        // the toe height follows the level apron edge down to grade.
         const bl = drop + 0.6;
         const bt = Math.min((bl - (hw - 0.1)) / 6, 1);
-        const by = THREE.MathUtils.lerp(s.point.y, -0.1, bt) + 0.06;
+        const by =
+          THREE.MathUtils.lerp(s.point.y + z.side * hw * this.bankTan[si], -0.1, bt) + 0.06;
         bm.compose(
           s.point.clone().addScaledVector(s.left, z.side * bl).setY(by),
           bq,
@@ -943,8 +1202,13 @@ export class Track {
       const outer = hw + 6;
       for (let i = 0; i <= n; i++) {
         const s = this.samples[i % n];
+        const bt = this.bankTan[i % n];
+        // Inner edge seats on the banked road edge, not the centerline —
+        // otherwise a cambered section leaves a wedge of skirt showing
+        // on the low side and a gap on the high side.
+        const edgeY = s.point.y + side * inner * bt;
         skPos.push(
-          s.point.x + s.left.x * side * inner, s.point.y, s.point.z + s.left.z * side * inner,
+          s.point.x + s.left.x * side * inner, edgeY, s.point.z + s.left.z * side * inner,
           // Outer edge meets the grade plane (-0.1) exactly — the old -0.35
           // dipped under the field so flat legs showed a ditch ring instead
           // of a shoulder that reaches grade (critic10 D1).
@@ -978,6 +1242,15 @@ export class Track {
     );
     stripe.rotation.x = -Math.PI / 2;
     stripe.rotation.z = -Math.atan2(s0.tangent.x, s0.tangent.z) + Math.PI / 2;
+    // If sample 0 ever sits inside a bank zone, tilt the stripe onto the
+    // camber (authored zones avoid frac 0, so this is a robustness guard).
+    if (this.bankTan[0] !== 0) {
+      const roll = new THREE.Quaternion().setFromAxisAngle(
+        s0.tangent,
+        Math.atan(this.bankTan[0]),
+      );
+      stripe.quaternion.premultiply(roll);
+    }
     stripe.position.copy(s0.point).setY(s0.point.y + 0.03); // above road, below wheels
     this.group.add(stripe);
 
@@ -1078,19 +1351,24 @@ export class Track {
       const wallSide = rightTurn ? 1 : -1;
       // 3 boards staggered across the corner entry.
       for (let b = 0; b < 3; b++) {
-        const s = this.samples[(i + b * 6) % n];
+        const bi = (i + b * 6) % n;
+        const s = this.samples[bi];
+        // On banked corners the wall top rides the camber — chevrons track
+        // the wall-face height (off = hw+0.05), not the centerline.
+        const baseY =
+          s.point.y + wallSide * (hw + 0.05) * this.bankTan[bi];
         const board = new THREE.Mesh(chevGeo, chevMat);
         const arrow = new THREE.Mesh(arrowGeo, arrowMat);
         board.position
           .copy(s.point)
           .addScaledVector(s.left, wallSide * (hw + 0.8))
-          .setY(s.point.y + TRACK.wallHeight + 0.75);
+          .setY(baseY + TRACK.wallHeight + 0.75);
         // Face the approaching driver — normal points back along tangent.
         board.rotation.y = Math.atan2(-s.tangent.x, -s.tangent.z);
         board.castShadow = true;
         const post = new THREE.Mesh(chevPostGeo, chevMat);
         post.position.copy(board.position).setY(
-          s.point.y + (TRACK.wallHeight + 1.0) / 2 - 0.1,
+          baseY + (TRACK.wallHeight + 1.0) / 2 - 0.1,
         );
         post.rotation.y = board.rotation.y;
         arrow.position.copy(board.position);
@@ -1282,20 +1560,35 @@ export class Track {
 
   /** Terrain height under a world point: skirt lerp measured from the leg
    *  actually beneath the prop — folded legs at different elevations made
-   *  source-sample heights float props (critic8 D9 floated boards). */
+   *  source-sample heights float props (critic8 D9 floated boards).
+   *  Bank-aware: the shoulder starts at the banked road/apron edge height,
+   *  not the centerline. */
   private fieldY(p: THREE.Vector3): number {
     const i = this.nearestIndex(p);
     const { lateral } = this.query(p, i);
     const s = this.samples[i];
+    const side = Math.sign(lateral) || 1;
+    const z = this.zoneAt(i);
+    // The drivable edge on the prop's side: the apron drop toe on a zone
+    // side (flat to hw+gw+0.2, then 1.8 m down to grade), else the skirt
+    // top at the road edge. The drop/skirt begins at the banked ROAD-EDGE
+    // height — the apron levels there, so the camber must not extend to
+    // edgeLat (that lifted the toe ~1 m on the high side).
+    const onZone = z !== null && z.side === side;
+    const edgeLat = onZone
+      ? TRACK.roadHalfWidth + TRACK.gravelWidth + 0.2
+      : TRACK.roadHalfWidth - 0.1;
+    const drop = onZone ? 1.8 : 6.1;
+    const edgeY = s.point.y + side * TRACK.roadHalfWidth * this.bankTan[i];
     const t = THREE.MathUtils.clamp(
-      (Math.abs(lateral) - TRACK.roadHalfWidth) / 6,
+      (Math.abs(lateral) - edgeLat) / drop,
       0,
       1,
     );
     // Grade target -0.1 matches the skirt's outer edge / field plane; the
     // +0.1 keeps prop bases ~0.1 proud (identical to the old formula at both
     // ends — -0.35+0.35 = -0.1+0.1 = 0 — only mid-slope seats tighter).
-    return THREE.MathUtils.lerp(s.point.y, -0.1, t) + 0.1;
+    return THREE.MathUtils.lerp(edgeY, -0.1, t) + 0.1;
   }
 
   /** Straightest sample index within frac range [f0,f1] passing `ok` —
@@ -1354,6 +1647,7 @@ export class Track {
       },
       avoid: (p, r) => this.avoidPts.push({ p: p.clone(), r }),
       fieldY: (p) => this.fieldY(p),
+      surfaceYAt: (i, lat) => this.surfaceYAt(i, lat),
       innerSide: (s) =>
         s.left.x * (centroid.x - s.point.x) +
           s.left.z * (centroid.z - s.point.z) >=
@@ -1361,6 +1655,7 @@ export class Track {
           ? 1
           : -1,
       straightSpot: (f0, f1, ok) => this.straightSpot(f0, f1, ok),
+      setPieces: this.layout.setPieces,
     };
     const dressed =
       this.signature === 'pastoral'
@@ -1498,7 +1793,9 @@ export class Track {
           const p = s.point.clone().addScaledVector(s.left, side * (hw + 1.1));
           if (this.nearStart(p)) continue;
           m.compose(
-            p.setY(s.point.y + 1.2),
+            // On the shoulder just past the wall — fieldY is bank-aware,
+            // so pylons stay planted on cambered embankments.
+            p.setY(this.fieldY(p) + 1.2),
             new THREE.Quaternion(),
             new THREE.Vector3(1, 1, 1),
           );
@@ -1528,13 +1825,15 @@ export class Track {
       const scanTex = new THREE.CanvasTexture(scanCv);
       scanTex.colorSpace = THREE.SRGBColorSpace;
       scanTex.wrapT = THREE.RepeatWrapping;
-      // Site it roadside on a straight-ish stretch — fixed candidates, first
-      // one clearing the drivable edge wins (deterministic, no rand draws).
-      for (const [f, sd] of [
-        [0.44, 1],
-        [0.31, -1],
-        [0.62, 1],
-      ] as const) {
+      // Site it roadside on a straight-ish stretch — layout-authored
+      // candidates, first one clearing the drivable edge wins.
+      const holoSites =
+        this.layout.setPieces?.find(
+          (p): p is SetPiece & { sites: ReadonlyArray<readonly [number, number]> } =>
+            p.kind === 'holoPylon' && 'sites' in p,
+        )?.sites ??
+        ([[0.44, 1], [0.31, -1], [0.62, 1]] as const);
+      for (const [f, sd] of holoSites) {
         const s = this.samples[Math.floor(f * n)];
         const p = s.point.clone().addScaledVector(s.left, sd * (hw + 3.4));
         if (this.nearStart(p) || this.nearStand(p) || this.roadClearance(p) < 1.8)
@@ -1613,12 +1912,13 @@ export class Track {
     const n = this.samples.length;
     let s: Sample | null = null;
     let side = 1;
-    for (const [f, sd] of [
-      [0.22, -1],
-      [0.5, 1],
-      [0.78, -1],
-      [0.36, 1],
-    ] as const) {
+    const sites =
+      this.layout.setPieces?.find(
+        (p): p is SetPiece & { sites: ReadonlyArray<readonly [number, number]> } =>
+          p.kind === 'windmill' && 'sites' in p,
+      )?.sites ??
+      ([[0.22, -1], [0.5, 1], [0.78, -1], [0.36, 1]] as const);
+    for (const [f, sd] of sites) {
       const c = this.samples[Math.floor(f * n)];
       const p = c.point.clone().addScaledVector(c.left, sd * (hw + 16));
       if (!this.nearStart(p) && !this.nearStand(p) && this.roadClearance(p) > 9) {
@@ -1868,7 +2168,11 @@ export class Track {
   /** Sponsor billboards around the circuit — generated poster art. */
   private buildBillboards(hw: number): void {
     const n = this.samples.length;
-    const spots = [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95];
+    const spots =
+      this.layout.setPieces?.find(
+        (p): p is SetPiece & { spots: ReadonlyArray<number> } =>
+          p.kind === 'billboards' && 'spots' in p,
+      )?.spots ?? [0.12, 0.3, 0.45, 0.58, 0.72, 0.86, 0.95];
     const postMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.8 });
     // Lifted off void-black — a barely-visible dark rim vs a light-swallowing
     // slab where the poster back loses the depth test at range (critic9).

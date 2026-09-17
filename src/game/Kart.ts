@@ -1045,8 +1045,10 @@ export class Kart {
     this.group.rotation.order = 'YXZ'; // yaw-dominant: pitch/roll after heading
     this.group.rotation.y = this.heading;
     // Pitch/roll the whole kart to the road grade — sells the elevation.
+    // 0.85 roll factor: banked corners read as true camber — the kart
+    // visibly tilts onto the banking instead of floating level over it.
     this.group.rotation.x = this.slopePitch * 0.7;
-    this.group.rotation.z = -this.slopeRoll * 0.6;
+    this.group.rotation.z = -this.slopeRoll * 0.85;
     this.wheelSpin += (this.forwardSpeed / KART.wheelRadius) * this.lastDt;
     for (const w of this.wheels) w.rotation.x = this.wheelSpin;
     for (const w of this.glbWheels) {

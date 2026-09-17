@@ -53,6 +53,46 @@ full 3-leg GP + gamepad-only results navigation verified end-to-end.
 Close-out record: `evidence/wave19/CRITIC19_REPORT.md`,
 `QUALITY_UNITS.md` FIX-001…010, `RELEASE_EVIDENCE.md` final section.
 
+## Wave 23 — track authoring pass (banking, homing, authored items)
+
+Resolves the six study findings (track-agnostic pads, centerline missiles,
+no banking, centerline-only elevation, shared prop grammar, unavoidable
+uniform item rows):
+
+- `TrackLayout` gains `banks` / `itemRows` / `pads` / `setPieces` —
+  every circuit now owns its authored content.
+- **Banking:** per-sample `bankTan` from authored zones; sign derived from
+  measured turn direction (unwrapped heading deltas) so zones can't bank
+  against the corner. `surfaceYAt`/`heightAt` are lateral-aware
+  (`y = centerY + lat·tan`); road/curbs/walls/rails/aprons/berms/skirts/
+  stripe/chevrons/pylons all ride the camber. Kart `slopeRoll` follows
+  for free; chase cam adds a damped bank roll.
+- **Camber break:** gravel aprons level at the road-edge height past `hw`
+  (extends fixed: apron drop-face cliff on the high side; `heightAt`,
+  `surfaceYAt`, `fieldY`, chevron bases all clamp to the edge on zone
+  sides). Kart-on-apron grounding verified live.
+- **Apron audit fix:** SR's two zones + NN's two zones were authored on
+  the OUTSIDE of their bends (measured via unwrapped heading + cross.y);
+  all four flipped/moved to the true inside cut. NN's "crest drop" bank
+  re-sited onto the real left corner (0.58–0.67).
+- **Homing missiles:** lock the nearest score-ahead racer, steer laterally
+  (≤10 m/s) to its live lateral within `roadLimitAt` (apron-capable),
+  drop the lock when the target is >22% of the lap ahead or overshot —
+  then fly the line. Range 90→130 m. Verified: chased a cornering target
+  off-line and hit; apron victim reached from the racing line.
+- **Authored item rows** place boxes at decision points incl. apron-only
+  pickups (±7.2 inside the cut); pads authored per track and tilted to
+  the camber.
+- **Set pieces:** neon gates, elevated rail, stone arch, holo pylons,
+  windmills, billboards consume `layout.setPieces` with legacy defaults;
+  gate/arch footings are bank-aware (clear the high edge).
+
+Verified: tsc+vite build clean; ai-smoke 9/9 finishes, 0 wall hits, 0
+stalls, lap times unchanged (PG 22.7/19.3/18.1 · SR 26.4/22.5/21.6 ·
+NN 25.5/21.6/20.9); live shots of banked SR sweeper, PG hairpin, NN
+left-drop+gate; missile homing hit logged; NN 75 fps / p95 14.0 /
+p99 14.4 / worst 15.5 (290 draws); console 0E/0W.
+
 ---
 
 ## Active Managed Devins
