@@ -25,6 +25,9 @@ function gauntletState(): Plugin {
 }
 
 export default defineConfig({
+  // GitHub Pages serves the site under /bot-kart/ — the env gate keeps
+  // dev server and `vite preview` rooted at '/'.
+  base: process.env.GITHUB_PAGES === 'true' ? '/bot-kart/' : '/',
   plugins: [gauntletState()],
   build: {
     // three.js minifies to ~610 kB and can't shrink via chunking — the
