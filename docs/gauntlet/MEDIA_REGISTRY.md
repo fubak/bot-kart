@@ -203,3 +203,7 @@ into the game/marketing.
   robot mascot + text rendered cleanly.
 - **Downstream Use:** billboard panels along each circuit (Track.ts).
 - **Critic Result:** accepted — legible, on-brand, no IP issues.
+- **Rebrand (2026-09-17):** `bb-grokkart` replaced by `bb-grokbotkart` —
+  `image_edit` on the original poster swapping only the logo text to
+  "GROK BOT KART" (prompt archive `2026-09-17_billboard-rename_v1.md`).
+  Artwork, palette, and tagline unchanged; re-sized to 1024×576.

@@ -181,7 +181,7 @@ export class RaceHud {
     this.titleEl.innerHTML =
       `<div style="font-size:64px;font-weight:900;letter-spacing:.06em;` +
       `background:linear-gradient(180deg,#fff,#7be8ff);-webkit-background-clip:text;` +
-      `-webkit-text-fill-color:transparent">GROK KART</div>` +
+      `-webkit-text-fill-color:transparent">GROK BOT KART</div>` +
       `<div style="font-size:15px;color:#c9d8ec;margin-top:6px">a grok bots racing game</div>` +
       `<div style="font-size:26px;font-weight:800;margin-top:26px;color:#ffe28a">` +
       `PRESS ENTER</div>` +

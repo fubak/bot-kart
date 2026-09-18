@@ -6,7 +6,7 @@ import gravelUrl from '../../assets/textures/gravel_tile.png?url';
 import cloudUrl from '../../assets/textures/cloud_sprite.png?url';
 import smokeUrl from '../../assets/textures/smoke_puff.png?url';
 import crowdUrl from '../../assets/textures/crowd.png?url';
-import bbAUrl from '../../assets/textures/billboard_grokkart.png?url';
+import bbAUrl from '../../assets/textures/billboard_grokbotkart.png?url';
 import bbBUrl from '../../assets/textures/billboard_turbo.png?url';
 import bbCUrl from '../../assets/textures/billboard_botpower.png?url';
 
