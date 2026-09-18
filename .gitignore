@@ -40,6 +40,14 @@ nul
 !.vscode/extensions.json
 !.vscode/settings.json
 .idea/
+*.code-workspace
+
+# Blender auto-backups (.blend source stays tracked — see NOTE below)
+*.blend[0-9]*
+
+# Gauntlet harness captured output (scripts stay tracked, dumps don't)
+__gauntlet/*.txt
+__gauntlet/*-profile.json
 
 # NOTE: intentionally NOT ignored — these are project source of truth:
 #   docs/gauntlet/          (gauntlet state, registries, specs)
